@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "Diaconia Mobile",
+    "slug": "diaconia-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "diaconiafield",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "py.org.diaconia.mobile"
+    },
+    "android": {
+      "package": "py.org.diaconia.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#2e3192"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Diaconia usa fotos para perfiles y evidencia de reuniones.",
+          "cameraPermission": "Diaconia usa la camara para capturar perfiles y fotos de reuniones."
+        }
+      ]
+    ]
+  }
+}

@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+import {
+  createMediaUploadInputSchema,
+  createSessionInputSchema,
+  formatDisplayDate,
+} from "./index";
+
+describe("shared validation", () => {
+  it("accepts a valid offline session payload", () => {
+    const parsed = createSessionInputSchema.parse({
+      id: "2e249c51-14ea-4c5a-85fa-3f7adcd8359a",
+      groupId: "e69a495f-b594-4985-9a72-6683bb427bbf",
+      heldAt: "2026-05-12T14:30:00.000Z",
+      attendance: [
+        {
+          attendeeId: "8ba2f986-78c1-433b-9a87-a9cb73b7878b",
+          status: "present",
+        },
+      ],
+    });
+
+    expect(parsed.followUpCategory).toBe("none");
+  });
+
+  it("limits uploaded images to known image types", () => {
+    expect(() =>
+      createMediaUploadInputSchema.parse({
+        type: "meeting_photo",
+        contentType: "application/pdf",
+        byteSize: 1024,
+      }),
+    ).toThrow();
+  });
+
+  it("formats dates for Paraguay Spanish by default", () => {
+    expect(formatDisplayDate("2026-05-12T14:30:00.000Z")).toContain("2026");
+  });
+});

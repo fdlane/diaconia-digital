@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.turbo/
+.next/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+.expo/
+.expo-shared/
+ios/
+android/
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
