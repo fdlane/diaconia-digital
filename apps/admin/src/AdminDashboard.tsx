@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDisplayDate } from "@diaconia/shared";
+import { formatDisplayDate, labels, type SupportedLocale } from "@diaconia/shared";
 import { useEffect, useMemo, useState } from "react";
 
 type AdminSession = {
@@ -21,9 +21,20 @@ type SessionMedia = {
   url: string;
 };
 
+type AdminSessionsResponse = {
+  sessions: AdminSession[];
+  warning?: string;
+};
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+const localeStorageKey = "diaconia:admin:locale";
+const localeOptions = [
+  { locale: "es", label: "ES" },
+  { locale: "en", label: "EN" },
+] as const;
 
 export function AdminDashboard() {
+  const [locale, setLocale] = useState<SupportedLocale>("es");
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [mediaBySession, setMediaBySession] = useState<Record<string, SessionMedia[]>>({});
   const [token, setToken] = useState("");
@@ -33,7 +44,8 @@ export function AdminDashboard() {
     from: "",
     to: "",
   });
-  const [status, setStatus] = useState("Listo");
+  const copy = labels[locale];
+  const [status, setStatus] = useState(copy.ready);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -46,7 +58,7 @@ export function AdminDashboard() {
   }, [filters]);
 
   async function loadSessions() {
-    setStatus("Cargando sesiones");
+    setStatus(copy.loadingSessions);
     const requestInit = token
       ? {
           headers: {
@@ -57,11 +69,14 @@ export function AdminDashboard() {
     const response = await fetch(`${apiUrl}/admin/sessions${query ? `?${query}` : ""}`, requestInit);
 
     if (!response.ok) {
-      setStatus(`Error ${response.status}`);
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; detail?: string }
+        | null;
+      setStatus(payload?.detail ?? payload?.error ?? `Error ${response.status}`);
       return;
     }
 
-    const payload = (await response.json()) as { sessions: AdminSession[] };
+    const payload = (await response.json()) as AdminSessionsResponse;
     setSessions(payload.sessions);
     const mediaEntries = await Promise.all(
       payload.sessions.slice(0, 20).map(async (session) => {
@@ -76,7 +91,13 @@ export function AdminDashboard() {
       }),
     );
     setMediaBySession(Object.fromEntries(mediaEntries));
-    setStatus(`${payload.sessions.length} sesiones`);
+    setStatus(payload.warning ?? `${payload.sessions.length} ${copy.sessions}`);
+  }
+
+  function updateLocale(nextLocale: SupportedLocale) {
+    setLocale(nextLocale);
+    setStatus(labels[nextLocale].ready);
+    window.localStorage.setItem(localeStorageKey, nextLocale);
   }
 
   function exportCsv() {
@@ -109,6 +130,11 @@ export function AdminDashboard() {
   }
 
   useEffect(() => {
+    const storedLocale = window.localStorage.getItem(localeStorageKey);
+    if (storedLocale === "es" || storedLocale === "en") {
+      setLocale(storedLocale);
+      setStatus(labels[storedLocale].ready);
+    }
     void loadSessions();
   }, []);
 
@@ -116,27 +142,44 @@ export function AdminDashboard() {
     <main className="shell">
       <header className="topbar">
         <div className="brand">
-          <strong>Diaconia Admin</strong>
-          <span>Sesiones de campo y asistencia</span>
+          <img alt="Diaconia" className="brand-logo" src="/logo.png" />
+          <div>
+            <span>{copy.adminSubtitle}</span>
+          </div>
         </div>
-        <button className="secondary" onClick={exportCsv} type="button">
-          Exportar CSV
-        </button>
+        <div className="topbar-actions">
+          <div className="language-switch" aria-label="Language">
+            {localeOptions.map((option) => (
+              <button
+                aria-pressed={locale === option.locale}
+                className={locale === option.locale ? "active" : ""}
+                key={option.locale}
+                onClick={() => updateLocale(option.locale)}
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <button className="secondary" onClick={exportCsv} type="button">
+            {copy.exportCsv}
+          </button>
+        </div>
       </header>
 
       <section className="content">
-        <div className="toolbar" aria-label="Filtros">
+        <div className="toolbar" aria-label={copy.filters}>
           <div className="field">
-            <label htmlFor="token">Token Cognito</label>
+            <label htmlFor="token">{copy.cognitoToken}</label>
             <input
               id="token"
               onChange={(event) => setToken(event.target.value)}
-              placeholder="Bearer token para ambiente real"
+              placeholder={copy.tokenPlaceholder}
               value={token}
             />
           </div>
           <div className="field">
-            <label htmlFor="from">Desde</label>
+            <label htmlFor="from">{copy.from}</label>
             <input
               id="from"
               onChange={(event) => setFilters((value) => ({ ...value, from: event.target.value }))}
@@ -145,7 +188,7 @@ export function AdminDashboard() {
             />
           </div>
           <div className="field">
-            <label htmlFor="to">Hasta</label>
+            <label htmlFor="to">{copy.to}</label>
             <input
               id="to"
               onChange={(event) => setFilters((value) => ({ ...value, to: event.target.value }))}
@@ -154,7 +197,7 @@ export function AdminDashboard() {
             />
           </div>
           <div className="field">
-            <label htmlFor="group">Grupo</label>
+            <label htmlFor="group">{copy.group}</label>
             <input
               id="group"
               onChange={(event) =>
@@ -165,7 +208,7 @@ export function AdminDashboard() {
             />
           </div>
           <button onClick={loadSessions} type="button">
-            Filtrar
+            {copy.filter}
           </button>
         </div>
 
@@ -175,18 +218,18 @@ export function AdminDashboard() {
           <table>
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Grupo</th>
-                <th>Facilitador</th>
-                <th>Seguimiento</th>
-                <th>Fotos</th>
-                <th>Notas</th>
+                <th>{copy.date}</th>
+                <th>{copy.group}</th>
+                <th>{copy.facilitator}</th>
+                <th>{copy.followUp}</th>
+                <th>{copy.photos}</th>
+                <th>{copy.notes}</th>
               </tr>
             </thead>
             <tbody>
               {sessions.map((session) => (
                 <tr key={session.id}>
-                  <td>{formatDisplayDate(session.heldAt)}</td>
+                  <td>{formatDisplayDate(session.heldAt, locale)}</td>
                   <td>
                     <strong>{session.groupName}</strong>
                     <br />
@@ -200,16 +243,16 @@ export function AdminDashboard() {
                   <td>
                     <div className="thumbs">
                       {(mediaBySession[session.id] ?? []).map((media) => (
-                        <img alt="Foto de reunion" key={media.id} src={media.url} />
+                        <img alt={copy.meetingPhotoAlt} key={media.id} src={media.url} />
                       ))}
                     </div>
                   </td>
-                  <td>{session.notes || "Sin notas"}</td>
+                  <td>{session.notes || copy.noNotes}</td>
                 </tr>
               ))}
               {!sessions.length ? (
                 <tr>
-                  <td colSpan={6}>No hay sesiones para mostrar.</td>
+                  <td colSpan={6}>{copy.noSessions}</td>
                 </tr>
               ) : null}
             </tbody>

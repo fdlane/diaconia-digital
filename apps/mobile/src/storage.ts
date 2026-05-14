@@ -1,8 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { SupportedLocale } from "@diaconia/shared";
 import type { LocalAttendee, LocalSession, LocalUser } from "./types";
 
 const keys = {
   user: "diaconia:user",
+  locale: "diaconia:locale",
   attendees: "diaconia:attendees",
   sessions: "diaconia:sessions",
 };
@@ -13,6 +15,14 @@ export async function loadUser() {
 
 export async function saveUser(user: LocalUser) {
   await AsyncStorage.setItem(keys.user, JSON.stringify(user));
+}
+
+export async function loadLocale() {
+  return readJson<SupportedLocale>(keys.locale, "es");
+}
+
+export async function saveLocale(locale: SupportedLocale) {
+  await AsyncStorage.setItem(keys.locale, JSON.stringify(locale));
 }
 
 export async function loadAttendees(defaults: LocalAttendee[]) {

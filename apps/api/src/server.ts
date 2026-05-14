@@ -210,8 +210,8 @@ app.get("/admin/sessions", async (c) => {
     to ? lte(sessions.heldAt, new Date(to)) : undefined,
   ].filter((filter): filter is NonNullable<typeof filter> => Boolean(filter));
 
-  const rows = await db
-    .select({
+  try {
+    const selectedColumns = {
       id: sessions.id,
       heldAt: sessions.heldAt,
       notes: sessions.notes,
@@ -221,21 +221,45 @@ app.get("/admin/sessions", async (c) => {
       groupName: groups.name,
       community: groups.community,
       facilitatorName: users.displayName,
-    })
-    .from(sessions)
-    .innerJoin(groups, eq(sessions.groupId, groups.id))
-    .innerJoin(users, eq(sessions.facilitatorId, users.id))
-    .where(filters.length ? and(...filters) : undefined)
-    .orderBy(desc(sessions.heldAt))
-    .limit(100);
+    };
 
-  return c.json({
-    sessions: rows.map((row) => ({
-      ...row,
-      heldAt: row.heldAt.toISOString(),
-      submittedAt: row.submittedAt?.toISOString() ?? null,
-    })),
-  });
+    const rows = filters.length
+      ? await db
+          .select(selectedColumns)
+          .from(sessions)
+          .innerJoin(groups, eq(sessions.groupId, groups.id))
+          .innerJoin(users, eq(sessions.facilitatorId, users.id))
+          .where(and(...filters))
+          .orderBy(desc(sessions.heldAt))
+          .limit(100)
+      : await db
+          .select(selectedColumns)
+          .from(sessions)
+          .innerJoin(groups, eq(sessions.groupId, groups.id))
+          .innerJoin(users, eq(sessions.facilitatorId, users.id))
+          .orderBy(desc(sessions.heldAt))
+          .limit(100);
+
+    return c.json({
+      sessions: rows.map((row) => ({
+        ...row,
+        heldAt: row.heldAt.toISOString(),
+        submittedAt: row.submittedAt?.toISOString() ?? null,
+      })),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown database error";
+    console.error("admin_sessions_query_failed", error);
+
+    if (process.env.NODE_ENV !== "production") {
+      return c.json({
+        sessions: [],
+        warning: `Database is not ready for admin sessions: ${detail}`,
+      });
+    }
+
+    return c.json({ error: "Admin sessions are unavailable" }, 503);
+  }
 });
 
 app.post("/me/profile-photo", async (c) => {

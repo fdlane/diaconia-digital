@@ -1,4 +1,9 @@
-import { labels, type AttendanceStatus, type FollowUpCategory } from "@diaconia/shared";
+import {
+  labels,
+  type AttendanceStatus,
+  type FollowUpCategory,
+  type SupportedLocale,
+} from "@diaconia/shared";
 import * as Crypto from "expo-crypto";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -12,21 +17,23 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import diaconiaLogo from "../assets/logo.png";
 import { pickImage } from "./media";
 import { defaultGroupId, seedAttendees, seedGroups } from "./seed";
 import { replaySessionWrite, uploadPhotoAsset } from "./sync/zero";
 import {
   loadAttendees,
+  loadLocale,
   loadSessions,
   loadUser,
   saveAttendees,
+  saveLocale,
   saveSessions,
   saveUser,
 } from "./storage";
 import type { LocalAttendee, LocalGroup, LocalSession, LocalUser } from "./types";
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
-const copy = labels.es;
 const brand = {
   background: "#f5f6fb",
   surface: "#ffffff",
@@ -40,6 +47,7 @@ const brand = {
 };
 
 export function FieldSessionApp() {
+  const [locale, setLocale] = useState<SupportedLocale>("es");
   const [user, setUser] = useState<LocalUser | null>(null);
   const [groups] = useState<LocalGroup[]>(seedGroups);
   const [attendees, setAttendees] = useState<LocalAttendee[]>(seedAttendees);
@@ -50,10 +58,13 @@ export function FieldSessionApp() {
   const [followUpNotes, setFollowUpNotes] = useState("");
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
   const [meetingPhotos, setMeetingPhotos] = useState<LocalSession["meetingPhotos"]>([]);
-  const [status, setStatus] = useState("Listo");
+  const copy = labels[locale];
+  const [status, setStatus] = useState(copy.ready);
 
   useEffect(() => {
     async function hydrate() {
+      const storedLocale = await loadLocale();
+      setLocale(storedLocale);
       setUser(await loadUser());
       setAttendees(await loadAttendees(seedAttendees));
       setSessions(await loadSessions());
@@ -61,6 +72,12 @@ export function FieldSessionApp() {
 
     void hydrate();
   }, []);
+
+  async function updateLocale(nextLocale: SupportedLocale) {
+    setLocale(nextLocale);
+    setStatus(labels[nextLocale].ready);
+    await saveLocale(nextLocale);
+  }
 
   const selectedGroup =
     groups.find((group) => group.id === selectedGroupId) ??
@@ -112,7 +129,7 @@ export function FieldSessionApp() {
         body: JSON.stringify({ mediaId: remoteMediaId }),
       });
     } catch {
-      setStatus("Foto de perfil pendiente");
+      setStatus(copy.profilePhotoPending);
     }
 
     const nextUser: LocalUser = remoteMediaId
@@ -145,7 +162,7 @@ export function FieldSessionApp() {
         body: JSON.stringify({ mediaId: remoteMediaId }),
       });
     } catch {
-      setStatus("Foto de asistente pendiente");
+      setStatus(copy.attendeePhotoPending);
     }
 
     const nextAttendees: LocalAttendee[] = attendees.map((attendee) => {
@@ -194,7 +211,7 @@ export function FieldSessionApp() {
     setFollowUpCategory("none");
     setFollowUpNotes("");
     setMeetingPhotos([]);
-    setStatus(syncNow ? "Sesion guardada para sincronizar" : "Borrador guardado");
+    setStatus(syncNow ? copy.sessionQueued : copy.draftSaved);
 
     if (syncNow) {
       await syncPending(nextSessions);
@@ -206,7 +223,7 @@ export function FieldSessionApp() {
       return;
     }
 
-    setStatus("Sincronizando");
+    setStatus(copy.syncing);
     const nextSessions: LocalSession[] = [];
 
     for (const session of source) {
@@ -256,17 +273,37 @@ export function FieldSessionApp() {
 
     setSessions(nextSessions);
     await saveSessions(nextSessions);
-    setStatus(nextSessions.some((session) => session.syncStatus === "failed") ? "Hay errores" : "Sincronizado");
+    setStatus(nextSessions.some((session) => session.syncStatus === "failed") ? copy.syncError : copy.syncComplete);
   }
+
+  const languageSwitch = (
+    <View style={styles.languageSwitch} accessibilityRole="tablist">
+      {(["es", "en"] as const).map((option) => (
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityState={{ selected: locale === option }}
+          key={option}
+          onPress={() => updateLocale(option)}
+          style={[styles.languageButton, locale === option && styles.languageButtonActive]}
+        >
+          <Text
+            style={[
+              styles.languageButtonText,
+              locale === option && styles.languageButtonTextActive,
+            ]}
+          >
+            {option.toUpperCase()}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
 
   const appContent = !user ? (
     <View style={styles.signIn}>
-          <Text style={styles.kicker}>Diaconia</Text>
-          <Text style={styles.title}>{copy.appName}</Text>
-          <Text style={styles.body}>
-            Ingreso de facilitadores con Cognito. En desarrollo local se usa un usuario demo para
-            validar el flujo de campo.
-          </Text>
+          {languageSwitch}
+          <Image source={diaconiaLogo} style={styles.signInLogo} resizeMode="contain" />
+          <Text style={styles.body}>{copy.signInHelp}</Text>
           <Pressable onPress={signIn} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>{copy.signIn}</Text>
           </Pressable>
@@ -275,17 +312,19 @@ export function FieldSessionApp() {
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.kicker}>Diaconia</Text>
-            <Text style={styles.title}>{copy.appName}</Text>
+            <Image source={diaconiaLogo} style={styles.headerLogo} resizeMode="contain" />
             <Text style={styles.body}>{user.displayName}</Text>
           </View>
-          <Pressable onPress={updateUserPhoto} style={styles.avatarButton}>
-            {user.profilePhotoUri ? (
-              <Image source={{ uri: user.profilePhotoUri }} style={styles.avatar} />
-            ) : (
-              <Text style={styles.avatarText}>Foto</Text>
-            )}
-          </Pressable>
+          <View style={styles.headerActions}>
+            {languageSwitch}
+            <Pressable onPress={updateUserPhoto} style={styles.avatarButton}>
+              {user.profilePhotoUri ? (
+                <Image source={{ uri: user.profilePhotoUri }} style={styles.avatar} />
+              ) : (
+                <Text style={styles.avatarText}>{copy.profilePhoto}</Text>
+              )}
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -348,7 +387,7 @@ export function FieldSessionApp() {
           <TextInput
             multiline
             onChangeText={setNotes}
-            placeholder="Notas de la reunion"
+            placeholder={copy.meetingNotesPlaceholder}
             style={styles.textArea}
             value={notes}
           />
@@ -370,7 +409,7 @@ export function FieldSessionApp() {
           </View>
           <TextInput
             onChangeText={setFollowUpNotes}
-            placeholder="Detalle de seguimiento"
+            placeholder={copy.followUpDetailPlaceholder}
             style={styles.input}
             value={followUpNotes}
           />
@@ -380,31 +419,31 @@ export function FieldSessionApp() {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>{copy.photos}</Text>
             <Pressable onPress={addMeetingPhoto} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Agregar</Text>
+              <Text style={styles.secondaryButtonText}>{copy.add}</Text>
             </Pressable>
           </View>
           <View style={styles.photoStrip}>
             {meetingPhotos.map((photo) => (
               <Image key={photo.id} source={{ uri: photo.uri }} style={styles.meetingPhoto} />
             ))}
-            {!meetingPhotos.length ? <Text style={styles.body}>Sin fotos de reunion.</Text> : null}
+            {!meetingPhotos.length ? <Text style={styles.body}>{copy.noMeetingPhotos}</Text> : null}
           </View>
         </View>
 
         <View style={styles.actions}>
           <Pressable onPress={() => saveDraft(false)} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Guardar borrador</Text>
+            <Text style={styles.secondaryButtonText}>{copy.saveDraft}</Text>
           </Pressable>
           <Pressable onPress={() => saveDraft(true)} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Guardar y sincronizar</Text>
+            <Text style={styles.primaryButtonText}>{copy.saveAndSync}</Text>
           </Pressable>
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Cola local</Text>
+            <Text style={styles.sectionTitle}>{copy.localQueue}</Text>
             <Pressable onPress={() => syncPending()} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Reintentar</Text>
+              <Text style={styles.secondaryButtonText}>{copy.retry}</Text>
             </Pressable>
           </View>
           <Text style={styles.body}>{status}</Text>
@@ -455,10 +494,52 @@ const styles = StyleSheet.create({
     minHeight: 640,
     padding: 24,
   },
+  signInLogo: {
+    height: 76,
+    width: 258,
+    alignSelf: "flex-start",
+  },
+  headerLogo: {
+    height: 46,
+    width: 156,
+    marginBottom: 8,
+  },
   header: {
     alignItems: "center",
     flexDirection: "row",
     justifyContent: "space-between",
+    gap: 12,
+  },
+  headerActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  languageSwitch: {
+    alignSelf: "flex-start",
+    borderColor: brand.line,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    overflow: "hidden",
+  },
+  languageButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 34,
+    minWidth: 44,
+    paddingHorizontal: 10,
+  },
+  languageButtonActive: {
+    backgroundColor: brand.primary,
+  },
+  languageButtonText: {
+    color: brand.primaryStrong,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  languageButtonTextActive: {
+    color: "#ffffff",
   },
   kicker: {
     color: brand.primary,

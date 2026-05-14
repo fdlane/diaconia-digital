@@ -67,7 +67,47 @@ select {
   background: var(--surface);
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.language-switch {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: white;
+}
+
+.language-switch button {
+  min-height: 2.1rem;
+  min-width: 2.75rem;
+  border-radius: 0;
+  background: transparent;
+  color: var(--brand-strong);
+  padding: 0 0.65rem;
+}
+
+.language-switch button.active {
+  background: var(--brand);
+  color: white;
+}
+
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.brand-logo {
+  width: 150px;
+  height: auto;
+  flex: 0 0 auto;
+}
+
+.brand div {
   display: grid;
   gap: 0.1rem;
 }
