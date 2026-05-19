@@ -1,0 +1,11 @@
+node_modules
+.next
+.expo
+dist
+coverage
+.terraform
+terraform.tfstate
+terraform.tfstate.*
+.env
+.env.*
+!.env.example

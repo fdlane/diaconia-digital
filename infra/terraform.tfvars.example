@@ -1,0 +1,14 @@
+environment = "dev"
+aws_region  = "sa-east-1"
+
+allowed_callback_urls = [
+  "http://localhost:3000",
+  "http://localhost:8081",
+  "http://localhost:19006"
+]
+
+allowed_logout_urls = [
+  "http://localhost:3000",
+  "http://localhost:8081",
+  "http://localhost:19006"
+]

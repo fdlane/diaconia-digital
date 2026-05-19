@@ -1,0 +1,27 @@
+{
+  "name": "diaconia-digital",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.1.3",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "pnpm -r check",
+    "typecheck": "pnpm -r typecheck",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "dev:api": "pnpm --filter @diaconia/api dev",
+    "dev:admin": "pnpm --filter @diaconia/admin dev",
+    "dev:mobile": "pnpm --filter @diaconia/mobile dev",
+    "db:generate": "pnpm --filter @diaconia/db db:generate",
+    "db:migrate": "pnpm --filter @diaconia/db db:migrate",
+    "db:seed": "pnpm --filter @diaconia/db db:seed",
+    "zero:generate": "pnpm --filter @diaconia/db zero:generate"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
