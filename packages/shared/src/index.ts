@@ -269,6 +269,20 @@ export const labels = {
   },
 } satisfies Record<SupportedLocale, Record<string, string>>;
 
+export function getProfileInitials(displayName: string, email?: string | null) {
+  const trimmedName = displayName.trim();
+  if (!trimmedName) {
+    return (email?.trim()[0] ?? "?").toLocaleUpperCase();
+  }
+
+  const parts = trimmedName.split(/\s+/).filter(Boolean);
+  const first = parts[0] ?? trimmedName;
+  const last = parts[parts.length - 1] ?? first;
+  const initials = parts.length > 1 ? `${first.charAt(0)}${last.charAt(0)}` : trimmedName.slice(0, 2);
+
+  return initials.toLocaleUpperCase();
+}
+
 export function formatDisplayDate(value: string, locale: SupportedLocale = "es") {
   return new Intl.DateTimeFormat(locale === "es" ? "es-PY" : "en", {
     dateStyle: "medium",

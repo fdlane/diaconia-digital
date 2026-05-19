@@ -3,6 +3,7 @@ import {
   createMediaUploadInputSchema,
   createSessionInputSchema,
   formatDisplayDate,
+  getProfileInitials,
 } from "./index";
 
 describe("shared validation", () => {
@@ -54,5 +55,10 @@ describe("shared validation", () => {
 
   it("formats dates for Paraguay Spanish by default", () => {
     expect(formatDisplayDate("2026-05-12T14:30:00.000Z")).toContain("2026");
+  });
+
+  it("builds compact profile initials from names or email", () => {
+    expect(getProfileInitials("María González", null)).toBe("MG");
+    expect(getProfileInitials("", "facilitator@example.com")).toBe("F");
   });
 });
