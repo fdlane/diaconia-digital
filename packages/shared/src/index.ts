@@ -16,6 +16,9 @@ export type MediaAssetType = z.infer<typeof mediaAssetTypeSchema>;
 export const attendanceStatusSchema = z.enum(["present", "absent", "excused"]);
 export type AttendanceStatus = z.infer<typeof attendanceStatusSchema>;
 
+export const prayerRequestStatusSchema = z.enum(["open", "answered", "archived"]);
+export type PrayerRequestStatus = z.infer<typeof prayerRequestStatusSchema>;
+
 export const followUpCategorySchema = z.enum([
   "none",
   "financial",
@@ -76,6 +79,16 @@ export const attendanceSchema = z.object({
 });
 export type Attendance = z.infer<typeof attendanceSchema>;
 
+export const prayerRequestSchema = z.object({
+  id: z.string().uuid(),
+  sessionId: z.string().uuid(),
+  attendeeId: z.string().uuid().nullable(),
+  requesterName: z.string().min(1),
+  request: z.string().min(1).max(2000),
+  status: prayerRequestStatusSchema,
+});
+export type PrayerRequest = z.infer<typeof prayerRequestSchema>;
+
 export const mediaAssetSchema = z.object({
   id: z.string().uuid(),
   type: mediaAssetTypeSchema,
@@ -103,6 +116,16 @@ export const createSessionInputSchema = z.object({
       status: attendanceStatusSchema,
     }),
   ),
+  prayerRequests: z
+    .array(
+      z.object({
+        id: z.string().uuid(),
+        attendeeId: z.string().uuid().nullable().optional(),
+        requesterName: z.string().min(1),
+        request: z.string().min(1).max(2000),
+      }),
+    )
+    .default([]),
   meetingPhotoMediaIds: z.array(z.string().uuid()).default([]),
 });
 export type CreateSessionInput = z.infer<typeof createSessionInputSchema>;

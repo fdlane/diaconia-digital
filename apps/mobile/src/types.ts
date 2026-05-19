@@ -1,9 +1,10 @@
-import type { AttendanceStatus, FollowUpCategory } from "@diaconia/shared";
+import type { AttendanceStatus, FollowUpCategory, Role } from "@diaconia/shared";
 
 export type LocalUser = {
   id: string;
   displayName: string;
   token: string;
+  role: Role;
   profilePhotoUri?: string;
   profilePhotoRemoteMediaId?: string;
 };
@@ -12,6 +13,7 @@ export type LocalGroup = {
   id: string;
   name: string;
   community: string;
+  facilitatorId?: string;
 };
 
 export type LocalAttendee = {
@@ -19,8 +21,16 @@ export type LocalAttendee = {
   groupId: string;
   displayName: string;
   phone?: string;
+  isFacilitator?: boolean;
   profilePhotoUri?: string;
   profilePhotoRemoteMediaId?: string;
+};
+
+export type LocalPrayerRequest = {
+  id: string;
+  attendeeId?: string | null;
+  requesterName: string;
+  request: string;
 };
 
 export type LocalPhoto = {
@@ -41,6 +51,7 @@ export type LocalSession = {
   followUpCategory: FollowUpCategory;
   followUpNotes: string;
   attendance: Record<string, AttendanceStatus>;
+  prayerRequests: LocalPrayerRequest[];
   meetingPhotos: LocalPhoto[];
   syncStatus: "draft" | "pending" | "synced" | "failed";
 };

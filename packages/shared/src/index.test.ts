@@ -17,9 +17,18 @@ describe("shared validation", () => {
           status: "present",
         },
       ],
+      prayerRequests: [
+        {
+          id: "f9362339-880f-4f2b-a676-51aee1594c20",
+          attendeeId: "8ba2f986-78c1-433b-9a87-a9cb73b7878b",
+          requesterName: "María González",
+          request: "Pray for her new business inventory purchase.",
+        },
+      ],
     });
 
     expect(parsed.followUpCategory).toBe("none");
+    expect(parsed.prayerRequests).toHaveLength(1);
   });
 
   it("limits uploaded images to known image types", () => {

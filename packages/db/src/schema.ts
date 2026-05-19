@@ -14,6 +14,7 @@ import { sql } from "drizzle-orm";
 
 export const userRole = pgEnum("user_role", ["facilitator", "admin"]);
 export const attendanceStatus = pgEnum("attendance_status", ["present", "absent", "excused"]);
+export const prayerRequestStatus = pgEnum("prayer_request_status", ["open", "answered", "archived"]);
 export const followUpCategory = pgEnum("follow_up_category", [
   "none",
   "financial",
@@ -127,6 +128,26 @@ export const attendanceRecords = pgTable(
       table.sessionId,
       table.attendeeId,
     ),
+  }),
+);
+
+export const prayerRequests = pgTable(
+  "prayer_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id),
+    attendeeId: uuid("attendee_id").references(() => attendees.id),
+    requesterName: text("requester_name").notNull(),
+    request: text("request").notNull(),
+    status: prayerRequestStatus("status").notNull().default("open"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    sessionIdx: index("prayer_requests_session_id_idx").on(table.sessionId),
+    attendeeIdx: index("prayer_requests_attendee_id_idx").on(table.attendeeId),
   }),
 );
 

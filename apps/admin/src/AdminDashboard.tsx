@@ -21,6 +21,15 @@ type SessionMedia = {
   url: string;
 };
 
+type PrayerRequest = {
+  id: string;
+  attendeeId: string | null;
+  requesterName: string;
+  request: string;
+  status: string;
+  createdAt: string;
+};
+
 type AdminSessionsResponse = {
   sessions: AdminSession[];
   warning?: string;
@@ -37,6 +46,9 @@ export function AdminDashboard() {
   const [locale, setLocale] = useState<SupportedLocale>("es");
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [mediaBySession, setMediaBySession] = useState<Record<string, SessionMedia[]>>({});
+  const [prayerRequestsBySession, setPrayerRequestsBySession] = useState<
+    Record<string, PrayerRequest[]>
+  >({});
   const [token, setToken] = useState("");
   const [filters, setFilters] = useState({
     facilitatorId: "",
@@ -90,7 +102,23 @@ export function AdminDashboard() {
         return [session.id, mediaPayload.media] as const;
       }),
     );
+    const prayerEntries = await Promise.all(
+      payload.sessions.slice(0, 20).map(async (session) => {
+        const prayerResponse = await fetch(
+          `${apiUrl}/admin/sessions/${session.id}/prayer-requests`,
+          requestInit,
+        );
+
+        if (!prayerResponse.ok) {
+          return [session.id, []] as const;
+        }
+
+        const prayerPayload = (await prayerResponse.json()) as { prayerRequests: PrayerRequest[] };
+        return [session.id, prayerPayload.prayerRequests] as const;
+      }),
+    );
     setMediaBySession(Object.fromEntries(mediaEntries));
+    setPrayerRequestsBySession(Object.fromEntries(prayerEntries));
     setStatus(payload.warning ?? `${payload.sessions.length} ${copy.sessions}`);
   }
 
@@ -223,6 +251,7 @@ export function AdminDashboard() {
                 <th>{copy.facilitator}</th>
                 <th>{copy.followUp}</th>
                 <th>{copy.photos}</th>
+                <th>{locale === "es" ? "Oración" : "Prayer"}</th>
                 <th>{copy.notes}</th>
               </tr>
             </thead>
@@ -247,12 +276,26 @@ export function AdminDashboard() {
                       ))}
                     </div>
                   </td>
+                  <td>
+                    <div className="prayer-list">
+                      {(prayerRequestsBySession[session.id] ?? []).map((request) => (
+                        <article className="prayer-card" key={request.id}>
+                          <strong>{request.requesterName}</strong>
+                          <p>{request.request}</p>
+                          <span>{request.status}</span>
+                        </article>
+                      ))}
+                      {!(prayerRequestsBySession[session.id] ?? []).length ? (
+                        <span className="muted">{locale === "es" ? "Sin peticiones" : "No requests"}</span>
+                      ) : null}
+                    </div>
+                  </td>
                   <td>{session.notes || copy.noNotes}</td>
                 </tr>
               ))}
               {!sessions.length ? (
                 <tr>
-                  <td colSpan={6}>{copy.noSessions}</td>
+                  <td colSpan={7}>{copy.noSessions}</td>
                 </tr>
               ) : null}
             </tbody>

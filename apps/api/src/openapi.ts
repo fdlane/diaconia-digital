@@ -43,6 +43,26 @@ export const openApiDocument = {
         },
       },
     },
+    "/admin/sessions/{sessionId}/media": {
+      get: {
+        summary: "List signed media URLs for an admin session report",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "Session media list" },
+          "403": { description: "Admin role required" },
+        },
+      },
+    },
+    "/admin/sessions/{sessionId}/prayer-requests": {
+      get: {
+        summary: "List public prayer requests for an admin session report",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "Prayer request list" },
+          "403": { description: "Admin role required" },
+        },
+      },
+    },
   },
   components: {
     securitySchemes: {

@@ -7,6 +7,7 @@ import {
   createDatabase,
   groups,
   mediaAssets,
+  prayerRequests,
   sessions,
   users,
 } from "@diaconia/db";
@@ -165,6 +166,29 @@ app.post("/sessions", async (c) => {
           target: [attendanceRecords.sessionId, attendanceRecords.attendeeId],
           set: {
             status: record.status,
+            updatedAt: new Date(),
+          },
+        });
+    }
+
+    for (const prayer of body.data.prayerRequests) {
+      await tx
+        .insert(prayerRequests)
+        .values({
+          id: prayer.id,
+          sessionId: body.data.id,
+          attendeeId: prayer.attendeeId ?? null,
+          requesterName: prayer.requesterName,
+          request: prayer.request,
+          status: "open",
+        })
+        .onConflictDoUpdate({
+          target: prayerRequests.id,
+          set: {
+            attendeeId: prayer.attendeeId ?? null,
+            requesterName: prayer.requesterName,
+            request: prayer.request,
+            status: "open",
             updatedAt: new Date(),
           },
         });
@@ -364,6 +388,31 @@ app.get("/admin/sessions/:sessionId/media", async (c) => {
   );
 
   return c.json({ media: signed });
+});
+
+app.get("/admin/sessions/:sessionId/prayer-requests", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) {
+    return forbidden;
+  }
+
+  const sessionId = c.req.param("sessionId");
+  const rows = await db
+    .select()
+    .from(prayerRequests)
+    .where(eq(prayerRequests.sessionId, sessionId))
+    .orderBy(prayerRequests.createdAt);
+
+  return c.json({
+    prayerRequests: rows.map((row) => ({
+      id: row.id,
+      attendeeId: row.attendeeId,
+      requesterName: row.requesterName,
+      request: row.request,
+      status: row.status,
+      createdAt: row.createdAt.toISOString(),
+    })),
+  });
 });
 
 app.get("/admin/groups/:groupId/attendees", async (c) => {
