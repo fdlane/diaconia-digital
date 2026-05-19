@@ -130,6 +130,54 @@ app.post("/sessions", async (c) => {
     return c.json({ error: "Facilitator profile not found" }, 403);
   }
 
+  const [existingSession] = await db
+    .select({ facilitatorId: sessions.facilitatorId })
+    .from(sessions)
+    .where(eq(sessions.id, body.data.id))
+    .limit(1);
+
+  if (existingSession && existingSession.facilitatorId !== facilitator.id) {
+    return c.json({ error: "Session id already belongs to another facilitator" }, 409);
+  }
+
+  const attendeeIds = Array.from(
+    new Set([
+      ...body.data.attendance.map((record) => record.attendeeId),
+      ...body.data.prayerRequests.flatMap((request) => (request.attendeeId ? [request.attendeeId] : [])),
+    ]),
+  );
+
+  if (attendeeIds.length) {
+    const knownAttendees = await db
+      .select({ id: attendees.id, groupId: attendees.groupId })
+      .from(attendees)
+      .where(inArray(attendees.id, attendeeIds));
+    const knownById = new Map(knownAttendees.map((attendee) => [attendee.id, attendee]));
+    const invalidAttendeeIds = attendeeIds.filter(
+      (attendeeId) => knownById.get(attendeeId)?.groupId !== body.data.groupId,
+    );
+
+    if (invalidAttendeeIds.length) {
+      return c.json({ error: "Session contains attendees outside the selected group", attendeeIds: invalidAttendeeIds }, 400);
+    }
+  }
+
+  if (body.data.meetingPhotoMediaIds.length) {
+    const mediaRows = await db
+      .select({ id: mediaAssets.id, sessionId: mediaAssets.sessionId, type: mediaAssets.type })
+      .from(mediaAssets)
+      .where(inArray(mediaAssets.id, body.data.meetingPhotoMediaIds));
+    const mediaById = new Map(mediaRows.map((asset) => [asset.id, asset]));
+    const invalidMediaIds = body.data.meetingPhotoMediaIds.filter((mediaId) => {
+      const asset = mediaById.get(mediaId);
+      return !asset || asset.type !== "meeting_photo" || (asset.sessionId && asset.sessionId !== body.data.id);
+    });
+
+    if (invalidMediaIds.length) {
+      return c.json({ error: "Session contains invalid meeting photo media", mediaIds: invalidMediaIds }, 400);
+    }
+  }
+
   await db.transaction(async (tx) => {
     await tx
       .insert(sessions)
@@ -146,6 +194,9 @@ app.post("/sessions", async (c) => {
       .onConflictDoUpdate({
         target: sessions.id,
         set: {
+          groupId: body.data.groupId,
+          facilitatorId: facilitator.id,
+          heldAt: new Date(body.data.heldAt),
           notes: body.data.notes,
           followUpCategory: body.data.followUpCategory,
           followUpNotes: body.data.followUpNotes,

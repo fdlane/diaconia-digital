@@ -78,48 +78,69 @@ export function AdminDashboard() {
           },
         }
       : undefined;
-    const response = await fetch(`${apiUrl}/admin/sessions${query ? `?${query}` : ""}`, requestInit);
 
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => null)) as
-        | { error?: string; detail?: string }
-        | null;
-      setStatus(payload?.detail ?? payload?.error ?? `Error ${response.status}`);
-      return;
+    try {
+      const response = await fetch(`${apiUrl}/admin/sessions${query ? `?${query}` : ""}`, requestInit);
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as
+          | { error?: string; detail?: string }
+          | null;
+        setStatus(payload?.detail ?? payload?.error ?? `Error ${response.status}`);
+        return;
+      }
+
+      const payload = (await response.json()) as AdminSessionsResponse;
+      setSessions(payload.sessions);
+      setMediaBySession({});
+      setPrayerRequestsBySession({});
+      let detailFailures = 0;
+      const mediaEntries = await Promise.all(
+        payload.sessions.map(async (session) => {
+          try {
+            const mediaResponse = await fetch(`${apiUrl}/admin/sessions/${session.id}/media`, requestInit);
+
+            if (!mediaResponse.ok) {
+              detailFailures += 1;
+              return [session.id, []] as const;
+            }
+
+            const mediaPayload = (await mediaResponse.json()) as { media: SessionMedia[] };
+            return [session.id, mediaPayload.media] as const;
+          } catch {
+            detailFailures += 1;
+            return [session.id, []] as const;
+          }
+        }),
+      );
+      const prayerEntries = await Promise.all(
+        payload.sessions.map(async (session) => {
+          try {
+            const prayerResponse = await fetch(
+              `${apiUrl}/admin/sessions/${session.id}/prayer-requests`,
+              requestInit,
+            );
+
+            if (!prayerResponse.ok) {
+              detailFailures += 1;
+              return [session.id, []] as const;
+            }
+
+            const prayerPayload = (await prayerResponse.json()) as { prayerRequests: PrayerRequest[] };
+            return [session.id, prayerPayload.prayerRequests] as const;
+          } catch {
+            detailFailures += 1;
+            return [session.id, []] as const;
+          }
+        }),
+      );
+      setMediaBySession(Object.fromEntries(mediaEntries));
+      setPrayerRequestsBySession(Object.fromEntries(prayerEntries));
+      const baseStatus = payload.warning ?? `${payload.sessions.length} ${copy.sessions}`;
+      setStatus(detailFailures ? `${baseStatus} · ${detailFailures} detail loads failed` : baseStatus);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : `Error ${copy.loadingSessions}`);
     }
-
-    const payload = (await response.json()) as AdminSessionsResponse;
-    setSessions(payload.sessions);
-    const mediaEntries = await Promise.all(
-      payload.sessions.slice(0, 20).map(async (session) => {
-        const mediaResponse = await fetch(`${apiUrl}/admin/sessions/${session.id}/media`, requestInit);
-
-        if (!mediaResponse.ok) {
-          return [session.id, []] as const;
-        }
-
-        const mediaPayload = (await mediaResponse.json()) as { media: SessionMedia[] };
-        return [session.id, mediaPayload.media] as const;
-      }),
-    );
-    const prayerEntries = await Promise.all(
-      payload.sessions.slice(0, 20).map(async (session) => {
-        const prayerResponse = await fetch(
-          `${apiUrl}/admin/sessions/${session.id}/prayer-requests`,
-          requestInit,
-        );
-
-        if (!prayerResponse.ok) {
-          return [session.id, []] as const;
-        }
-
-        const prayerPayload = (await prayerResponse.json()) as { prayerRequests: PrayerRequest[] };
-        return [session.id, prayerPayload.prayerRequests] as const;
-      }),
-    );
-    setMediaBySession(Object.fromEntries(mediaEntries));
-    setPrayerRequestsBySession(Object.fromEntries(prayerEntries));
-    setStatus(payload.warning ?? `${payload.sessions.length} ${copy.sessions}`);
   }
 
   function updateLocale(nextLocale: SupportedLocale) {

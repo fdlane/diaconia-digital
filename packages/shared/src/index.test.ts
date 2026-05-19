@@ -41,6 +41,17 @@ describe("shared validation", () => {
     ).toThrow();
   });
 
+  it("rejects media type associations that contradict the upload type", () => {
+    expect(() =>
+      createMediaUploadInputSchema.parse({
+        type: "meeting_photo",
+        contentType: "image/jpeg",
+        byteSize: 1024,
+        ownerUserId: "55faf062-c862-4449-85a8-a97e14886b1d",
+      }),
+    ).toThrow();
+  });
+
   it("formats dates for Paraguay Spanish by default", () => {
     expect(formatDisplayDate("2026-05-12T14:30:00.000Z")).toContain("2026");
   });

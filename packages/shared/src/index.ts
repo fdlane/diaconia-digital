@@ -130,14 +130,40 @@ export const createSessionInputSchema = z.object({
 });
 export type CreateSessionInput = z.infer<typeof createSessionInputSchema>;
 
-export const createMediaUploadInputSchema = z.object({
-  type: mediaAssetTypeSchema,
-  contentType: z.string().regex(/^image\/(jpeg|png|webp)$/),
-  byteSize: z.number().int().positive().max(10 * 1024 * 1024),
-  ownerUserId: z.string().uuid().optional(),
-  attendeeId: z.string().uuid().optional(),
-  sessionId: z.string().uuid().optional(),
-});
+export const createMediaUploadInputSchema = z
+  .object({
+    type: mediaAssetTypeSchema,
+    contentType: z.string().regex(/^image\/(jpeg|png|webp)$/),
+    byteSize: z.number().int().positive().max(10 * 1024 * 1024),
+    ownerUserId: z.string().uuid().optional(),
+    attendeeId: z.string().uuid().optional(),
+    sessionId: z.string().uuid().optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.type === "user_profile_photo" && value.attendeeId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["attendeeId"],
+        message: "user_profile_photo cannot be attached to an attendee",
+      });
+    }
+
+    if (value.type === "attendee_profile_photo" && value.ownerUserId) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["ownerUserId"],
+        message: "attendee_profile_photo cannot be attached to a user",
+      });
+    }
+
+    if (value.type === "meeting_photo" && (value.ownerUserId || value.attendeeId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["type"],
+        message: "meeting_photo cannot be attached as a profile photo",
+      });
+    }
+  });
 export type CreateMediaUploadInput = z.infer<typeof createMediaUploadInputSchema>;
 
 export const createMediaUploadResponseSchema = z.object({

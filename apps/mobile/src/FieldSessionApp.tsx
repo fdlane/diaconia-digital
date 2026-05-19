@@ -295,15 +295,17 @@ export function FieldSessionApp() {
     setStatus(copy.syncing);
     const nextSessions: LocalSession[] = [];
     for (const session of source) {
-      if (session.syncStatus === "synced") {
+      if (session.syncStatus !== "pending" && session.syncStatus !== "failed") {
         nextSessions.push(session);
         continue;
       }
+      let uploadedMeetingPhotos = session.meetingPhotos;
       try {
-        const uploadedMeetingPhotos = [];
         for (const photo of session.meetingPhotos) {
-          const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token: user.token, photo, sessionId: session.id }));
-          uploadedMeetingPhotos.push({ ...photo, uploaded: true, remoteMediaId });
+          const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token: user.token, photo }));
+          uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) =>
+            candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate,
+          );
         }
         await replaySessionWrite({
           apiUrl,
@@ -322,7 +324,7 @@ export function FieldSessionApp() {
         });
         nextSessions.push({ ...session, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" });
       } catch {
-        nextSessions.push({ ...session, syncStatus: "failed" });
+        nextSessions.push({ ...session, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" });
       }
     }
     setSessions(nextSessions);
