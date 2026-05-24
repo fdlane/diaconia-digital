@@ -30,7 +30,23 @@ terraform -chdir=infra plan \
 
 terraform -chdir=infra apply -auto-approve tfplan
 
-aws ecs wait services-stable \
+if ! aws ecs wait services-stable \
   --region "$AWS_REGION" \
   --cluster "$name" \
-  --services api admin
+  --services api admin; then
+  echo "ECS services did not stabilize. Recent service state:" >&2
+  aws ecs describe-services \
+    --region "$AWS_REGION" \
+    --cluster "$name" \
+    --services api admin \
+    --query 'services[].{service:serviceName,desired:desiredCount,running:runningCount,pending:pendingCount,deployments:deployments[].{status:status,rolloutState:rolloutState,desired:desiredCount,running:runningCount,pending:pendingCount,failed:failedTasks,taskDefinition:taskDefinition},events:events[0:8].message}' \
+    --output json >&2
+
+  echo "Recent API logs:" >&2
+  aws logs tail "/aws/ecs/${name}/api" --region "$AWS_REGION" --since 20m >&2 || true
+
+  echo "Recent admin logs:" >&2
+  aws logs tail "/aws/ecs/${name}/admin" --region "$AWS_REGION" --since 20m >&2 || true
+
+  exit 1
+fi
