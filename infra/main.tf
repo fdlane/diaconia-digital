@@ -6,11 +6,18 @@ locals {
     Environment = var.environment
     ManagedBy   = "terraform"
   }
+
+  api_container_name   = "api"
+  admin_container_name = "admin"
 }
 
 data "aws_availability_zones" "available" {
   state = "available"
 }
+
+data "aws_caller_identity" "current" {}
+
+data "aws_partition" "current" {}
 
 resource "random_password" "database" {
   length  = 32
@@ -21,7 +28,41 @@ resource "aws_kms_key" "app" {
   description             = "Diaconia foundation application key"
   deletion_window_in_days = 30
   enable_key_rotation     = true
-  tags                    = local.common_tags
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EnableAccountAdministration"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:${data.aws_partition.current.partition}:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/ecs/${local.name}/*"
+          }
+        }
+      }
+    ]
+  })
+  tags = local.common_tags
 }
 
 resource "aws_kms_alias" "app" {
@@ -112,11 +153,102 @@ resource "aws_security_group" "database" {
   tags        = local.common_tags
 }
 
+resource "aws_security_group_rule" "database_from_api" {
+  type                     = "ingress"
+  from_port                = 5432
+  to_port                  = 5432
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.database.id
+  source_security_group_id = aws_security_group.api_service.id
+  description              = "Allow API tasks to connect to PostgreSQL"
+}
+
+resource "aws_security_group" "load_balancer" {
+  name        = "${local.name}-alb"
+  description = "Public HTTP access to Diaconia dev services"
+  vpc_id      = aws_vpc.main.id
+  tags        = local.common_tags
+}
+
+resource "aws_security_group_rule" "load_balancer_http_in" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  security_group_id = aws_security_group.load_balancer.id
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "Allow public HTTP for the first ALB DNS deploy"
+}
+
+resource "aws_security_group_rule" "load_balancer_all_out" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  security_group_id = aws_security_group.load_balancer.id
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "Allow ALB egress to ECS tasks"
+}
+
+resource "aws_security_group" "api_service" {
+  name        = "${local.name}-api"
+  description = "API ECS service access"
+  vpc_id      = aws_vpc.main.id
+  tags        = local.common_tags
+}
+
+resource "aws_security_group_rule" "api_from_load_balancer" {
+  type                     = "ingress"
+  from_port                = var.api_container_port
+  to_port                  = var.api_container_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.api_service.id
+  source_security_group_id = aws_security_group.load_balancer.id
+  description              = "Allow ALB traffic to API tasks"
+}
+
+resource "aws_security_group_rule" "api_all_out" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  security_group_id = aws_security_group.api_service.id
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "Allow API egress for AWS APIs and package runtime access"
+}
+
+resource "aws_security_group" "admin_service" {
+  name        = "${local.name}-admin"
+  description = "Admin ECS service access"
+  vpc_id      = aws_vpc.main.id
+  tags        = local.common_tags
+}
+
+resource "aws_security_group_rule" "admin_from_load_balancer" {
+  type                     = "ingress"
+  from_port                = var.admin_container_port
+  to_port                  = var.admin_container_port
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.admin_service.id
+  source_security_group_id = aws_security_group.load_balancer.id
+  description              = "Allow ALB traffic to admin tasks"
+}
+
+resource "aws_security_group_rule" "admin_all_out" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  security_group_id = aws_security_group.admin_service.id
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "Allow admin egress for API calls and runtime access"
+}
+
 resource "aws_db_instance" "postgres" {
   identifier              = local.name
   allocated_storage       = 20
   engine                  = "postgres"
-  engine_version          = "16.4"
+  engine_version          = var.database_engine_version
   instance_class          = "db.t4g.micro"
   db_name                 = var.database_name
   username                = var.database_username
@@ -125,7 +257,7 @@ resource "aws_db_instance" "postgres" {
   vpc_security_group_ids  = [aws_security_group.database.id]
   storage_encrypted       = true
   kms_key_id              = aws_kms_key.app.arn
-  backup_retention_period = 7
+  backup_retention_period = var.database_backup_retention_period
   deletion_protection     = true
   skip_final_snapshot     = false
   tags                    = local.common_tags
@@ -213,8 +345,163 @@ resource "aws_ecs_cluster" "main" {
   tags = local.common_tags
 }
 
+resource "aws_ecr_repository" "api" {
+  name                 = "${local.name}/api"
+  image_tag_mutability = "IMMUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_ecr_repository" "admin" {
+  name                 = "${local.name}/admin"
+  image_tag_mutability = "IMMUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_lb" "app" {
+  name               = local.name
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.load_balancer.id]
+  subnets            = aws_subnet.public[*].id
+  tags               = local.common_tags
+}
+
+resource "aws_lb_target_group" "api" {
+  name        = "${local.name}-api"
+  port        = var.api_container_port
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
+
+  health_check {
+    enabled             = true
+    path                = "/health"
+    matcher             = "200"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 5
+    interval            = 30
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_lb_target_group" "admin" {
+  name        = "${local.name}-admin"
+  port        = var.admin_container_port
+  protocol    = "HTTP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
+
+  health_check {
+    enabled             = true
+    path                = "/"
+    matcher             = "200-399"
+    healthy_threshold   = 2
+    unhealthy_threshold = 3
+    timeout             = 5
+    interval            = 30
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.app.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.admin.arn
+  }
+
+  tags = local.common_tags
+}
+
+resource "aws_lb_listener_rule" "api_health" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 10
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/health", "/openapi.json"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "api_existing_routes" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 20
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/admin/*", "/attendees/*", "/media/*", "/me/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "api_sessions" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 30
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/sessions", "/sessions/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "api_prefix" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 40
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/api/*"]
+    }
+  }
+}
+
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/aws/ecs/${local.name}/api"
+  retention_in_days = 30
+  kms_key_id        = aws_kms_key.app.arn
+  tags              = local.common_tags
+}
+
+resource "aws_cloudwatch_log_group" "admin" {
+  name              = "/aws/ecs/${local.name}/admin"
   retention_in_days = 30
   kms_key_id        = aws_kms_key.app.arn
   tags              = local.common_tags
@@ -243,4 +530,274 @@ resource "aws_secretsmanager_secret_version" "database_url" {
     aws_db_instance.postgres.port,
     var.database_name
   )
+}
+
+resource "aws_iam_role" "ecs_task_execution" {
+  name = "${local.name}-ecs-execution"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_task_execution" {
+  role       = aws_iam_role.ecs_task_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+}
+
+resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
+  name = "${local.name}-ecs-execution-secrets"
+  role = aws_iam_role.ecs_task_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = aws_secretsmanager_secret.database_url.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt"
+        ]
+        Resource = aws_kms_key.app.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "api_task" {
+  name = "${local.name}-api-task"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_iam_role_policy" "api_task" {
+  name = "${local.name}-api-task"
+  role = aws_iam_role.api_task.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
+        Resource = "${aws_s3_bucket.media.arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:GenerateDataKey"
+        ]
+        Resource = aws_kms_key.app.arn
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role" "admin_task" {
+  name = "${local.name}-admin-task"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ecs-tasks.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+resource "aws_ecs_task_definition" "api" {
+  family                   = "${local.name}-api"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = tostring(var.api_task_cpu)
+  memory                   = tostring(var.api_task_memory)
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.api_task.arn
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
+
+  container_definitions = jsonencode([
+    {
+      name      = local.api_container_name
+      image     = "${aws_ecr_repository.api.repository_url}:${var.api_image_tag}"
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.api_container_port
+          hostPort      = var.api_container_port
+          protocol      = "tcp"
+        }
+      ]
+      environment = [
+        { name = "NODE_ENV", value = "production" },
+        { name = "PORT", value = tostring(var.api_container_port) },
+        { name = "AWS_REGION", value = var.aws_region },
+        { name = "MEDIA_BUCKET_NAME", value = aws_s3_bucket.media.bucket },
+        { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main.id },
+        { name = "COGNITO_APP_CLIENT_ID", value = aws_cognito_user_pool_client.facilitator.id },
+        { name = "ALLOWED_ORIGINS", value = join(",", concat(var.allowed_callback_urls, ["http://${aws_lb.app.dns_name}"])) }
+      ]
+      secrets = [
+        { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.api.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+
+  tags = local.common_tags
+}
+
+resource "aws_ecs_task_definition" "admin" {
+  family                   = "${local.name}-admin"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = tostring(var.admin_task_cpu)
+  memory                   = tostring(var.admin_task_memory)
+  execution_role_arn       = aws_iam_role.ecs_task_execution.arn
+  task_role_arn            = aws_iam_role.admin_task.arn
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "ARM64"
+  }
+
+  container_definitions = jsonencode([
+    {
+      name      = local.admin_container_name
+      image     = "${aws_ecr_repository.admin.repository_url}:${var.admin_image_tag}"
+      essential = true
+      portMappings = [
+        {
+          containerPort = var.admin_container_port
+          hostPort      = var.admin_container_port
+          protocol      = "tcp"
+        }
+      ]
+      environment = [
+        { name = "NODE_ENV", value = "production" },
+        { name = "PORT", value = tostring(var.admin_container_port) },
+        { name = "NEXT_PUBLIC_API_URL", value = "http://${aws_lb.app.dns_name}" }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.admin.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    }
+  ])
+
+  tags = local.common_tags
+}
+
+resource "aws_ecs_service" "api" {
+  name            = "api"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.api.arn
+  desired_count   = var.api_desired_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    assign_public_ip = true
+    security_groups  = [aws_security_group.api_service.id]
+    subnets          = aws_subnet.public[*].id
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.api.arn
+    container_name   = local.api_container_name
+    container_port   = var.api_container_port
+  }
+
+  depends_on = [aws_lb_listener.http]
+  tags       = local.common_tags
+}
+
+resource "aws_ecs_service" "admin" {
+  name            = "admin"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.admin.arn
+  desired_count   = var.admin_desired_count
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    assign_public_ip = true
+    security_groups  = [aws_security_group.admin_service.id]
+    subnets          = aws_subnet.public[*].id
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.admin.arn
+    container_name   = local.admin_container_name
+    container_port   = var.admin_container_port
+  }
+
+  depends_on = [aws_lb_listener.http]
+  tags       = local.common_tags
+}
+
+resource "aws_cognito_user_group" "admin" {
+  name         = "admin"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Diaconia admin dashboard users"
+}
+
+resource "aws_cognito_user_group" "facilitator" {
+  name         = "facilitator"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Diaconia facilitator mobile users"
 }

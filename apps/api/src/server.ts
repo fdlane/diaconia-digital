@@ -33,8 +33,9 @@ const s3 = new S3Client({ region: config.awsRegion });
 const profilePhotoBodySchema = z.object({ mediaId: z.string().uuid() });
 
 const app = new Hono<AppBindings>();
+const api = new Hono<AppBindings>();
 
-app.use(
+api.use(
   "*",
   cors({
     origin: config.allowedOrigins,
@@ -43,7 +44,7 @@ app.use(
   }),
 );
 
-app.get("/health", (c) =>
+api.get("/health", (c) =>
   c.json({
     ok: true,
     service: "diaconia-foundation-api",
@@ -51,15 +52,15 @@ app.get("/health", (c) =>
   }),
 );
 
-app.get("/openapi.json", (c) => c.json(openApiDocument));
+api.get("/openapi.json", (c) => c.json(openApiDocument));
 
-app.use("/media/*", authMiddleware(config));
-app.use("/sessions", authMiddleware(config));
-app.use("/me/*", authMiddleware(config));
-app.use("/attendees/*", authMiddleware(config));
-app.use("/admin/*", authMiddleware(config));
+api.use("/media/*", authMiddleware(config));
+api.use("/sessions", authMiddleware(config));
+api.use("/me/*", authMiddleware(config));
+api.use("/attendees/*", authMiddleware(config));
+api.use("/admin/*", authMiddleware(config));
 
-app.post("/media/uploads", async (c) => {
+api.post("/media/uploads", async (c) => {
   const body = createMediaUploadInputSchema.safeParse(await c.req.json());
   if (!body.success) {
     return c.json({ error: "Invalid upload request", details: body.error.flatten() }, 400);
@@ -115,7 +116,7 @@ app.post("/media/uploads", async (c) => {
   return c.json(response);
 });
 
-app.post("/sessions", async (c) => {
+api.post("/sessions", async (c) => {
   const authUser = c.get("authUser");
   const body = createSessionInputSchema.safeParse(await c.req.json());
 
@@ -270,7 +271,7 @@ app.post("/sessions", async (c) => {
   return c.json({ id: body.data.id, status: "accepted" }, 201);
 });
 
-app.get("/admin/sessions", async (c) => {
+api.get("/admin/sessions", async (c) => {
   const forbidden = requireAdmin(c);
   if (forbidden) {
     return forbidden;
@@ -340,7 +341,7 @@ app.get("/admin/sessions", async (c) => {
   }
 });
 
-app.post("/me/profile-photo", async (c) => {
+api.post("/me/profile-photo", async (c) => {
   const authUser = c.get("authUser");
   const bodyResult = profilePhotoBodySchema.safeParse(await c.req.json());
   if (!bodyResult.success) {
@@ -375,7 +376,7 @@ app.post("/me/profile-photo", async (c) => {
   return c.json({ ok: true });
 });
 
-app.post("/attendees/:attendeeId/profile-photo", async (c) => {
+api.post("/attendees/:attendeeId/profile-photo", async (c) => {
   const authUser = c.get("authUser");
   const attendeeId = c.req.param("attendeeId");
   const bodyResult = profilePhotoBodySchema.safeParse(await c.req.json());
@@ -431,7 +432,7 @@ app.post("/attendees/:attendeeId/profile-photo", async (c) => {
   return c.json({ ok: true });
 });
 
-app.get("/media/:mediaId/access", async (c) => {
+api.get("/media/:mediaId/access", async (c) => {
   const mediaId = c.req.param("mediaId");
   const [asset] = await db.select().from(mediaAssets).where(eq(mediaAssets.id, mediaId)).limit(1);
   if (!asset) {
@@ -455,7 +456,7 @@ app.get("/media/:mediaId/access", async (c) => {
   });
 });
 
-app.get("/admin/sessions/:sessionId/media", async (c) => {
+api.get("/admin/sessions/:sessionId/media", async (c) => {
   const forbidden = requireAdmin(c);
   if (forbidden) {
     return forbidden;
@@ -486,7 +487,7 @@ app.get("/admin/sessions/:sessionId/media", async (c) => {
   return c.json({ media: signed });
 });
 
-app.get("/admin/sessions/:sessionId/prayer-requests", async (c) => {
+api.get("/admin/sessions/:sessionId/prayer-requests", async (c) => {
   const forbidden = requireAdmin(c);
   if (forbidden) {
     return forbidden;
@@ -511,7 +512,7 @@ app.get("/admin/sessions/:sessionId/prayer-requests", async (c) => {
   });
 });
 
-app.get("/admin/groups/:groupId/attendees", async (c) => {
+api.get("/admin/groups/:groupId/attendees", async (c) => {
   const forbidden = requireAdmin(c);
   if (forbidden) {
     return forbidden;
@@ -526,6 +527,9 @@ app.get("/admin/groups/:groupId/attendees", async (c) => {
 
   return c.json({ attendees: rows });
 });
+
+app.route("/", api);
+app.route("/api", api);
 
 serve(
   {

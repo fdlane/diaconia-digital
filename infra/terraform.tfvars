@@ -1,9 +1,6 @@
 environment = "dev"
 aws_region  = "sa-east-1"
 
-database_backup_retention_period = 0
-database_engine_version          = "16"
-
 allowed_callback_urls = [
   "http://localhost:3000",
   "http://localhost:8081",
@@ -19,11 +16,13 @@ allowed_logout_urls = [
 # First apply:
 #   keep desired counts at 0 so the ALB/ECR/cluster can bootstrap before images exist.
 # Second apply after pushing immutable git-SHA image tags:
-#   api_image_tag       = "abc1234"
+#   api_image_tag       = "0084120-api-fix1"
 #   admin_image_tag     = "abc1234"
 #   api_desired_count   = 1
 #   admin_desired_count = 1
-api_image_tag       = "bootstrap"
-admin_image_tag     = "bootstrap"
-api_desired_count   = 0
-admin_desired_count = 0
+api_image_tag       = "reset-api-4"
+admin_image_tag     = "reset-admin-2"
+api_desired_count   = 1
+admin_desired_count = 1
+
+database_engine_version = "18.4"

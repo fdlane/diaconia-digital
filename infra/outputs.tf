@@ -22,3 +22,23 @@ output "database_secret_arn" {
 output "ecs_cluster_name" {
   value = aws_ecs_cluster.main.name
 }
+
+output "load_balancer_dns_name" {
+  value = aws_lb.app.dns_name
+}
+
+output "api_ecr_repository_url" {
+  value = aws_ecr_repository.api.repository_url
+}
+
+output "admin_ecr_repository_url" {
+  value = aws_ecr_repository.admin.repository_url
+}
+
+output "api_service_name" {
+  value = aws_ecs_service.api.name
+}
+
+output "admin_service_name" {
+  value = aws_ecs_service.admin.name
+}
