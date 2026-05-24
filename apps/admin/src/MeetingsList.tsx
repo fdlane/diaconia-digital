@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
 import { useAuth } from "./AuthContext";
+import { t } from "./adminLabels";
 import { DownloadIcon, FilterIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -29,6 +30,7 @@ type PrayerRequest = {
 
 export function MeetingsList() {
   const { token, locale } = useAuth();
+  const l = t(locale);
 
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [mediaBySession, setMediaBySession] = useState<Record<string, SessionMedia[]>>({});
@@ -53,7 +55,7 @@ export function MeetingsList() {
 
   async function loadSessions() {
     setStatus("loading");
-    setStatusMsg("Loading sessions…");
+    setStatusMsg(l.loadingSessions);
 
     const headers: Record<string, string> = token
       ? { authorization: `Bearer ${token}` }
@@ -114,17 +116,13 @@ export function MeetingsList() {
       setMediaBySession(Object.fromEntries(mediaEntries));
       setPrayersBySession(Object.fromEntries(prayerEntries));
 
-      const base = data.warning ?? `${data.sessions.length} sessions`;
+      const base = data.warning ?? l.sessions(data.sessions.length);
       setStatus("done");
       setStatusMsg(failures ? `${base} · ${failures} detail loads failed` : base);
     } catch (err) {
       setStatus("error");
-      setStatusMsg(err instanceof Error ? err.message : "Unexpected error");
+      setStatusMsg(err instanceof Error ? err.message : "Error");
     }
-  }
-
-  function applyFilters() {
-    void loadSessions();
   }
 
   function exportCsv() {
@@ -151,7 +149,7 @@ export function MeetingsList() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "diaconia-meetings.csv";
+    a.download = "diaconia-reuniones.csv";
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -175,14 +173,22 @@ export function MeetingsList() {
   return (
     <div>
       <div className="page-header">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem", flexWrap: "wrap" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "1rem",
+            flexWrap: "wrap",
+          }}
+        >
           <div>
-            <h1 className="page-title">Meetings</h1>
-            <p className="page-subtitle">All trust group sessions and field reports</p>
+            <h1 className="page-title">{l.meetings}</h1>
+            <p className="page-subtitle">{l.meetingsSubtitle}</p>
           </div>
           <button className="btn btn-secondary" onClick={exportCsv} type="button">
             <DownloadIcon size={16} />
-            Export CSV
+            {l.exportCsv}
           </button>
         </div>
       </div>
@@ -190,7 +196,7 @@ export function MeetingsList() {
       <div className="card">
         <div className="toolbar">
           <div className="form-field">
-            <label htmlFor="from">From</label>
+            <label htmlFor="from">{l.from}</label>
             <input
               id="from"
               onChange={(e) => setFilters((v) => ({ ...v, from: e.target.value }))}
@@ -199,7 +205,7 @@ export function MeetingsList() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="to">To</label>
+            <label htmlFor="to">{l.to}</label>
             <input
               id="to"
               onChange={(e) => setFilters((v) => ({ ...v, to: e.target.value }))}
@@ -208,7 +214,7 @@ export function MeetingsList() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="group">Group ID</label>
+            <label htmlFor="group">{l.groupId}</label>
             <input
               id="group"
               onChange={(e) => setFilters((v) => ({ ...v, groupId: e.target.value }))}
@@ -217,9 +223,13 @@ export function MeetingsList() {
             />
           </div>
           <div style={{ display: "flex", alignItems: "flex-end" }}>
-            <button className="btn btn-primary" onClick={applyFilters} type="button">
+            <button
+              className="btn btn-primary"
+              onClick={() => void loadSessions()}
+              type="button"
+            >
               <FilterIcon size={15} />
-              Filter
+              {l.filter}
             </button>
           </div>
         </div>
@@ -233,13 +243,13 @@ export function MeetingsList() {
           <table>
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Group</th>
-                <th>Facilitator</th>
-                <th>Follow-up</th>
-                <th>Photos</th>
-                <th>Prayer</th>
-                <th>Notes</th>
+                <th>{l.colDate}</th>
+                <th>{l.colGroup}</th>
+                <th>{l.colFacilitator}</th>
+                <th>{l.colFollowUp}</th>
+                <th>{l.colPhotos}</th>
+                <th>{l.colPrayer}</th>
+                <th>{l.colNotes}</th>
               </tr>
             </thead>
             <tbody>
@@ -269,7 +279,7 @@ export function MeetingsList() {
                   <td>
                     <div className="thumbs">
                       {(mediaBySession[session.id] ?? []).map((m) => (
-                        <img alt="Meeting photo" key={m.id} src={m.url} />
+                        <img alt={l.meetingPhoto} key={m.id} src={m.url} />
                       ))}
                     </div>
                   </td>
@@ -283,19 +293,19 @@ export function MeetingsList() {
                         </div>
                       ))}
                       {!(prayersBySession[session.id] ?? []).length ? (
-                        <span className="text-muted text-sm">No requests</span>
+                        <span className="text-muted text-sm">{l.noRequests}</span>
                       ) : null}
                     </div>
                   </td>
                   <td className="text-sm text-muted">
-                    {session.notes || "No notes"}
+                    {session.notes || l.noNotes}
                   </td>
                 </tr>
               ))}
               {!sessions.length && status !== "loading" ? (
                 <tr>
                   <td className="table-empty" colSpan={7}>
-                    No sessions to show
+                    {l.noSessions}
                   </td>
                 </tr>
               ) : null}

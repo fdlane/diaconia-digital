@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
+import { t } from "./adminLabels";
 import { UsersIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -11,7 +12,6 @@ type AdminSession = {
   facilitatorName: string;
   groupName: string;
   community: string;
-  heldAt: string;
 };
 
 type FacilitatorRow = {
@@ -22,7 +22,8 @@ type FacilitatorRow = {
 };
 
 export function MembersPage() {
-  const { token } = useAuth();
+  const { token, locale } = useAuth();
+  const l = t(locale);
   const [facilitators, setFacilitators] = useState<FacilitatorRow[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,17 +43,15 @@ export function MembersPage() {
 
       const map = new Map<string, FacilitatorRow>();
       for (const s of data.sessions) {
-        const key = s.facilitatorName;
-        if (!map.has(key)) {
-          map.set(key, {
+        if (!map.has(s.facilitatorName)) {
+          map.set(s.facilitatorName, {
             name: s.facilitatorName,
             groupName: s.groupName,
             community: s.community,
             sessionCount: 0,
           });
         }
-        const entry = map.get(key)!;
-        entry.sessionCount++;
+        map.get(s.facilitatorName)!.sessionCount++;
       }
       setFacilitators([...map.values()].sort((a, b) => a.name.localeCompare(b.name)));
     } catch {
@@ -64,25 +63,25 @@ export function MembersPage() {
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Members</h1>
-        <p className="page-subtitle">Facilitators and group members</p>
+        <h1 className="page-title">{l.members}</h1>
+        <p className="page-subtitle">{l.membersSubtitle}</p>
       </div>
 
       <div className="card" style={{ marginBottom: "1.5rem" }}>
         <div className="card-header">
-          <span className="card-title">Facilitators</span>
+          <span className="card-title">{l.facilitators}</span>
           {!loading && (
-            <span className="text-sm text-muted">{facilitators.length} found</span>
+            <span className="text-sm text-muted">{l.found(facilitators.length)}</span>
           )}
         </div>
         <div className="table-wrapper">
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Group</th>
-                <th>Community</th>
-                <th>Sessions</th>
+                <th>{l.colName}</th>
+                <th>{l.colGroup}</th>
+                <th>{l.colCommunity}</th>
+                <th>{l.colSessions}</th>
               </tr>
             </thead>
             <tbody>
@@ -99,14 +98,14 @@ export function MembersPage() {
               {!facilitators.length && !loading ? (
                 <tr>
                   <td className="table-empty" colSpan={4}>
-                    No facilitators found
+                    {l.noFacilitators}
                   </td>
                 </tr>
               ) : null}
               {loading ? (
                 <tr>
                   <td className="table-empty" colSpan={4}>
-                    Loading…
+                    {l.loading}
                   </td>
                 </tr>
               ) : null}
@@ -117,7 +116,7 @@ export function MembersPage() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Group Attendees</span>
+          <span className="card-title">{l.groupAttendees}</span>
         </div>
         <div className="card-body">
           <div className="placeholder-page" style={{ minHeight: 200 }}>
@@ -126,10 +125,10 @@ export function MembersPage() {
             </div>
             <div>
               <p className="font-semibold" style={{ color: "var(--ink-2)" }}>
-                Attendee management coming soon
+                {l.attendeesComing}
               </p>
               <p className="text-sm text-muted" style={{ marginTop: "0.25rem" }}>
-                Group-level attendee lists will be available here once the roster API is ready.
+                {l.attendeesComingDesc}
               </p>
             </div>
           </div>

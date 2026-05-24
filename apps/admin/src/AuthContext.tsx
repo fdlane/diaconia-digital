@@ -38,7 +38,7 @@ export const defaultProfile: CurrentUserProfile = {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTokenState] = useState("");
   const [currentUser, setCurrentUser] = useState<CurrentUserProfile | null>(null);
-  const [locale, setLocaleState] = useState<SupportedLocale>("en");
+  const [locale, setLocaleState] = useState<SupportedLocale>("es");
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {

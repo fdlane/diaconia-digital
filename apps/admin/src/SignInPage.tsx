@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { defaultProfile, useAuth, type CurrentUserProfile } from "./AuthContext";
+import { t } from "./adminLabels";
 
 export function SignInPage() {
-  const { signIn } = useAuth();
+  const { signIn, locale, setLocale } = useAuth();
+  const l = t(locale);
   const [token, setToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,7 +24,7 @@ export function SignInPage() {
       });
 
       if (!res.ok && res.status === 401) {
-        setError("Invalid token. Please check your Cognito ID token and try again.");
+        setError(l.invalidToken);
         setLoading(false);
         return;
       }
@@ -43,14 +45,12 @@ export function SignInPage() {
         </div>
         <div className="signin-heading">
           <h1>Diaconia Admin</h1>
-          <p>
-            Paste a Cognito ID token, or continue without one in local dev.
-          </p>
+          <p>{l.signInSubtitle}</p>
         </div>
         <div className="signin-form">
           {error ? <div className="alert alert-danger">{error}</div> : null}
           <div className="form-field">
-            <label htmlFor="token">Cognito ID Token</label>
+            <label htmlFor="token">{l.cognitoTokenLabel}</label>
             <input
               autoComplete="off"
               id="token"
@@ -58,7 +58,7 @@ export function SignInPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void handleSignIn();
               }}
-              placeholder="Paste bearer token (optional for local dev)"
+              placeholder={l.cognitoTokenPlaceholder}
               type="password"
               value={token}
             />
@@ -70,8 +70,26 @@ export function SignInPage() {
             style={{ width: "100%", height: "2.75rem", fontSize: "0.9375rem" }}
             type="button"
           >
-            {loading ? "Signing in…" : "Sign in"}
+            {loading ? l.signingIn : l.signIn}
           </button>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div className="locale-toggle">
+            <button
+              className={locale === "es" ? "locale-btn active" : "locale-btn"}
+              onClick={() => setLocale("es")}
+              type="button"
+            >
+              ES
+            </button>
+            <button
+              className={locale === "en" ? "locale-btn active" : "locale-btn"}
+              onClick={() => setLocale("en")}
+              type="button"
+            >
+              EN
+            </button>
+          </div>
         </div>
       </div>
     </div>

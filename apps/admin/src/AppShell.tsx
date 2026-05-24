@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getProfileInitials } from "@diaconia/shared";
-import { defaultProfile, useAuth, type CurrentUserProfile } from "./AuthContext";
+import { useAuth, type CurrentUserProfile } from "./AuthContext";
+import { t } from "./adminLabels";
 import {
   CalendarIcon,
   DashboardIcon,
@@ -16,12 +17,6 @@ import {
   UsersIcon,
 } from "./icons";
 import { SignInPage } from "./SignInPage";
-
-const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", Icon: DashboardIcon },
-  { href: "/meetings", label: "Meetings", Icon: CalendarIcon },
-  { href: "/members", label: "Members", Icon: UsersIcon },
-];
 
 function Avatar({ user }: { user: CurrentUserProfile }) {
   return (
@@ -39,11 +34,14 @@ function ProfileEditor({
   initial,
   onSave,
   onClose,
+  locale,
 }: {
   initial: CurrentUserProfile;
   onSave: (p: CurrentUserProfile) => void;
   onClose: () => void;
+  locale: import("@diaconia/shared").SupportedLocale;
 }) {
+  const l = t(locale);
   const [draft, setDraft] = useState(initial);
 
   function update(field: keyof CurrentUserProfile) {
@@ -54,15 +52,15 @@ function ProfileEditor({
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        aria-label="Edit profile"
+        aria-label={l.editProfile}
         className="modal"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
       >
         <div className="modal-header">
-          <h2>Edit Profile</h2>
+          <h2>{l.editProfile}</h2>
           <button
-            aria-label="Close"
+            aria-label={l.cancel}
             className="icon-btn"
             onClick={onClose}
             type="button"
@@ -72,32 +70,32 @@ function ProfileEditor({
         </div>
         <div className="modal-body">
           <div className="form-field">
-            <label htmlFor="pe-name">Display Name</label>
+            <label htmlFor="pe-name">{l.displayName}</label>
             <input id="pe-name" onChange={update("displayName")} value={draft.displayName} />
           </div>
           <div className="form-field">
-            <label htmlFor="pe-email">Email</label>
+            <label htmlFor="pe-email">{l.email}</label>
             <input id="pe-email" onChange={update("email")} type="email" value={draft.email} />
           </div>
           <div className="form-field">
-            <label htmlFor="pe-phone">Phone</label>
+            <label htmlFor="pe-phone">{l.phone}</label>
             <input id="pe-phone" onChange={update("phone")} value={draft.phone} />
           </div>
           <div className="form-field">
-            <label htmlFor="pe-avatar">Avatar URL</label>
+            <label htmlFor="pe-avatar">{l.avatarUrl}</label>
             <input id="pe-avatar" onChange={update("avatarUrl")} value={draft.avatarUrl} />
           </div>
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose} type="button">
-            Cancel
+            {l.cancel}
           </button>
           <button
             className="btn btn-primary"
             onClick={() => onSave(draft)}
             type="button"
           >
-            Save Profile
+            {l.saveProfile}
           </button>
         </div>
       </div>
@@ -107,8 +105,15 @@ function ProfileEditor({
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { currentUser, isLoaded, signOut, updateProfile, locale, setLocale } = useAuth();
+  const l = t(locale);
   const pathname = usePathname();
   const router = useRouter();
+
+  const navItems = [
+    { href: "/", label: l.dashboard, Icon: DashboardIcon },
+    { href: "/meetings", label: l.meetings, Icon: CalendarIcon },
+    { href: "/members", label: l.members, Icon: UsersIcon },
+  ];
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dotsOpen, setDotsOpen] = useState(false);
@@ -150,14 +155,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="app-bar">
         <div className="app-bar-left">
           <button
-            aria-label="Toggle sidebar"
+            aria-label={l.toggleSidebar}
             className="icon-btn hamburger-btn"
             onClick={() => setSidebarOpen((v) => !v)}
             type="button"
           >
             <MenuIcon size={20} />
           </button>
-          <Link aria-label="Home" className="brand-link" href="/">
+          <Link aria-label={l.dashboard} className="brand-link" href="/">
             <img alt="Diaconia" className="brand-logo" src="/logo.png" />
           </Link>
         </div>
@@ -183,7 +188,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="dots-anchor" ref={dotsRef}>
             <button
               aria-expanded={dotsOpen}
-              aria-label="User menu"
+              aria-label={l.userMenu}
               className="icon-btn dots-btn"
               onClick={() => setDotsOpen((v) => !v)}
               type="button"
@@ -207,7 +212,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                 >
                   <UserIcon size={16} />
-                  Profile
+                  {l.profile}
                 </button>
                 <button
                   className="context-menu-item danger"
@@ -216,7 +221,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                 >
                   <LogOutIcon size={16} />
-                  Sign out
+                  {l.signOut}
                 </button>
               </div>
             ) : null}
@@ -226,7 +231,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Body */}
       <div className="app-body">
-        {/* Mobile overlay */}
         {sidebarOpen ? (
           <div
             aria-hidden
@@ -237,11 +241,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Sidebar */}
         <nav
-          aria-label="Main navigation"
+          aria-label={l.toggleSidebar}
           className={`sidebar${sidebarOpen ? "" : " sidebar-collapsed"}`}
         >
           <div className="nav-items">
-            {NAV_ITEMS.map(({ href, label, Icon }) => (
+            {navItems.map(({ href, label, Icon }) => (
               <Link
                 className={`nav-item${isActive(href) ? " nav-item-active" : ""}`}
                 href={href}
@@ -268,19 +272,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <span className="nav-icon">
                 <SettingsIcon size={18} />
               </span>
-              <span className="nav-label">Settings</span>
+              <span className="nav-label">{l.settings}</span>
             </Link>
           </div>
         </nav>
 
-        {/* Main content */}
         <main className="main-content">{children}</main>
       </div>
 
-      {/* Profile editor modal */}
       {profileEditorOpen ? (
         <ProfileEditor
           initial={currentUser}
+          locale={locale}
           onClose={() => setProfileEditorOpen(false)}
           onSave={handleSaveProfile}
         />

@@ -1,28 +1,42 @@
 "use client";
 
 import { useAuth } from "./AuthContext";
+import { t } from "./adminLabels";
 import { SettingsIcon } from "./icons";
 
 export function SettingsPage() {
   const { locale, setLocale } = useAuth();
+  const l = t(locale);
 
   return (
     <div>
       <div className="page-header">
-        <h1 className="page-title">Settings</h1>
-        <p className="page-subtitle">Application preferences and configuration</p>
+        <h1 className="page-title">{l.settings}</h1>
+        <p className="page-subtitle">{l.settingsSubtitle}</p>
       </div>
 
       <div className="card" style={{ maxWidth: 640 }}>
         <div className="card-header">
-          <span className="card-title">Preferences</span>
+          <span className="card-title">{l.preferences}</span>
         </div>
-        <div className="card-body" style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "1rem" }}>
+        <div
+          className="card-body"
+          style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "1rem",
+            }}
+          >
             <div>
-              <div className="font-semibold" style={{ fontSize: "0.9375rem" }}>Language</div>
+              <div className="font-semibold" style={{ fontSize: "0.9375rem" }}>
+                {l.language}
+              </div>
               <div className="text-sm text-muted" style={{ marginTop: "0.2rem" }}>
-                Choose the display language for dates and labels
+                {l.languageDesc}
               </div>
             </div>
             <div className="locale-toggle">
@@ -46,9 +60,11 @@ export function SettingsPage() {
           <div className="context-menu-divider" />
 
           <div>
-            <div className="font-semibold" style={{ fontSize: "0.9375rem" }}>API Endpoint</div>
+            <div className="font-semibold" style={{ fontSize: "0.9375rem" }}>
+              {l.apiEndpoint}
+            </div>
             <div className="text-sm text-muted" style={{ marginTop: "0.2rem" }}>
-              {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000 (default)"}
+              {process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000"}
             </div>
           </div>
         </div>
@@ -56,7 +72,7 @@ export function SettingsPage() {
 
       <div className="card" style={{ maxWidth: 640, marginTop: "1.5rem" }}>
         <div className="card-header">
-          <span className="card-title">Advanced</span>
+          <span className="card-title">{l.advanced}</span>
         </div>
         <div className="card-body">
           <div className="placeholder-page" style={{ minHeight: 160 }}>
@@ -64,9 +80,11 @@ export function SettingsPage() {
               <SettingsIcon size={40} />
             </div>
             <div>
-              <p className="font-semibold" style={{ color: "var(--ink-2)" }}>More settings coming soon</p>
+              <p className="font-semibold" style={{ color: "var(--ink-2)" }}>
+                {l.moreSettingsSoon}
+              </p>
               <p className="text-sm text-muted" style={{ marginTop: "0.25rem" }}>
-                Group management, notifications, and user roles will appear here.
+                {l.moreSettingsDesc}
               </p>
             </div>
           </div>

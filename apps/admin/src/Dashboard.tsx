@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { CalendarIcon, MeetingReportIcon, PrayerIcon } from "./icons";
+import { t } from "./adminLabels";
+import { CalendarIcon, MeetingReportIcon, PrayerIcon, UsersIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
@@ -10,14 +11,9 @@ type AdminSession = {
   id: string;
   heldAt: string;
   submittedAt: string | null;
-  groupName: string;
-  facilitatorName: string;
 };
 
-type PrayerRequest = {
-  id: string;
-  status: string;
-};
+type PrayerRequest = { id: string; status: string };
 
 type StatCardProps = {
   icon: React.ReactNode;
@@ -39,7 +35,8 @@ function StatCard({ icon, iconColor, value, label, description }: StatCardProps)
 }
 
 export function Dashboard() {
-  const { token, currentUser } = useAuth();
+  const { token, currentUser, locale } = useAuth();
+  const l = t(locale);
 
   const [plannedCount, setPlannedCount] = useState<number | "…">("…");
   const [reportsCount, setReportsCount] = useState<number | "…">("…");
@@ -59,19 +56,16 @@ export function Dashboard() {
       const data = (await res.json()) as { sessions: AdminSession[] };
       const sessions = data.sessions;
 
-      const planned = sessions.filter((s) => !s.submittedAt).length;
-      const submitted = sessions.filter((s) => s.submittedAt).length;
-      setPlannedCount(planned);
-      setReportsCount(submitted);
+      setPlannedCount(sessions.filter((s) => !s.submittedAt).length);
+      setReportsCount(sessions.filter((s) => s.submittedAt).length);
 
-      const submittedSessions = sessions.filter((s) => s.submittedAt);
-      const prayerResults = await Promise.all(
-        submittedSessions.map(async (session) => {
+      const submitted = sessions.filter((s) => s.submittedAt);
+      const counts = await Promise.all(
+        submitted.map(async (s) => {
           try {
-            const r = await fetch(
-              `${apiUrl}/admin/sessions/${session.id}/prayer-requests`,
-              { headers },
-            );
+            const r = await fetch(`${apiUrl}/admin/sessions/${s.id}/prayer-requests`, {
+              headers,
+            });
             if (!r.ok) return 0;
             const p = (await r.json()) as { prayerRequests: PrayerRequest[] };
             return p.prayerRequests.filter((pr) => pr.status === "open").length;
@@ -80,7 +74,7 @@ export function Dashboard() {
           }
         }),
       );
-      setOpenPrayersCount(prayerResults.reduce((sum, n) => sum + n, 0));
+      setOpenPrayersCount(counts.reduce((sum, n) => sum + n, 0));
     } catch {
       setPlannedCount(0);
       setReportsCount(0);
@@ -88,11 +82,10 @@ export function Dashboard() {
     }
   }
 
-  const greeting = currentUser?.displayName
-    ? `Welcome back, ${currentUser.displayName.split(" ")[0]}`
-    : "Welcome back";
+  const firstName = currentUser?.displayName.split(" ")[0];
+  const greeting = firstName ? l.greeting(firstName) : l.greetingFallback;
 
-  const today = new Intl.DateTimeFormat("en", {
+  const today = new Intl.DateTimeFormat(locale === "es" ? "es-PY" : "en", {
     weekday: "long",
     month: "long",
     day: "numeric",
@@ -108,40 +101,41 @@ export function Dashboard() {
 
       <div className="stat-cards">
         <StatCard
-          description="Meetings awaiting submission"
+          description={l.plannedMeetingsDesc}
           icon={<CalendarIcon size={20} />}
           iconColor="blue"
-          label="Planned Meetings"
+          label={l.plannedMeetings}
           value={plannedCount}
         />
         <StatCard
-          description="Prayer requests still open"
+          description={l.openPrayerRequestsDesc}
           icon={<PrayerIcon size={20} />}
           iconColor="purple"
-          label="Open Prayer Requests"
+          label={l.openPrayerRequests}
           value={openPrayersCount}
         />
         <StatCard
-          description="Reports submitted by facilitators"
+          description={l.meetingReportsDesc}
           icon={<MeetingReportIcon size={20} />}
           iconColor="green"
-          label="Meeting Reports"
+          label={l.meetingReports}
           value={reportsCount}
         />
       </div>
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">Quick Links</span>
+          <span className="card-title">{l.quickLinks}</span>
         </div>
         <div className="card-body">
           <div className="quick-links">
             <a className="quick-link" href="/meetings">
               <CalendarIcon size={18} />
-              View all meetings
+              {l.viewAllMeetings}
             </a>
             <a className="quick-link" href="/members">
-              View members
+              <UsersIcon size={18} />
+              {l.viewMembers}
             </a>
           </div>
         </div>
