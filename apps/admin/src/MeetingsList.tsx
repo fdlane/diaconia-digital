@@ -1,12 +1,16 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
-import { DownloadIcon, FilterIcon } from "./icons";
+import { ChevronRightIcon, DownloadIcon, FilterIcon, PlusIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+
+type Group = { id: string; name: string; community: string };
 
 type AdminSession = {
   id: string;
@@ -31,8 +35,10 @@ type PrayerRequest = {
 export function MeetingsList() {
   const { token, locale } = useAuth();
   const l = t(locale);
+  const router = useRouter();
 
   const [sessions, setSessions] = useState<AdminSession[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [mediaBySession, setMediaBySession] = useState<Record<string, SessionMedia[]>>({});
   const [prayersBySession, setPrayersBySession] = useState<
     Record<string, PrayerRequest[]>
@@ -50,8 +56,19 @@ export function MeetingsList() {
   }, [filters]);
 
   useEffect(() => {
+    void loadGroups();
     void loadSessions();
   }, [token]);
+
+  async function loadGroups() {
+    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    try {
+      const res = await fetch(`${apiUrl}/admin/groups`, { headers });
+      if (!res.ok) return;
+      const data = (await res.json()) as { groups: Group[] };
+      setGroups(data.groups.filter((g) => g.name));
+    } catch { /* non-critical */ }
+  }
 
   async function loadSessions() {
     setStatus("loading");
@@ -186,10 +203,16 @@ export function MeetingsList() {
             <h1 className="page-title">{l.meetings}</h1>
             <p className="page-subtitle">{l.meetingsSubtitle}</p>
           </div>
-          <button className="btn btn-secondary" onClick={exportCsv} type="button">
-            <DownloadIcon size={16} />
-            {l.exportCsv}
-          </button>
+          <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+            <button className="btn btn-secondary" onClick={exportCsv} type="button">
+              <DownloadIcon size={16} />
+              {l.exportCsv}
+            </button>
+            <Link className="btn btn-primary" href="/meetings/new">
+              <PlusIcon size={15} />
+              {l.newMeeting}
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -214,13 +237,19 @@ export function MeetingsList() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="group">{l.groupId}</label>
-            <input
+            <label htmlFor="group">{l.colGroup}</label>
+            <select
               id="group"
               onChange={(e) => setFilters((v) => ({ ...v, groupId: e.target.value }))}
-              placeholder="UUID"
               value={filters.groupId}
-            />
+            >
+              <option value="">{locale === "es" ? "Todos los grupos" : "All groups"}</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}{g.community ? ` — ${g.community}` : ""}
+                </option>
+              ))}
+            </select>
           </div>
           <div style={{ display: "flex", alignItems: "flex-end" }}>
             <button
@@ -250,11 +279,16 @@ export function MeetingsList() {
                 <th>{l.colPhotos}</th>
                 <th>{l.colPrayer}</th>
                 <th>{l.colNotes}</th>
+                <th />
               </tr>
             </thead>
             <tbody>
               {sessions.map((session) => (
-                <tr key={session.id}>
+                <tr
+                  className="row-link"
+                  key={session.id}
+                  onClick={() => router.push(`/meetings/${session.id}`)}
+                >
                   <td style={{ whiteSpace: "nowrap" }}>
                     {formatDisplayDate(session.heldAt, locale)}
                   </td>
@@ -300,12 +334,34 @@ export function MeetingsList() {
                   <td className="text-sm text-muted">
                     {session.notes || l.noNotes}
                   </td>
+                  <td className="row-action-cell">
+                    <ChevronRightIcon size={16} />
+                  </td>
                 </tr>
               ))}
               {!sessions.length && status !== "loading" ? (
                 <tr>
-                  <td className="table-empty" colSpan={7}>
-                    {l.noSessions}
+                  <td colSpan={8}>
+                    <div className="empty-state">
+                      <div className="empty-state-icon">
+                        <svg fill="none" height={40} stroke="currentColor" strokeLinecap="round"
+                          strokeLinejoin="round" strokeWidth={1.5} viewBox="0 0 24 24" width={40}>
+                          <rect height="18" rx="2" width="18" x="3" y="4" />
+                          <line x1="16" x2="16" y1="2" y2="6" />
+                          <line x1="8" x2="8" y1="2" y2="6" />
+                          <line x1="3" x2="21" y1="10" y2="10" />
+                        </svg>
+                      </div>
+                      <p className="empty-state-title">{l.noSessions}</p>
+                      <Link className="btn btn-primary" href="/meetings/new">
+                        <svg fill="none" height={14} stroke="currentColor" strokeLinecap="round"
+                          strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24" width={14}>
+                          <line x1="12" x2="12" y1="5" y2="19" />
+                          <line x1="5" x2="19" y1="12" y2="12" />
+                        </svg>
+                        {l.newMeeting}
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ) : null}
