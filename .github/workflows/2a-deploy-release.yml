@@ -55,12 +55,10 @@ jobs:
         id: images
         run: .github/scripts/deploy-images.sh prod "${{ github.event.release.tag_name }}"
 
-      - name: Deploy services
+      - name: Deploy service images
         run: >
-          .github/scripts/terraform-apply.sh
+          .github/scripts/deploy-services.sh
           prod
           "${{ steps.tfvars.outputs.tfvars_file }}"
           -var="api_image_tag=${{ steps.images.outputs.image_tag }}"
           -var="admin_image_tag=${{ steps.images.outputs.image_tag }}"
-          -var="api_desired_count=1"
-          -var="admin_desired_count=1"
