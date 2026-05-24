@@ -61,11 +61,16 @@ content; otherwise dev uses the committed `infra/terraform.tfvars`, and prod exp
 
 The deployment workflows are:
 
-- `0a. Deploy branch to AWS`: manual branch/tag/SHA deploy
-- `1a. Deploy main to AWS`: deploys `main` to dev after merge
-- `2a. Deploy release to AWS`: deploys published releases to prod once prod exists
-- `3a. Deploy infra to AWS`: manual Terraform apply
+- `0a. Deploy branch to AWS`: manual branch/tag/SHA code deploy
+- `1a. Deploy main to AWS`: code deploy for `main` to dev after merge
+- `2a. Deploy release to AWS`: code deploy for published releases to prod once prod exists
+- `3a. Deploy infra to AWS`: manual full Terraform apply for infrastructure changes
 - `3b. Run db migrations`: manual Drizzle migration task in ECS
+
+Code deploy workflows build or reuse API/admin images, then update only the ECS
+task definitions and services to the selected image tags. Infrastructure changes
+and database migrations are intentionally manual through the `3a` and `3b`
+workflows.
 
 Capture the outputs:
 
