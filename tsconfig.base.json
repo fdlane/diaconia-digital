@@ -10,10 +10,9 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "baseUrl": ".",
     "paths": {
-      "@diaconia/shared": ["packages/shared/src/index.ts"],
-      "@diaconia/db": ["packages/db/src/index.ts"]
+      "@diaconia/shared": ["./packages/shared/src/index.ts"],
+      "@diaconia/db": ["./packages/db/src/index.ts"]
     }
   }
 }
