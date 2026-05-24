@@ -3,6 +3,8 @@ import type { AttendanceStatus, FollowUpCategory, Role } from "@diaconia/shared"
 export type LocalUser = {
   id: string;
   displayName: string;
+  email?: string | null;
+  phone?: string | null;
   token: string;
   role: Role;
   profilePhotoUri?: string;

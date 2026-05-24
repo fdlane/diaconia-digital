@@ -21,6 +21,7 @@ import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { randomUUID } from "node:crypto";
+import { z } from "zod";
 import { authMiddleware, requireAdmin, type AppBindings } from "./auth";
 import { loadConfig } from "./config";
 import { openApiDocument } from "./openapi";
@@ -29,12 +30,14 @@ const config = loadConfig();
 const db = createDatabase(config.databaseUrl);
 const s3 = new S3Client({ region: config.awsRegion });
 
+const profilePhotoBodySchema = z.object({ mediaId: z.string().uuid() });
+
 const app = new Hono<AppBindings>();
 
 app.use(
   "*",
   cors({
-    origin: ["http://localhost:3000", "http://localhost:8081", "http://localhost:19006"],
+    origin: config.allowedOrigins,
     allowHeaders: ["authorization", "content-type"],
     allowMethods: ["GET", "POST", "OPTIONS"],
   }),
@@ -339,23 +342,34 @@ app.get("/admin/sessions", async (c) => {
 
 app.post("/me/profile-photo", async (c) => {
   const authUser = c.get("authUser");
-  const body = (await c.req.json()) as { mediaId?: string };
-  if (!body.mediaId) {
-    return c.json({ error: "mediaId is required" }, 400);
+  const bodyResult = profilePhotoBodySchema.safeParse(await c.req.json());
+  if (!bodyResult.success) {
+    return c.json({ error: "mediaId is required and must be a valid UUID" }, 400);
   }
+  const { mediaId } = bodyResult.data;
 
   const [actor] = await db.select().from(users).where(eq(users.cognitoSub, authUser.sub)).limit(1);
   if (!actor) {
     return c.json({ error: "User profile not found" }, 403);
   }
 
-  await db.update(users).set({ profilePhotoMediaId: body.mediaId }).where(eq(users.id, actor.id));
+  const [asset] = await db
+    .select({ ownerUserId: mediaAssets.ownerUserId, type: mediaAssets.type })
+    .from(mediaAssets)
+    .where(eq(mediaAssets.id, mediaId))
+    .limit(1);
+
+  if (!asset || asset.ownerUserId !== actor.id || asset.type !== "user_profile_photo") {
+    return c.json({ error: "Media not found or not owned by user" }, 403);
+  }
+
+  await db.update(users).set({ profilePhotoMediaId: mediaId }).where(eq(users.id, actor.id));
   await db.insert(auditEvents).values({
     actorUserId: actor.id,
     action: "user_profile_photo_updated",
     entityType: "user",
     entityId: actor.id,
-    metadataJson: JSON.stringify({ mediaId: body.mediaId }),
+    metadataJson: JSON.stringify({ mediaId }),
   });
 
   return c.json({ ok: true });
@@ -364,23 +378,54 @@ app.post("/me/profile-photo", async (c) => {
 app.post("/attendees/:attendeeId/profile-photo", async (c) => {
   const authUser = c.get("authUser");
   const attendeeId = c.req.param("attendeeId");
-  const body = (await c.req.json()) as { mediaId?: string };
-  if (!body.mediaId) {
-    return c.json({ error: "mediaId is required" }, 400);
+  const bodyResult = profilePhotoBodySchema.safeParse(await c.req.json());
+  if (!bodyResult.success) {
+    return c.json({ error: "mediaId is required and must be a valid UUID" }, 400);
   }
+  const { mediaId } = bodyResult.data;
 
   const [actor] = await db.select().from(users).where(eq(users.cognitoSub, authUser.sub)).limit(1);
   if (!actor) {
     return c.json({ error: "User profile not found" }, 403);
   }
 
-  await db.update(attendees).set({ profilePhotoMediaId: body.mediaId }).where(eq(attendees.id, attendeeId));
+  const [attendee] = await db
+    .select({ groupId: attendees.groupId })
+    .from(attendees)
+    .where(eq(attendees.id, attendeeId))
+    .limit(1);
+
+  if (!attendee) {
+    return c.json({ error: "Attendee not found" }, 404);
+  }
+
+  const [group] = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(and(eq(groups.id, attendee.groupId), eq(groups.facilitatorId, actor.id)))
+    .limit(1);
+
+  if (!group) {
+    return c.json({ error: "Not authorized to update this attendee" }, 403);
+  }
+
+  const [asset] = await db
+    .select({ attendeeId: mediaAssets.attendeeId, type: mediaAssets.type })
+    .from(mediaAssets)
+    .where(eq(mediaAssets.id, mediaId))
+    .limit(1);
+
+  if (!asset || asset.attendeeId !== attendeeId || asset.type !== "attendee_profile_photo") {
+    return c.json({ error: "Media not found or not associated with attendee" }, 403);
+  }
+
+  await db.update(attendees).set({ profilePhotoMediaId: mediaId }).where(eq(attendees.id, attendeeId));
   await db.insert(auditEvents).values({
     actorUserId: actor.id,
     action: "attendee_profile_photo_updated",
     entityType: "attendee",
     entityId: attendeeId,
-    metadataJson: JSON.stringify({ mediaId: body.mediaId }),
+    metadataJson: JSON.stringify({ mediaId }),
   });
 
   return c.json({ ok: true });

@@ -1,5 +1,6 @@
 import {
   formatDisplayDate,
+  getProfileInitials,
   labels,
   type AttendanceStatus,
   type FollowUpCategory,
@@ -10,6 +11,7 @@ import * as Crypto from "expo-crypto";
 import { useEffect, useMemo, useState } from "react";
 import {
   Image,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -28,6 +30,7 @@ import {
   loadLocale,
   loadSessions,
   loadUser,
+  removeUser,
   saveAttendees,
   saveLocale,
   saveSessions,
@@ -77,6 +80,16 @@ const ui = {
     reportHistory: "Reportes locales",
     noPrayers: "Sin peticiones todavía.",
     signedInAs: "Ingresaste como",
+    myProfile: "Mi perfil",
+    editProfile: "Editar perfil",
+    displayName: "Nombre",
+    email: "Correo",
+    phone: "Teléfono",
+    cognitoToken: "Token Cognito",
+    cognitoTokenHelp: "Pega un ID token de Cognito cuando el pool esté configurado; demo local sigue disponible.",
+    saveProfile: "Guardar perfil",
+    signOut: "Cerrar sesión",
+    cancel: "Cancelar",
   },
   en: {
     heroTitle: "Trust group meeting",
@@ -103,6 +116,16 @@ const ui = {
     reportHistory: "Local reports",
     noPrayers: "No requests yet.",
     signedInAs: "Signed in as",
+    myProfile: "My profile",
+    editProfile: "Edit profile",
+    displayName: "Name",
+    email: "Email",
+    phone: "Phone",
+    cognitoToken: "Cognito token",
+    cognitoTokenHelp: "Paste a Cognito ID token once the user pool is configured; local demo stays available.",
+    saveProfile: "Save profile",
+    signOut: "Sign out",
+    cancel: "Cancel",
   },
 } satisfies Record<SupportedLocale, Record<string, string>>;
 
@@ -127,6 +150,12 @@ export function FieldSessionApp() {
   const [newPrayer, setNewPrayer] = useState("");
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonPhone, setNewPersonPhone] = useState("");
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
+  const [profileName, setProfileName] = useState("");
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [cognitoToken, setCognitoToken] = useState("");
   const copy = labels[locale];
   const text = ui[locale];
   const [status, setStatus] = useState(copy.ready);
@@ -135,7 +164,14 @@ export function FieldSessionApp() {
     async function hydrate() {
       const storedLocale = await loadLocale();
       setLocale(storedLocale);
-      setUser(await loadUser());
+      const storedUser = await loadUser();
+      setUser(storedUser);
+      if (storedUser) {
+        setProfileName(storedUser.displayName);
+        setProfileEmail(storedUser.email ?? "");
+        setProfilePhone(storedUser.phone ?? "");
+        setCognitoToken(storedUser.token === "local-dev-token" ? "" : storedUser.token);
+      }
       setAttendees(await loadAttendees(seedAttendees));
       setSessions(await loadSessions());
     }
@@ -162,15 +198,45 @@ export function FieldSessionApp() {
     await saveLocale(nextLocale);
   }
 
-  async function signIn(role: Role) {
+  async function signIn(role: Role, token = "local-dev-token") {
+    const isAdmin = role === "admin";
     const nextUser: LocalUser = {
-      id: role === "admin" ? adminUserId : facilitatorUserId,
-      displayName: role === "admin" ? "Administradora Demo" : "Facilitadora Demo",
+      id: isAdmin ? adminUserId : facilitatorUserId,
+      displayName: isAdmin ? "Administradora Demo" : "Facilitadora Demo",
+      email: isAdmin ? "admin@diaconia.local" : "facilitator@diaconia.local",
+      phone: isAdmin ? "+595 21 000 100" : "+595 21 000 200",
       role,
-      token: "local-dev-token",
+      token: token.trim() || "local-dev-token",
+    };
+    setUser(nextUser);
+    setProfileName(nextUser.displayName);
+    setProfileEmail(nextUser.email ?? "");
+    setProfilePhone(nextUser.phone ?? "");
+    setCognitoToken(nextUser.token === "local-dev-token" ? "" : nextUser.token);
+    await saveUser(nextUser);
+  }
+
+  async function saveProfile() {
+    if (!user) return;
+    const nextUser: LocalUser = {
+      ...user,
+      displayName: profileName.trim() || user.displayName,
+      email: profileEmail.trim() || null,
+      phone: profilePhone.trim() || null,
+      token: cognitoToken.trim() || user.token,
     };
     setUser(nextUser);
     await saveUser(nextUser);
+    setProfileEditorOpen(false);
+    setProfileMenuOpen(false);
+  }
+
+  async function signOut() {
+    setUser(null);
+    setProfileMenuOpen(false);
+    setProfileEditorOpen(false);
+    setCognitoToken("");
+    await removeUser();
   }
 
   async function updateUserPhoto() {
@@ -351,10 +417,17 @@ export function FieldSessionApp() {
           <Text style={styles.heroTitle}>{text.heroTitle}</Text>
           <Text style={styles.heroSubtitle}>{text.heroSubtitle}</Text>
           <View style={styles.signInButtons}>
-            <Pressable onPress={() => signIn("facilitator")} style={styles.primaryButton}>
+            <TextInput
+              onChangeText={setCognitoToken}
+              placeholder={text.cognitoToken}
+              style={styles.input}
+              value={cognitoToken}
+            />
+            <Text style={styles.microcopy}>{text.cognitoTokenHelp}</Text>
+            <Pressable onPress={() => signIn("facilitator", cognitoToken)} style={styles.primaryButton}>
               <Text style={styles.primaryButtonText}>{text.facilitatorMode}</Text>
             </Pressable>
-            <Pressable onPress={() => signIn("admin")} style={styles.secondaryButton}>
+            <Pressable onPress={() => signIn("admin", cognitoToken)} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>{text.adminMode}</Text>
             </Pressable>
           </View>
@@ -370,14 +443,39 @@ export function FieldSessionApp() {
         <View style={styles.heroCard}>
           <View style={styles.headerRow}>
             <Image source={diaconiaLogo} style={styles.headerLogo} resizeMode="contain" />
-            {languageSwitch}
+            <View style={styles.headerActions}>
+              {languageSwitch}
+              <Pressable onPress={() => setProfileMenuOpen((value) => !value)} style={styles.headerAvatarButton}>
+                {user.profilePhotoUri ? (
+                  <Image source={{ uri: user.profilePhotoUri }} style={styles.headerAvatar} />
+                ) : (
+                  <Text style={styles.headerAvatarText}>{getProfileInitials(user.displayName, user.email)}</Text>
+                )}
+              </Pressable>
+            </View>
           </View>
+          {profileMenuOpen ? (
+            <View style={styles.profileMenu}>
+              <Text style={styles.menuTitle}>{text.myProfile}</Text>
+              <Text style={styles.menuName}>{user.displayName}</Text>
+              <Text style={styles.menuMeta}>{user.email ?? user.phone ?? user.role}</Text>
+              <Pressable onPress={() => setProfileEditorOpen(true)} style={styles.menuItem}>
+                <Text style={styles.menuItemText}>{text.editProfile}</Text>
+              </Pressable>
+              <Pressable onPress={updateUserPhoto} style={styles.menuItem}>
+                <Text style={styles.menuItemText}>{copy.profilePhoto}</Text>
+              </Pressable>
+              <Pressable onPress={signOut} style={styles.menuItemDanger}>
+                <Text style={styles.menuItemDangerText}>{text.signOut}</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <Text style={styles.overline}>{selectedGroup.community}</Text>
           <Text style={styles.heroTitleLight}>{text.heroTitle}</Text>
           <Text style={styles.heroSubtitleLight}>{text.heroSubtitle}</Text>
           <View style={styles.userRow}>
             <Pressable onPress={updateUserPhoto} style={styles.avatarButton}>
-              {user.profilePhotoUri ? <Image source={{ uri: user.profilePhotoUri }} style={styles.avatar} /> : <Text style={styles.avatarText}>{copy.profilePhoto}</Text>}
+              {user.profilePhotoUri ? <Image source={{ uri: user.profilePhotoUri }} style={styles.avatar} /> : <Text style={styles.avatarText}>{getProfileInitials(user.displayName, user.email)}</Text>}
             </Pressable>
             <View style={styles.userCopy}>
               <Text style={styles.microcopyLight}>{text.signedInAs}</Text>
@@ -507,6 +605,21 @@ export function FieldSessionApp() {
           ))}
         </View>
       </ScrollView>
+      <Modal animationType="fade" onRequestClose={() => setProfileEditorOpen(false)} transparent visible={profileEditorOpen}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.sectionTitle}>{text.editProfile}</Text>
+            <TextInput onChangeText={setProfileName} placeholder={text.displayName} style={styles.input} value={profileName} />
+            <TextInput autoCapitalize="none" keyboardType="email-address" onChangeText={setProfileEmail} placeholder={text.email} style={styles.input} value={profileEmail} />
+            <TextInput keyboardType="phone-pad" onChangeText={setProfilePhone} placeholder={text.phone} style={styles.input} value={profilePhone} />
+            <TextInput autoCapitalize="none" multiline onChangeText={setCognitoToken} placeholder={text.cognitoToken} style={styles.textAreaSmall} value={cognitoToken} />
+            <View style={styles.actions}>
+              <Pressable onPress={() => setProfileEditorOpen(false)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.cancel}</Text></Pressable>
+              <Pressable onPress={saveProfile} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{text.saveProfile}</Text></Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -522,6 +635,7 @@ const styles = StyleSheet.create({
   signInLogo: { width: 260, height: 82, alignSelf: "flex-start" },
   heroCard: { gap: 12, borderRadius: 28, padding: 20, backgroundColor: brand.dark, ...Platform.select({ web: { boxShadow: "0 24px 60px rgba(18,28,34,.22)" } }) },
   headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
   headerLogo: { width: 160, height: 48, backgroundColor: brand.surface, borderRadius: 14 },
   heroTitle: { color: brand.ink, fontSize: 30, fontWeight: "900", letterSpacing: -0.8 },
   heroTitleLight: { color: "white", fontSize: 30, fontWeight: "900", letterSpacing: -0.8 },
@@ -531,6 +645,17 @@ const styles = StyleSheet.create({
   userRow: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,.13)", paddingTop: 14 },
   userCopy: { flex: 1 },
   avatarButton: { width: 54, height: 54, alignItems: "center", justifyContent: "center", overflow: "hidden", borderRadius: 18, backgroundColor: brand.surfaceAlt },
+  headerAvatarButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center", overflow: "hidden", borderRadius: 999, backgroundColor: brand.surface },
+  headerAvatar: { width: 42, height: 42 },
+  headerAvatarText: { color: brand.primaryStrong, fontSize: 13, fontWeight: "900" },
+  profileMenu: { alignSelf: "flex-end", width: 230, gap: 8, borderRadius: 18, padding: 14, backgroundColor: brand.surface, ...Platform.select({ web: { boxShadow: "0 16px 42px rgba(18,28,34,.20)" } }) },
+  menuTitle: { color: brand.muted, fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
+  menuName: { color: brand.ink, fontSize: 16, fontWeight: "900" },
+  menuMeta: { color: brand.muted, fontSize: 12 },
+  menuItem: { borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 10 },
+  menuItemText: { color: brand.primary, fontWeight: "900" },
+  menuItemDanger: { borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 10 },
+  menuItemDangerText: { color: brand.danger, fontWeight: "900" },
   avatar: { width: 54, height: 54 },
   avatarText: { color: brand.primaryStrong, fontSize: 11, fontWeight: "900" },
   rolePill: { overflow: "hidden", borderRadius: 999, backgroundColor: brand.accent, color: "white", fontSize: 12, fontWeight: "900", paddingHorizontal: 10, paddingVertical: 6, textTransform: "uppercase" },
@@ -593,4 +718,6 @@ const styles = StyleSheet.create({
   meetingPhoto: { width: 96, height: 96, borderRadius: 18, borderWidth: 1, borderColor: brand.line },
   actions: { flexDirection: "row", gap: 10 },
   queueRow: { borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 10, gap: 3 },
+  modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(18,28,34,.45)", padding: 18 },
+  modalCard: { width: "100%", maxWidth: 520, gap: 12, borderRadius: 24, padding: 18, backgroundColor: brand.surface },
 });

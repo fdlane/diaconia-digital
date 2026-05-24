@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDisplayDate, labels, type SupportedLocale } from "@diaconia/shared";
+import { formatDisplayDate, getProfileInitials, labels, type SupportedLocale } from "@diaconia/shared";
 import { useEffect, useMemo, useState } from "react";
 
 type AdminSession = {
@@ -35,8 +35,23 @@ type AdminSessionsResponse = {
   warning?: string;
 };
 
+type CurrentUserProfile = {
+  displayName: string;
+  email: string;
+  phone: string;
+  avatarUrl: string;
+};
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const localeStorageKey = "diaconia:admin:locale";
+const profileStorageKey = "diaconia:admin:profile";
+const tokenStorageKey = "diaconia:admin:cognitoToken";
+const defaultProfile: CurrentUserProfile = {
+  displayName: "Diaconia Admin",
+  email: "admin@diaconia.local",
+  phone: "+595 21 000 100",
+  avatarUrl: "",
+};
 const localeOptions = [
   { locale: "es", label: "ES" },
   { locale: "en", label: "EN" },
@@ -50,6 +65,10 @@ export function AdminDashboard() {
     Record<string, PrayerRequest[]>
   >({});
   const [token, setToken] = useState("");
+  const [currentUser, setCurrentUser] = useState<CurrentUserProfile | null>(null);
+  const [profileDraft, setProfileDraft] = useState<CurrentUserProfile>(defaultProfile);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const [filters, setFilters] = useState({
     facilitatorId: "",
     groupId: "",
@@ -69,12 +88,12 @@ export function AdminDashboard() {
     return params.toString();
   }, [filters]);
 
-  async function loadSessions() {
+  async function loadSessions(tokenOverride = token) {
     setStatus(copy.loadingSessions);
-    const requestInit = token
+    const requestInit = tokenOverride
       ? {
           headers: {
-            authorization: `Bearer ${token}`,
+            authorization: `Bearer ${tokenOverride}`,
           },
         }
       : undefined;
@@ -149,6 +168,42 @@ export function AdminDashboard() {
     window.localStorage.setItem(localeStorageKey, nextLocale);
   }
 
+  function saveProfile() {
+    const nextProfile = {
+      ...profileDraft,
+      displayName: profileDraft.displayName.trim() || defaultProfile.displayName,
+      email: profileDraft.email.trim(),
+      phone: profileDraft.phone.trim(),
+      avatarUrl: profileDraft.avatarUrl.trim(),
+    };
+    setCurrentUser(nextProfile);
+    setProfileDraft(nextProfile);
+    window.localStorage.setItem(profileStorageKey, JSON.stringify(nextProfile));
+    window.localStorage.setItem(tokenStorageKey, token);
+    setProfileEditorOpen(false);
+    setProfileMenuOpen(false);
+  }
+
+  function signInWithCognito() {
+    setCurrentUser(profileDraft);
+    window.localStorage.setItem(profileStorageKey, JSON.stringify(profileDraft));
+    window.localStorage.setItem(tokenStorageKey, token);
+    void loadSessions(token);
+  }
+
+  function signOut() {
+    setCurrentUser(null);
+    setToken("");
+    setSessions([]);
+    setMediaBySession({});
+    setPrayerRequestsBySession({});
+    setProfileMenuOpen(false);
+    setProfileEditorOpen(false);
+    window.localStorage.removeItem(tokenStorageKey);
+    window.localStorage.removeItem(profileStorageKey);
+    setStatus(locale === "es" ? "Sesión cerrada" : "Signed out");
+  }
+
   function exportCsv() {
     const header = [
       "heldAt",
@@ -184,7 +239,19 @@ export function AdminDashboard() {
       setLocale(storedLocale);
       setStatus(labels[storedLocale].ready);
     }
-    void loadSessions();
+    const storedToken = window.localStorage.getItem(tokenStorageKey) ?? "";
+    setToken(storedToken);
+    const storedProfile = window.localStorage.getItem(profileStorageKey);
+    if (storedProfile) {
+      try {
+        const parsed = JSON.parse(storedProfile) as CurrentUserProfile;
+        setCurrentUser(parsed);
+        setProfileDraft(parsed);
+      } catch {
+        setCurrentUser(null);
+      }
+    }
+    void loadSessions(storedToken);
   }, []);
 
   return (
@@ -213,16 +280,64 @@ export function AdminDashboard() {
           <button className="secondary" onClick={exportCsv} type="button">
             {copy.exportCsv}
           </button>
+          {currentUser ? (
+            <div className="profile-anchor">
+              <button
+                aria-expanded={profileMenuOpen}
+                aria-label={locale === "es" ? "Abrir perfil" : "Open profile"}
+                className="avatar-menu-button"
+                onClick={() => setProfileMenuOpen((value) => !value)}
+                type="button"
+              >
+                {currentUser.avatarUrl ? (
+                  <img alt="" src={currentUser.avatarUrl} />
+                ) : (
+                  <span>{getProfileInitials(currentUser.displayName, currentUser.email)}</span>
+                )}
+              </button>
+              {profileMenuOpen ? (
+                <div className="profile-menu">
+                  <span className="eyebrow">{locale === "es" ? "Mi perfil" : "My profile"}</span>
+                  <strong>{currentUser.displayName}</strong>
+                  <span>{currentUser.email || currentUser.phone || "Cognito admin"}</span>
+                  <button className="secondary" onClick={() => setProfileEditorOpen(true)} type="button">
+                    {locale === "es" ? "Editar perfil" : "Edit profile"}
+                  </button>
+                  <button className="danger" onClick={signOut} type="button">
+                    {locale === "es" ? "Cerrar sesión" : "Sign out"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </header>
 
       <section className="content">
+        {!currentUser ? (
+          <div className="signin-panel">
+            <h1>{locale === "es" ? "Iniciar sesión" : "Sign in"}</h1>
+            <p className="muted">
+              {locale === "es"
+                ? "Use un ID token de AWS Cognito cuando el pool esté configurado; localmente puede continuar como admin demo."
+                : "Use an AWS Cognito ID token once the pool is configured; locally you can continue as a demo admin."}
+            </p>
+            <input
+              aria-label={copy.cognitoToken}
+              onChange={(event) => setToken(event.target.value)}
+              placeholder={copy.tokenPlaceholder}
+              value={token}
+            />
+            <button onClick={signInWithCognito} type="button">{copy.signIn}</button>
+          </div>
+        ) : null}
         <div className="toolbar" aria-label={copy.filters}>
           <div className="field">
             <label htmlFor="token">{copy.cognitoToken}</label>
             <input
               id="token"
               onChange={(event) => setToken(event.target.value)}
+              onBlur={() => window.localStorage.setItem(tokenStorageKey, token)}
               placeholder={copy.tokenPlaceholder}
               value={token}
             />
@@ -256,7 +371,7 @@ export function AdminDashboard() {
               value={filters.groupId}
             />
           </div>
-          <button onClick={loadSessions} type="button">
+          <button onClick={() => void loadSessions()} type="button">
             {copy.filter}
           </button>
         </div>
@@ -322,6 +437,49 @@ export function AdminDashboard() {
             </tbody>
           </table>
         </div>
+              {profileEditorOpen ? (
+          <div className="modal-backdrop" role="presentation">
+            <div aria-label={locale === "es" ? "Editar perfil" : "Edit profile"} className="profile-editor" role="dialog">
+              <h2>{locale === "es" ? "Editar perfil" : "Edit profile"}</h2>
+              <label>
+                {locale === "es" ? "Nombre" : "Name"}
+                <input
+                  onChange={(event) => setProfileDraft((value) => ({ ...value, displayName: event.target.value }))}
+                  value={profileDraft.displayName}
+                />
+              </label>
+              <label>
+                {locale === "es" ? "Correo" : "Email"}
+                <input
+                  onChange={(event) => setProfileDraft((value) => ({ ...value, email: event.target.value }))}
+                  value={profileDraft.email}
+                />
+              </label>
+              <label>
+                {locale === "es" ? "Teléfono" : "Phone"}
+                <input
+                  onChange={(event) => setProfileDraft((value) => ({ ...value, phone: event.target.value }))}
+                  value={profileDraft.phone}
+                />
+              </label>
+              <label>
+                {locale === "es" ? "URL de avatar" : "Avatar URL"}
+                <input
+                  onChange={(event) => setProfileDraft((value) => ({ ...value, avatarUrl: event.target.value }))}
+                  value={profileDraft.avatarUrl}
+                />
+              </label>
+              <div className="modal-actions">
+                <button className="secondary" onClick={() => setProfileEditorOpen(false)} type="button">
+                  {locale === "es" ? "Cancelar" : "Cancel"}
+                </button>
+                <button onClick={saveProfile} type="button">
+                  {locale === "es" ? "Guardar perfil" : "Save profile"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </section>
     </main>
   );

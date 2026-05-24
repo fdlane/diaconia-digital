@@ -17,6 +17,10 @@ export async function saveUser(user: LocalUser) {
   await AsyncStorage.setItem(keys.user, JSON.stringify(user));
 }
 
+export async function removeUser() {
+  await AsyncStorage.removeItem(keys.user);
+}
+
 export async function loadLocale() {
   return readJson<SupportedLocale>(keys.locale, "es");
 }

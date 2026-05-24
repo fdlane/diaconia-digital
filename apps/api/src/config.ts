@@ -14,6 +14,7 @@ export type ApiConfig = {
   mediaBucketName: string;
   cognitoUserPoolId: string;
   cognitoAppClientId: string;
+  allowedOrigins: string[];
 };
 
 export function loadConfig(env = process.env): ApiConfig {
@@ -24,6 +25,9 @@ export function loadConfig(env = process.env): ApiConfig {
     mediaBucketName: env.MEDIA_BUCKET_NAME ?? "diaconia-foundation-media-dev",
     cognitoUserPoolId: env.COGNITO_USER_POOL_ID ?? "",
     cognitoAppClientId: env.COGNITO_APP_CLIENT_ID ?? "",
+    allowedOrigins: (
+      env.ALLOWED_ORIGINS ?? "http://localhost:3000,http://localhost:8081,http://localhost:19006"
+    ).split(","),
   };
 }
 
