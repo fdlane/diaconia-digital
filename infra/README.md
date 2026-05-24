@@ -27,11 +27,45 @@ cp infra/terraform.tfvars.example infra/terraform.tfvars
 
 Set `api_image_tag` and `admin_image_tag` to image tags that already exist in ECR, and keep `api_desired_count` and `admin_desired_count` at `1` for the dev environment. If you are creating the ECR repositories before images exist, temporarily set both desired counts to `0`, apply once, push images, then set both counts back to `1`.
 
+Terraform uses the S3 backend declared in `providers.tf` so local applies and GitHub
+Actions share the same state. Create the backend bucket before applying infra, then
+initialize Terraform with the backend settings:
+
 ```bash
-terraform -chdir=infra init
+AWS_REGION=sa-east-1
+TF_STATE_BUCKET=<terraform-state-bucket>
+TF_STATE_KEY=diaconia-foundation/dev/terraform.tfstate
+
+terraform -chdir=infra init \
+  -backend-config="bucket=$TF_STATE_BUCKET" \
+  -backend-config="key=$TF_STATE_KEY" \
+  -backend-config="region=$AWS_REGION" \
+  -backend-config="encrypt=true"
 terraform -chdir=infra plan -var-file=terraform.tfvars
 terraform -chdir=infra apply -var-file=terraform.tfvars
 ```
+
+For GitHub Actions, configure GitHub environments named `dev` and, when ready,
+`prod`. Add these environment or repository variables:
+
+- `AWS_REGION` defaults to `sa-east-1` if omitted
+- `PROJECT` defaults to `diaconia-foundation` if omitted
+- `TF_STATE_BUCKET` is required
+- `TF_STATE_KEY` is optional and defaults to `<project>/<environment>/terraform.tfstate`
+
+Use an `AWS_ROLE_TO_ASSUME` environment secret for GitHub OIDC. If that is not set,
+the workflows fall back to `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` secrets.
+Optionally set `TF_VARS_DEV` and `TF_VARS_PROD` secrets with complete `.tfvars`
+content; otherwise dev uses the committed `infra/terraform.tfvars`, and prod expects
+`infra/terraform.prod.tfvars` or `TF_VARS_PROD`.
+
+The deployment workflows are:
+
+- `0a. Deploy branch to AWS`: manual branch/tag/SHA deploy
+- `1a. Deploy main to AWS`: deploys `main` to dev after merge
+- `2a. Deploy release to AWS`: deploys published releases to prod once prod exists
+- `3a. Deploy infra to AWS`: manual Terraform apply
+- `3b. Run db migrations`: manual Drizzle migration task in ECS
 
 Capture the outputs:
 
@@ -87,24 +121,16 @@ terraform -chdir=infra apply -var-file=terraform.tfvars
 
 ## Database Migrations
 
-Fetch the RDS URL from Secrets Manager and run migrations from a network location that can reach the private RDS instance. For this first setup, use a temporary controlled path such as a bastion/session-manager host or an ECS one-off task in the VPC.
+The RDS instance is private. The `3b. Run db migrations` GitHub workflow builds
+`packages/db/Dockerfile`, pushes it to ECR, and runs it as a one-off ECS Fargate
+task in the existing API service network.
 
-```bash
-DATABASE_SECRET_ARN=$(terraform -chdir=infra output -raw database_secret_arn)
-DATABASE_URL=$(aws secretsmanager get-secret-value \
-  --region sa-east-1 \
-  --secret-id "$DATABASE_SECRET_ARN" \
-  --query SecretString \
-  --output text)
+For local emergency use, run migrations only from a network location that can reach
+the private RDS instance, such as a bastion/session-manager host or an ECS one-off
+task in the VPC.
 
-DATABASE_URL="$DATABASE_URL" pnpm db:migrate
-```
-
-Optionally seed demo data:
-
-```bash
-DATABASE_URL="$DATABASE_URL" pnpm db:seed
-```
+Optionally seed demo data from the same private network path with
+`DATABASE_URL="$DATABASE_URL" pnpm db:seed`.
 
 ## Smoke Tests
 

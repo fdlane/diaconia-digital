@@ -1,0 +1,67 @@
+name: 3a. Deploy infra to AWS
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub/AWS environment name.
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - prod
+
+concurrency:
+  group: infra-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy infra to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'sa-east-1' }}
+      AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+      PROJECT: ${{ vars.PROJECT || 'diaconia-foundation' }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
+      TF_VARS_DEV: ${{ secrets.TF_VARS_DEV }}
+      TF_VARS_PROD: ${{ secrets.TF_VARS_PROD }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: env.AWS_ROLE_TO_ASSUME != ''
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.AWS_ROLE_TO_ASSUME }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: env.AWS_ROLE_TO_ASSUME == ''
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Prepare Terraform variables
+        id: tfvars
+        run: |
+          if [ "${{ inputs.environment }}" = "prod" ]; then
+            tfvars_content="$TF_VARS_PROD"
+          else
+            tfvars_content="$TF_VARS_DEV"
+          fi
+          .github/scripts/prepare-tfvars.sh "${{ inputs.environment }}" "$tfvars_content"
+
+      - name: Deploy infra
+        run: .github/scripts/terraform-apply.sh "${{ inputs.environment }}" "${{ steps.tfvars.outputs.tfvars_file }}"
