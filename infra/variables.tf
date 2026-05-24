@@ -28,6 +28,18 @@ variable "database_name" {
   default     = "diaconia"
 }
 
+variable "database_engine_version" {
+  description = "RDS PostgreSQL engine version. Use a major version so AWS can choose a supported regional patch."
+  type        = string
+  default     = "16"
+}
+
+variable "database_backup_retention_period" {
+  description = "RDS backup retention in days. Use 0 for free-tier dev accounts; raise before production."
+  type        = number
+  default     = 0
+}
+
 variable "allowed_callback_urls" {
   description = "Cognito callback URLs for hosted auth flows."
   type        = list(string)
@@ -38,4 +50,64 @@ variable "allowed_logout_urls" {
   description = "Cognito logout URLs for hosted auth flows."
   type        = list(string)
   default     = ["http://localhost:3000", "http://localhost:8081"]
+}
+
+variable "api_image_tag" {
+  description = "Immutable ECR image tag for the API task. Use a git SHA for live deploys."
+  type        = string
+  default     = "bootstrap"
+}
+
+variable "admin_image_tag" {
+  description = "Immutable ECR image tag for the admin task. Use a git SHA for live deploys."
+  type        = string
+  default     = "bootstrap"
+}
+
+variable "api_container_port" {
+  description = "Container port exposed by the API service."
+  type        = number
+  default     = 4000
+}
+
+variable "admin_container_port" {
+  description = "Container port exposed by the admin Next.js service."
+  type        = number
+  default     = 3000
+}
+
+variable "api_task_cpu" {
+  description = "Fargate CPU units for the API task."
+  type        = number
+  default     = 256
+}
+
+variable "api_task_memory" {
+  description = "Fargate memory MiB for the API task."
+  type        = number
+  default     = 512
+}
+
+variable "admin_task_cpu" {
+  description = "Fargate CPU units for the admin task."
+  type        = number
+  default     = 256
+}
+
+variable "admin_task_memory" {
+  description = "Fargate memory MiB for the admin task."
+  type        = number
+  default     = 512
+}
+
+variable "api_desired_count" {
+  description = "Desired API task count. Keep 0 for bootstrap before images are pushed, then set to 1."
+  type        = number
+  default     = 0
+}
+
+variable "admin_desired_count" {
+  description = "Desired admin task count. Keep 0 for bootstrap before images are pushed, then set to 1."
+  type        = number
+  default     = 0
 }

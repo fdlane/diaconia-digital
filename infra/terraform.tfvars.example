@@ -1,6 +1,9 @@
 environment = "dev"
 aws_region  = "sa-east-1"
 
+database_backup_retention_period = 0
+database_engine_version          = "16"
+
 allowed_callback_urls = [
   "http://localhost:3000",
   "http://localhost:8081",
@@ -12,3 +15,10 @@ allowed_logout_urls = [
   "http://localhost:8081",
   "http://localhost:19006"
 ]
+
+# Set these to pushed immutable image tags before applying with desired counts of 1.
+# If you need to create ECR before images exist, temporarily set both desired counts to 0.
+api_image_tag       = "bootstrap"
+admin_image_tag     = "bootstrap"
+api_desired_count   = 1
+admin_desired_count = 1
