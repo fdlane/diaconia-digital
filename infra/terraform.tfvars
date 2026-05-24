@@ -20,8 +20,8 @@ allowed_logout_urls = [
 #   admin_image_tag     = "abc1234"
 #   api_desired_count   = 1
 #   admin_desired_count = 1
-api_image_tag       = "reset-api-4"
-admin_image_tag     = "reset-admin-2"
+api_image_tag       = "0abad7e"
+admin_image_tag     = "0abad7e"
 api_desired_count   = 1
 admin_desired_count = 1
 
