@@ -390,7 +390,7 @@ resource "aws_lb_target_group" "api" {
     healthy_threshold   = 2
     unhealthy_threshold = 3
     timeout             = 5
-    interval            = 30
+    interval            = 15
   }
 
   tags = local.common_tags
@@ -410,7 +410,7 @@ resource "aws_lb_target_group" "admin" {
     healthy_threshold   = 2
     unhealthy_threshold = 3
     timeout             = 5
-    interval            = 30
+    interval            = 15
   }
 
   tags = local.common_tags

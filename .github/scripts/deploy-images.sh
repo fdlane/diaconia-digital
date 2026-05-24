@@ -32,6 +32,27 @@ fi
 aws ecr get-login-password --region "$AWS_REGION" \
   | docker login --username AWS --password-stdin "$registry"
 
+build_and_push() {
+  local app="$1"
+  local dockerfile="$2"
+  local image="$3"
+  shift 3
+
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then
+    docker buildx build \
+      -f "$dockerfile" \
+      --cache-from "type=gha,scope=${name}-${app}" \
+      --cache-to "type=gha,mode=max,scope=${name}-${app}" \
+      --push \
+      -t "$image" \
+      "$@" \
+      .
+  else
+    docker build -f "$dockerfile" -t "$image" "$@" .
+    docker push "$image"
+  fi
+}
+
 image_exists() {
   local repository_name="$1"
 
@@ -44,18 +65,14 @@ image_exists() {
 if image_exists "${name}/api"; then
   echo "API image ${api_repo}:${image_tag} already exists; reusing it."
 else
-  docker build -f apps/api/Dockerfile -t "${api_repo}:${image_tag}" .
-  docker push "${api_repo}:${image_tag}"
+  build_and_push api apps/api/Dockerfile "${api_repo}:${image_tag}"
 fi
 
 if image_exists "${name}/admin"; then
   echo "Admin image ${admin_repo}:${image_tag} already exists; reusing it."
 else
-  docker build \
-    -f apps/admin/Dockerfile \
-    --build-arg "NEXT_PUBLIC_API_URL=${admin_api_url}" \
-    -t "${admin_repo}:${image_tag}" .
-  docker push "${admin_repo}:${image_tag}"
+  build_and_push admin apps/admin/Dockerfile "${admin_repo}:${image_tag}" \
+    --build-arg "NEXT_PUBLIC_API_URL=${admin_api_url}"
 fi
 
 {
