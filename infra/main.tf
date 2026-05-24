@@ -727,8 +727,7 @@ resource "aws_ecs_task_definition" "admin" {
       ]
       environment = [
         { name = "NODE_ENV", value = "production" },
-        { name = "PORT", value = tostring(var.admin_container_port) },
-        { name = "NEXT_PUBLIC_API_URL", value = "http://${aws_lb.app.dns_name}" }
+        { name = "PORT", value = tostring(var.admin_container_port) }
       ]
       logConfiguration = {
         logDriver = "awslogs"

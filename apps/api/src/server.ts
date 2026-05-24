@@ -22,9 +22,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { authMiddleware, requireAdmin, type AppBindings } from "./auth";
-import { loadConfig } from "./config";
-import { openApiDocument } from "./openapi";
+import { authMiddleware, requireAdmin, type AppBindings } from "./auth.js";
+import { loadConfig } from "./config.js";
+import { openApiDocument } from "./openapi.js";
 
 const config = loadConfig();
 const db = createDatabase(config.databaseUrl);

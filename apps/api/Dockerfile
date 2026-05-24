@@ -22,6 +22,9 @@ COPY --from=deps /app/node_modules node_modules
 COPY --from=deps /app/apps/api/node_modules apps/api/node_modules
 COPY --from=deps /app/packages/db/node_modules packages/db/node_modules
 COPY --from=deps /app/packages/shared/node_modules packages/shared/node_modules
-COPY --from=build /app/apps/api/src apps/api/src
-COPY --from=build /app/packages packages
-CMD ["node", "--import", "./apps/api/node_modules/tsx/dist/loader.mjs", "apps/api/src/server.ts"]
+COPY --from=build /app/apps/api/package.json apps/api/package.json
+COPY --from=build /app/apps/api/dist/apps/api/src apps/api/dist
+COPY --from=build /app/apps/api/dist/packages packages
+RUN printf '{"type":"module","main":"./src/index.js"}\n' > packages/db/package.json \
+  && printf '{"type":"module","main":"./src/index.js"}\n' > packages/shared/package.json
+CMD ["node", "apps/api/dist/server.js"]

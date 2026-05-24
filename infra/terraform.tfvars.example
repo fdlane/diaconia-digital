@@ -16,14 +16,9 @@ allowed_logout_urls = [
   "http://localhost:19006"
 ]
 
-# First apply:
-#   keep desired counts at 0 so the ALB/ECR/cluster can bootstrap before images exist.
-# Second apply after pushing immutable git-SHA image tags:
-#   api_image_tag       = "abc1234"
-#   admin_image_tag     = "abc1234"
-#   api_desired_count   = 1
-#   admin_desired_count = 1
+# Set these to pushed immutable image tags before applying with desired counts of 1.
+# If you need to create ECR before images exist, temporarily set both desired counts to 0.
 api_image_tag       = "bootstrap"
 admin_image_tag     = "bootstrap"
-api_desired_count   = 0
-admin_desired_count = 0
+api_desired_count   = 1
+admin_desired_count = 1

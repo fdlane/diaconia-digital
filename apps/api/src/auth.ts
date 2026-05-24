@@ -1,6 +1,6 @@
 import type { Context, MiddlewareHandler } from "hono";
 import { CognitoJwtVerifier } from "aws-jwt-verify";
-import type { ApiConfig } from "./config";
+import type { ApiConfig } from "./config.js";
 
 export type AuthUser = {
   sub: string;

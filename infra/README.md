@@ -25,7 +25,7 @@ Create a local tfvars file:
 cp infra/terraform.tfvars.example infra/terraform.tfvars
 ```
 
-Keep `api_desired_count` and `admin_desired_count` at `0` for the first apply. This creates ECR, the ALB, RDS, S3, Cognito, and ECS service definitions without trying to start tasks before images exist.
+Set `api_image_tag` and `admin_image_tag` to image tags that already exist in ECR, and keep `api_desired_count` and `admin_desired_count` at `1` for the dev environment. If you are creating the ECR repositories before images exist, temporarily set both desired counts to `0`, apply once, push images, then set both counts back to `1`.
 
 ```bash
 terraform -chdir=infra init
@@ -79,7 +79,7 @@ api_desired_count   = 1
 admin_desired_count = 1
 ```
 
-Apply again to start the services:
+Apply to start or update the services:
 
 ```bash
 terraform -chdir=infra apply -var-file=terraform.tfvars
