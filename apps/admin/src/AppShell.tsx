@@ -101,9 +101,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <MenuIcon size={20} />
           </button>
-          <Link aria-label={l.dashboard} className="brand-link" href="/">
-            <img alt="Diaconia" className="brand-logo" src="/logo.png" />
-          </Link>
         </div>
 
         <div className="app-bar-right">
@@ -180,6 +177,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           aria-label={l.toggleSidebar}
           className={`sidebar${sidebarOpen ? "" : " sidebar-collapsed"}`}
         >
+          <Link
+            aria-label={l.dashboard}
+            className="sidebar-brand"
+            href="/"
+            onClick={() => {
+              if (window.innerWidth < 768) setSidebarOpen(false);
+            }}
+          >
+            <img alt="Diaconia" className="sidebar-brand-logo sidebar-brand-logo-full" src="/sidebar-logo.png" />
+            <img alt="" aria-hidden className="sidebar-brand-logo sidebar-brand-logo-mark" src="/sidebar-logo-mark.png" />
+          </Link>
           <div className="nav-items">
             {navItems.map(({ href, label, Icon }) => (
               <Link
