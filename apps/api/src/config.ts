@@ -12,9 +12,13 @@ export type ApiConfig = {
   databaseUrl: string;
   awsRegion: string;
   mediaBucketName: string;
-  clerkIssuer: string;
-  clerkJwksUrl: string;
-  clerkAudience: string;
+  clerkSecretKey: string;
+  clerkJwtKey: string;
+  clerkJwtAudience: string;
+  clerkAuthorizedParties: string[];
+  authDevBypass: boolean;
+  authDevSubject: string;
+  authDevPhone: string;
   allowedOrigins: string[];
 };
 
@@ -24,9 +28,16 @@ export function loadConfig(env = process.env): ApiConfig {
     databaseUrl: env.DATABASE_URL ?? defaultLocalDatabaseUrl,
     awsRegion: env.AWS_REGION ?? "sa-east-1",
     mediaBucketName: env.MEDIA_BUCKET_NAME ?? "diaconia-foundation-media-dev",
-    clerkIssuer: env.CLERK_ISSUER ?? "",
-    clerkJwksUrl: env.CLERK_JWKS_URL ?? "",
-    clerkAudience: env.CLERK_AUDIENCE ?? "",
+    clerkSecretKey: env.CLERK_SECRET_KEY ?? "",
+    clerkJwtKey: env.CLERK_JWT_KEY ?? "",
+    clerkJwtAudience: env.CLERK_JWT_AUDIENCE ?? "diaconia-api",
+    clerkAuthorizedParties: (env.CLERK_AUTHORIZED_PARTIES ?? "")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
+    authDevBypass: env.AUTH_DEV_BYPASS === "true" && env.NODE_ENV !== "production",
+    authDevSubject: env.AUTH_DEV_SUBJECT ?? "local-dev-user",
+    authDevPhone: env.AUTH_DEV_PHONE ?? "+595000000000",
     allowedOrigins: (
       env.ALLOWED_ORIGINS ?? "http://localhost:3000,http://localhost:8081,http://localhost:19006"
     ).split(","),

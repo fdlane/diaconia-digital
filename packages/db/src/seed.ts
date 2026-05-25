@@ -12,18 +12,18 @@ import {
 
 const db = createDatabase();
 
-const adminId = "55faf062-c862-4449-85a8-a97e14886b1d";
-const dewayneAdminId = "e4c237c0-ef29-4da1-9d16-3bad8b45892c";
-const kelsieAdminId = "dee633cf-f57d-47d1-94c0-0bb321dcaecf";
-const facilitatorId = "87bb00ed-6a12-451d-93b5-77ab36bded73";
-const chaplainId = "fc96a375-777c-4613-8d35-f2b0e9bd2d25";
-const mariaId = "48e2e5fb-c82e-47e9-b1ca-37eaf17123c1";
-const anaId = "2d61cf91-f83d-4be9-9d85-476d099a4a43";
-const rosaId = "f4e90aa1-c43e-4f3d-b42a-c537a49148fc";
-const firstGroupId = "2a86f82b-5f8a-405e-9074-9dc8e4cd32db";
-const secondGroupId = "9f34b54d-3d61-4cd6-b308-6a933e2ee2fb";
-const completedMeetingId = "2e249c51-14ea-4c5a-85fa-3f7adcd8359a";
-const scheduledMeetingId = "4925327e-0845-4f2d-b1d5-d7293f911111";
+const adminId = "019e606b-ce98-7134-b1d1-958703c36595";
+const dewayneAdminId = "019e606b-ce9a-7217-a2af-a9729b4d1107";
+const kelsieAdminId = "019e606b-ce9a-7217-a2af-ae7ac4769a81";
+const facilitatorId = "019e606b-ce9a-7217-a2af-b3aff656a78b";
+const chaplainId = "019e606b-ce9a-7217-a2af-b6db0b3fa660";
+const mariaId = "019e606b-ce9a-7217-a2af-bb021acfe955";
+const anaId = "019e606b-ce9a-7217-a2af-bd89eb528287";
+const rosaId = "019e606b-ce9a-7217-a2af-c16b10a2e4f0";
+const firstGroupId = "019e606b-ce9a-7217-a2af-c8c18b19c27e";
+const secondGroupId = "019e606b-ce9a-7217-a2af-cd113443806a";
+const completedMeetingId = "019e606b-ce9a-7217-a2af-d099fc127b08";
+const scheduledMeetingId = "019e606b-ce9a-7217-a2af-d54756e0158f";
 
 function tokenHash(value: string) {
   return createHash("sha256").update(value).digest("hex");
@@ -53,7 +53,7 @@ await db
       authSubject: "local-dewayne-lane",
       displayName: "F. DeWayne Lane",
       email: "dewayne.lane@diaconia.local",
-      phone: "+595000000001",
+      phone: "+18653350788",
       role: "admin",
       status: "active",
       invitedAt: now,
@@ -65,7 +65,7 @@ await db
       authSubject: "local-kelsie-jeon",
       displayName: "Kelsie Jeon",
       email: "kelsie.jeon@diaconia.local",
-      phone: "+595000000002",
+      phone: "+595975241834",
       role: "admin",
       status: "active",
       invitedAt: now,
@@ -133,6 +133,7 @@ await db
   .values([
     {
       userId: mariaId,
+      phone: "+595981000001",
       email: "maria.gonzalez@diaconia.local",
       tokenHash: tokenHash("demo-maria-invite"),
       expiresAt,
@@ -140,6 +141,7 @@ await db
     },
     {
       userId: anaId,
+      phone: "+595981000002",
       email: "ana.martinez@diaconia.local",
       tokenHash: tokenHash("demo-ana-invite"),
       expiresAt,
@@ -147,6 +149,7 @@ await db
     },
     {
       userId: rosaId,
+      phone: "+595981000003",
       email: "rosa.benitez@diaconia.local",
       tokenHash: tokenHash("demo-rosa-invite"),
       expiresAt,

@@ -1,10 +1,10 @@
-import { JwtRsaVerifier } from "aws-jwt-verify";
+import { verifyToken } from "@clerk/backend";
+import { normalizePhoneNumber } from "@diaconia/shared";
 import type { MiddlewareHandler } from "hono";
 import type { ApiConfig } from "./config.js";
 
 export type AuthUser = {
   sub: string;
-  email: string | null;
   phone: string | null;
 };
 
@@ -15,50 +15,73 @@ export type AppBindings = {
 };
 
 type IdentityJwtPayload = {
-  sub: string;
-  email?: string;
-  phone_number?: string;
-  primary_email_address?: string;
+  sub?: unknown;
+  phone_number?: unknown;
 };
 
+export const authErrors = {
+  missingToken: { code: "UNAUTHENTICATED", message: "Missing bearer token" },
+  invalidToken: { code: "UNAUTHENTICATED", message: "Invalid bearer token" },
+  missingConfig: {
+    code: "AUTH_CONFIG_MISSING",
+    message: "Missing Clerk verifier configuration",
+  },
+} as const;
+
+function bearerToken(authorization: string | undefined) {
+  return authorization?.startsWith("Bearer ") ? authorization.slice(7) : "";
+}
+
+function normalizeClaimPhone(value: unknown) {
+  if (typeof value !== "string" || !value.trim()) return null;
+
+  try {
+    return normalizePhoneNumber(value);
+  } catch {
+    return null;
+  }
+}
+
 export function authMiddleware(config: ApiConfig): MiddlewareHandler<AppBindings> {
-  const verifier =
-    config.clerkIssuer && config.clerkJwksUrl
-      ? JwtRsaVerifier.create({
-          issuer: config.clerkIssuer,
-          jwksUri: config.clerkJwksUrl,
-          audience: config.clerkAudience || null,
-        } as never)
-      : null;
-
   return async (c, next) => {
-    const authorization = c.req.header("authorization");
-    const token = authorization?.startsWith("Bearer ") ? authorization.slice(7) : "";
+    const token = bearerToken(c.req.header("authorization"));
 
-    if (!verifier) {
+    if (config.authDevBypass) {
       c.set("authUser", {
-        sub: "local-dev-user",
-        email: "dev@diaconia.local",
-        phone: "+595000000000",
+        sub: config.authDevSubject,
+        phone: config.authDevPhone,
       });
       await next();
       return;
     }
 
     if (!token) {
-      return c.json({ error: "Missing bearer token" }, 401);
+      return c.json({ error: authErrors.missingToken.message, code: authErrors.missingToken.code }, 401);
+    }
+
+    if (!config.clerkSecretKey && !config.clerkJwtKey) {
+      return c.json({ error: authErrors.missingConfig.message, code: authErrors.missingConfig.code }, 500);
     }
 
     try {
-      const payload = (await verifier.verify(token)) as IdentityJwtPayload;
+      const payload = (await verifyToken(token, {
+        audience: config.clerkJwtAudience,
+        authorizedParties: config.clerkAuthorizedParties.length ? config.clerkAuthorizedParties : undefined,
+        jwtKey: config.clerkJwtKey || undefined,
+        secretKey: config.clerkSecretKey || undefined,
+      })) as IdentityJwtPayload;
+
+      if (typeof payload.sub !== "string" || !payload.sub) {
+        return c.json({ error: authErrors.invalidToken.message, code: authErrors.invalidToken.code }, 401);
+      }
+
       c.set("authUser", {
         sub: payload.sub,
-        email: payload.email ?? payload.primary_email_address ?? null,
-        phone: payload.phone_number ?? null,
+        phone: normalizeClaimPhone(payload.phone_number),
       });
       await next();
     } catch {
-      return c.json({ error: "Invalid bearer token" }, 401);
+      return c.json({ error: authErrors.invalidToken.message, code: authErrors.invalidToken.code }, 401);
     }
   };
 }

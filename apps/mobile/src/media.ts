@@ -1,6 +1,6 @@
 import * as ImagePicker from "expo-image-picker";
-import * as Crypto from "expo-crypto";
 import type { LocalPhoto } from "./types";
+import { uuidv7 } from "./uuid";
 
 export async function pickImage(type: LocalPhoto["type"]): Promise<LocalPhoto | null> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -19,7 +19,7 @@ export async function pickImage(type: LocalPhoto["type"]): Promise<LocalPhoto | 
   }
 
   return {
-    id: Crypto.randomUUID(),
+    id: await uuidv7(),
     uri: result.assets[0].uri,
     type,
     contentType: result.assets[0].mimeType ?? "image/jpeg",

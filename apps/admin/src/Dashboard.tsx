@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
 import { CalendarIcon, MeetingReportIcon, PrayerIcon, UsersIcon } from "./icons";
@@ -35,19 +35,22 @@ function StatCard({ icon, iconColor, value, label, description }: StatCardProps)
 }
 
 export function Dashboard() {
-  const { token, currentUser, locale } = useAuth();
+  const { token, currentUser, isLoaded, locale } = useAuth();
   const l = t(locale);
+  const loadedTokenRef = useRef("");
 
   const [plannedCount, setPlannedCount] = useState<number | "…">("…");
   const [reportsCount, setReportsCount] = useState<number | "…">("…");
   const [openPrayersCount, setOpenPrayersCount] = useState<number | "…">("…");
 
   useEffect(() => {
-    void loadStats();
-  }, [token]);
+    if (!isLoaded || !token || loadedTokenRef.current === token) return;
+    loadedTokenRef.current = token;
+    void loadStats(token);
+  }, [isLoaded, token]);
 
-  async function loadStats() {
-    const headers = token ? { authorization: `Bearer ${token}` } : {};
+  async function loadStats(activeToken: string) {
+    const headers = { authorization: `Bearer ${activeToken}` };
 
     try {
       const res = await fetch(`${apiUrl}/meetings`, { headers });

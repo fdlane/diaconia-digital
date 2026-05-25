@@ -10,8 +10,8 @@ import {
 describe("shared validation", () => {
   it("accepts a valid offline meeting payload", () => {
     const parsed = createMeetingInputSchema.parse({
-      id: "2e249c51-14ea-4c5a-85fa-3f7adcd8359a",
-      groupId: "e69a495f-b594-4985-9a72-6683bb427bbf",
+      id: "019e606c-17c0-7d9d-82e4-0f78ffb117d1",
+      groupId: "019e606c-17c0-7d9d-82e4-14d0e0d98998",
       scheduledStartAt: "2026-05-12T14:30:00.000Z",
       occurredAt: "2026-05-12T14:40:00.000Z",
       latitude: -25.5167,
@@ -20,13 +20,13 @@ describe("shared validation", () => {
       locationSource: "device",
       attendance: [
         {
-          userId: "8ba2f986-78c1-433b-9a87-a9cb73b7878b",
+          userId: "019e606c-17c0-7d9d-82e4-1c898f2cb5ba",
           status: "present",
         },
       ],
       prayerRequests: [
         {
-          id: "f9362339-880f-4f2b-a676-51aee1594c20",
+          id: "019e606c-17c0-7d9d-82e4-26c8bfcb8ff0",
           request: "Pray for her new business inventory purchase.",
         },
       ],
@@ -52,7 +52,7 @@ describe("shared validation", () => {
         type: "meeting_photo",
         contentType: "image/jpeg",
         byteSize: 1024,
-        ownerUserId: "55faf062-c862-4449-85a8-a97e14886b1d",
+        ownerUserId: "019e606c-17c0-7d9d-82e4-35c6de72f2e1",
       }),
     ).toThrow();
   });

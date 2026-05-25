@@ -13,7 +13,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "actor_user_id": {
           "name": "actor_user_id",
@@ -122,7 +122,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "group_id": {
           "name": "group_id",
@@ -297,7 +297,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "name": {
           "name": "name",
@@ -426,7 +426,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "user_id": {
           "name": "user_id",
@@ -434,11 +434,17 @@
           "primaryKey": false,
           "notNull": true
         },
+        "phone": {
+          "name": "phone",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
         "email": {
           "name": "email",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "token_hash": {
           "name": "token_hash",
@@ -493,6 +499,21 @@
           "columns": [
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "invitations_phone_idx": {
+          "name": "invitations_phone_idx",
+          "columns": [
+            {
+              "expression": "phone",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -593,7 +614,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "type": {
           "name": "type",
@@ -775,7 +796,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "meeting_id": {
           "name": "meeting_id",
@@ -899,7 +920,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "group_id": {
           "name": "group_id",
@@ -1170,7 +1191,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "meeting_id": {
           "name": "meeting_id",
@@ -1254,7 +1275,7 @@
           "type": "uuid",
           "primaryKey": true,
           "notNull": true,
-          "default": "gen_random_uuid()"
+          "default": "uuidv7()"
         },
         "auth_provider": {
           "name": "auth_provider",
@@ -1279,13 +1300,13 @@
           "name": "email",
           "type": "text",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "phone": {
           "name": "phone",
           "type": "text",
           "primaryKey": false,
-          "notNull": false
+          "notNull": true
         },
         "role": {
           "name": "role",
@@ -1359,6 +1380,22 @@
           "method": "btree",
           "with": {}
         },
+        "users_active_phone_idx": {
+          "name": "users_active_phone_idx",
+          "columns": [
+            {
+              "expression": "phone",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"users\".\"status\" <> 'disabled'",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "users_email_idx": {
           "name": "users_email_idx",
           "columns": [
@@ -1370,6 +1407,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"users\".\"email\" IS NOT NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

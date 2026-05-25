@@ -5,11 +5,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: diaconia
+      PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "5432:5432"
     command: postgres -c wal_level=logical
     volumes:
-      - db_data_pg18:/var/lib/postgresql
+      - db_data_pg18:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d diaconia"]
       interval: 5s
@@ -32,9 +33,9 @@ services:
       ZERO_ADMIN_PASSWORD: dev-admin
       ZERO_QUERY_URL: http://host.docker.internal:4000/zero/query
       ZERO_MUTATE_URL: http://host.docker.internal:4000/zero/mutate
-      ZERO_AUTH_JWKS_URL: ${CLERK_JWKS_URL:-}
-      ZERO_AUTH_ISSUER: ${CLERK_ISSUER:-}
-      ZERO_AUTH_AUDIENCE: ${CLERK_AUDIENCE:-}
+      ZERO_AUTH_JWKS_URL: ${ZERO_AUTH_JWKS_URL:-}
+      ZERO_AUTH_ISSUER: ${ZERO_AUTH_ISSUER:-}
+      ZERO_AUTH_AUDIENCE: ${ZERO_AUTH_AUDIENCE:-diaconia-api}
     volumes:
       - zero_cache_data:/data
     depends_on:

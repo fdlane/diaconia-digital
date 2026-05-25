@@ -3,10 +3,10 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
 import { useAuth } from "./AuthContext";
-import { t } from "./adminLabels";
+import { localizeRouteError, t } from "./adminLabels";
 import { ChevronRightIcon, DownloadIcon, FilterIcon, PlusIcon } from "./icons";
 
 const MeetingsMap = dynamic(() => import("./MeetingsMap").then((m) => ({ default: m.MeetingsMap })), {
@@ -31,6 +31,9 @@ export type AdminMeeting = {
   notes: string;
   followUpCategory: string;
   followUpNotes: string;
+  mediaCount?: number;
+  prayerRequestCount?: number;
+  openPrayerRequestCount?: number;
 };
 
 type MeetingMedia = { id: string; type: string; url: string };
@@ -41,18 +44,18 @@ type PrayerRequest = {
 };
 
 export function MeetingsList() {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
 
   const [meetings, setMeetings] = useState<AdminMeeting[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [mediaByMeeting, setMediaByMeeting] = useState<Record<string, MeetingMedia[]>>({});
-  const [prayersByMeeting, setPrayersByMeeting] = useState<Record<string, PrayerRequest[]>>({});
   const [filters, setFilters] = useState({ from: "", to: "", groupId: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [statusMsg, setStatusMsg] = useState("");
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const loadedGroupsTokenRef = useRef("");
+  const loadedMeetingsKeyRef = useRef("");
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -63,12 +66,22 @@ export function MeetingsList() {
   }, [filters]);
 
   useEffect(() => {
+    if (!isLoaded || !token || loadedGroupsTokenRef.current === token) return;
+    loadedGroupsTokenRef.current = token;
     void loadGroups();
+  }, [isLoaded, token]);
+
+  useEffect(() => {
+    if (!isLoaded || !token) return;
+    const requestKey = `${token}:${query}`;
+    if (loadedMeetingsKeyRef.current === requestKey) return;
+    loadedMeetingsKeyRef.current = requestKey;
     void loadMeetings();
-  }, [token]);
+  }, [isLoaded, token, query]);
 
   async function loadGroups() {
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    if (!token) return;
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     try {
       const res = await fetch(`${apiUrl}/groups`, { headers });
       if (!res.ok) return;
@@ -78,12 +91,16 @@ export function MeetingsList() {
   }
 
   async function loadMeetings() {
+    if (!token) {
+      setStatus("error");
+      setStatusMsg(l.authMissingSession);
+      return;
+    }
+
     setStatus("loading");
     setStatusMsg(l.loadingMeetings);
 
-    const headers: Record<string, string> = token
-      ? { authorization: `Bearer ${token}` }
-      : {};
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
 
     try {
       const res = await fetch(
@@ -93,11 +110,12 @@ export function MeetingsList() {
 
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as {
+          code?: string;
           error?: string;
           detail?: string;
         } | null;
         setStatus("error");
-        setStatusMsg(payload?.detail ?? payload?.error ?? `Error ${res.status}`);
+        setStatusMsg(payload?.detail ?? localizeRouteError(payload, l, res.status));
         return;
       }
 
@@ -106,43 +124,10 @@ export function MeetingsList() {
         warning?: string;
       };
       setMeetings(data.meetings);
-      setMediaByMeeting({});
-      setPrayersByMeeting({});
-
-      let failures = 0;
-
-      const [mediaEntries, prayerEntries] = await Promise.all([
-        Promise.all(
-          data.meetings.map(async (s) => {
-            try {
-              const r = await fetch(`${apiUrl}/meetings/${s.id}/media`, { headers });
-              if (!r.ok) { failures++; return [s.id, []] as const; }
-              const p = (await r.json()) as { media: MeetingMedia[] };
-              return [s.id, p.media] as const;
-            } catch { failures++; return [s.id, []] as const; }
-          }),
-        ),
-        Promise.all(
-          data.meetings.map(async (s) => {
-            try {
-              const r = await fetch(
-                `${apiUrl}/meetings/${s.id}/prayer-requests`,
-                { headers },
-              );
-              if (!r.ok) { failures++; return [s.id, []] as const; }
-              const p = (await r.json()) as { prayerRequests: PrayerRequest[] };
-              return [s.id, p.prayerRequests] as const;
-            } catch { failures++; return [s.id, []] as const; }
-          }),
-        ),
-      ]);
-
-      setMediaByMeeting(Object.fromEntries(mediaEntries));
-      setPrayersByMeeting(Object.fromEntries(prayerEntries));
 
       const base = data.warning ?? l.meetingsCount(data.meetings.length);
       setStatus("done");
-      setStatusMsg(failures ? `${base} · ${failures} detail loads failed` : base);
+      setStatusMsg(base);
     } catch (err) {
       setStatus("error");
       setStatusMsg(err instanceof Error ? err.message : "Error");
@@ -350,24 +335,16 @@ export function MeetingsList() {
                     ) : null}
                   </td>
                   <td>
-                    <div className="thumbs">
-                      {(mediaByMeeting[meeting.id] ?? []).map((m) => (
-                        <img alt={l.meetingPhoto} key={m.id} src={m.url} />
-                      ))}
-                    </div>
+                    <span className="badge badge-default">{meeting.mediaCount ?? 0}</span>
                   </td>
                   <td>
-                    <div className="prayer-list">
-                      {(prayersByMeeting[meeting.id] ?? []).map((pr) => (
-                        <div className="prayer-card" key={pr.id}>
-                          <p>{pr.request}</p>
-                          <span className="prayer-status">{pr.status}</span>
-                        </div>
-                      ))}
-                      {!(prayersByMeeting[meeting.id] ?? []).length ? (
-                        <span className="text-muted text-sm">{l.noRequests}</span>
-                      ) : null}
-                    </div>
+                    {(meeting.prayerRequestCount ?? 0) > 0 ? (
+                      <span className="badge badge-default">
+                        {meeting.openPrayerRequestCount ?? 0}/{meeting.prayerRequestCount ?? 0}
+                      </span>
+                    ) : (
+                      <span className="text-muted text-sm">{l.noRequests}</span>
+                    )}
                   </td>
                   <td className="text-sm text-muted">
                     {meeting.notes || l.noNotes}

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { t } from "./adminLabels";
+import { localizeRouteError, t } from "./adminLabels";
 import { ChevronRightIcon, GroupsIcon, PlusIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
@@ -20,26 +20,35 @@ type GroupRow = {
 };
 
 export function GroupsListPage() {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
 
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const loadedTokenRef = useRef("");
 
   useEffect(() => {
+    if (!isLoaded || !token || loadedTokenRef.current === token) return;
+    loadedTokenRef.current = token;
     void load();
-  }, [token]);
+  }, [isLoaded, token]);
 
   async function load() {
+    if (!token) {
+      setErrorMsg(l.authMissingSession);
+      setStatus("error");
+      return;
+    }
+
     setStatus("loading");
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     try {
       const res = await fetch(`${apiUrl}/groups`, { headers });
       if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${res.status}`);
+        const payload = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
+        setErrorMsg(localizeRouteError(payload, l, res.status));
         setStatus("error");
         return;
       }

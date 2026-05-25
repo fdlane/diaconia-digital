@@ -38,12 +38,12 @@ export const mediaAssetType = pgEnum("media_asset_type", [
 export const users = pgTable(
   "users",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     authProvider: text("auth_provider").notNull().default("clerk"),
     authSubject: text("auth_subject"),
     displayName: text("display_name").notNull(),
-    email: text("email").notNull(),
-    phone: text("phone"),
+    email: text("email"),
+    phone: text("phone").notNull(),
     role: userRole("role").notNull().default("member"),
     status: userStatus("status").notNull().default("invited"),
     profilePhotoMediaId: uuid("profile_photo_media_id"),
@@ -56,7 +56,12 @@ export const users = pgTable(
     authSubjectIdx: uniqueIndex("users_auth_provider_subject_idx")
       .on(table.authProvider, table.authSubject)
       .where(sql`${table.authSubject} IS NOT NULL`),
-    emailIdx: uniqueIndex("users_email_idx").on(table.email),
+    activePhoneIdx: uniqueIndex("users_active_phone_idx")
+      .on(table.phone)
+      .where(sql`${table.status} <> 'disabled'`),
+    emailIdx: uniqueIndex("users_email_idx")
+      .on(table.email)
+      .where(sql`${table.email} IS NOT NULL`),
     roleIdx: index("users_role_idx").on(table.role),
     statusIdx: index("users_status_idx").on(table.status),
   }),
@@ -65,11 +70,12 @@ export const users = pgTable(
 export const invitations = pgTable(
   "invitations",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id),
-    email: text("email").notNull(),
+    phone: text("phone").notNull(),
+    email: text("email"),
     tokenHash: text("token_hash").notNull(),
     status: invitationStatus("status").notNull().default("pending"),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
@@ -80,6 +86,7 @@ export const invitations = pgTable(
   },
   (table) => ({
     userIdx: index("invitations_user_id_idx").on(table.userId),
+    phoneIdx: index("invitations_phone_idx").on(table.phone),
     emailIdx: index("invitations_email_idx").on(table.email),
     tokenHashIdx: uniqueIndex("invitations_token_hash_idx").on(table.tokenHash),
     pendingUserIdx: uniqueIndex("invitations_pending_user_idx")
@@ -91,7 +98,7 @@ export const invitations = pgTable(
 export const groups = pgTable(
   "groups",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     name: text("name").notNull(),
     community: text("community").notNull(),
     facilitatorId: uuid("facilitator_id")
@@ -112,7 +119,7 @@ export const groups = pgTable(
 export const groupMemberships = pgTable(
   "group_memberships",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     groupId: uuid("group_id")
       .notNull()
       .references(() => groups.id),
@@ -141,7 +148,7 @@ export const groupMemberships = pgTable(
 export const meetings = pgTable(
   "meetings",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     groupId: uuid("group_id")
       .notNull()
       .references(() => groups.id),
@@ -181,7 +188,7 @@ export const meetings = pgTable(
 export const meetingAttendance = pgTable(
   "meeting_attendance",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     meetingId: uuid("meeting_id")
       .notNull()
       .references(() => meetings.id),
@@ -202,7 +209,7 @@ export const meetingAttendance = pgTable(
 export const prayerRequests = pgTable(
   "prayer_requests",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     meetingId: uuid("meeting_id")
       .notNull()
       .references(() => meetings.id),
@@ -219,7 +226,7 @@ export const prayerRequests = pgTable(
 export const mediaAssets = pgTable(
   "media_assets",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     type: mediaAssetType("type").notNull(),
     ownerUserId: uuid("owner_user_id").references(() => users.id),
     groupId: uuid("group_id").references(() => groups.id),
@@ -242,7 +249,7 @@ export const mediaAssets = pgTable(
 export const auditEvents = pgTable(
   "audit_events",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    id: uuid("id").primaryKey().default(sql`uuidv7()`),
     actorUserId: uuid("actor_user_id").references(() => users.id),
     action: text("action").notNull(),
     entityType: text("entity_type").notNull(),

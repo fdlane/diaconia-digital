@@ -7,7 +7,6 @@ import {
   type Role,
   type SupportedLocale,
 } from "@diaconia/shared";
-import * as Crypto from "expo-crypto";
 import { useEffect, useMemo, useState } from "react";
 import {
   Image,
@@ -37,6 +36,13 @@ import {
   saveUser,
 } from "./storage";
 import type { LocalGroup, LocalMeeting, LocalMember, LocalPrayerRequest, LocalUser } from "./types";
+import { uuidv7 } from "./uuid";
+
+export type AuthenticatedSession = {
+  user: LocalUser;
+  getToken: () => Promise<string>;
+  signOut: () => Promise<void>;
+};
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
 const brand = {
@@ -133,7 +139,7 @@ function statusLabel(status: AttendanceStatus, locale: SupportedLocale) {
   return ui[locale][status];
 }
 
-export function FieldMeetingApp() {
+export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession?: AuthenticatedSession }) {
   const [locale, setLocale] = useState<SupportedLocale>("es");
   const [user, setUser] = useState<LocalUser | null>(null);
   const [groups] = useState<LocalGroup[]>(seedGroups);
@@ -158,11 +164,22 @@ export function FieldMeetingApp() {
   const copy = labels[locale];
   const text = ui[locale];
   const [status, setStatus] = useState(copy.ready);
+  const authLocked = Boolean(authenticatedSession);
 
   useEffect(() => {
     async function hydrate() {
       const storedLocale = await loadLocale();
       setLocale(storedLocale);
+      if (authenticatedSession) {
+        setUser(authenticatedSession.user);
+        setProfileName(authenticatedSession.user.displayName);
+        setProfileEmail(authenticatedSession.user.email ?? "");
+        setProfilePhone(authenticatedSession.user.phone ?? "");
+        setAccessToken("");
+        setMembers(await loadMembers(seedMembers));
+        setMeetings(await loadMeetings());
+        return;
+      }
       const storedUser = await loadUser();
       setUser(storedUser);
       if (storedUser) {
@@ -176,7 +193,7 @@ export function FieldMeetingApp() {
     }
 
     void hydrate();
-  }, []);
+  }, [authenticatedSession]);
 
   const selectedGroup =
     groups.find((group) => group.id === selectedGroupId) ?? groups[0] ?? {
@@ -190,6 +207,13 @@ export function FieldMeetingApp() {
   );
   const presentCount = groupMembers.filter((member) => (attendance[member.id] ?? "present") === "present").length;
   const canAdmin = user?.role === "admin";
+
+  async function getApiToken() {
+    if (authenticatedSession) {
+      return authenticatedSession.getToken();
+    }
+    return user?.token ?? "";
+  }
 
   async function updateLocale(nextLocale: SupportedLocale) {
     setLocale(nextLocale);
@@ -222,7 +246,7 @@ export function FieldMeetingApp() {
       displayName: profileName.trim() || user.displayName,
       email: profileEmail.trim() || null,
       phone: profilePhone.trim() || null,
-      token: accessToken.trim() || user.token,
+      token: authLocked ? user.token : accessToken.trim() || user.token,
     };
     setUser(nextUser);
     await saveUser(nextUser);
@@ -231,6 +255,10 @@ export function FieldMeetingApp() {
   }
 
   async function signOut() {
+    if (authenticatedSession) {
+      await authenticatedSession.signOut();
+      return;
+    }
     setUser(null);
     setProfileMenuOpen(false);
     setProfileEditorOpen(false);
@@ -244,10 +272,11 @@ export function FieldMeetingApp() {
     if (!photo) return;
     let remoteMediaId = user.profilePhotoRemoteMediaId;
     try {
-      remoteMediaId = await uploadPhotoAsset({ apiUrl, token: user.token, photo, ownerUserId: user.id });
+      const token = await getApiToken();
+      remoteMediaId = await uploadPhotoAsset({ apiUrl, token, photo, ownerUserId: user.id });
       await fetch(`${apiUrl}/me/profile-photo`, {
         method: "POST",
-        headers: { authorization: `Bearer ${user.token}`, "content-type": "application/json" },
+        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
         body: JSON.stringify({ mediaId: remoteMediaId }),
       });
     } catch {
@@ -265,7 +294,7 @@ export function FieldMeetingApp() {
     if (!photo) return;
     let remoteMediaId: string | undefined;
     try {
-      remoteMediaId = await uploadPhotoAsset({ apiUrl, token: user?.token ?? "", photo, ownerUserId: memberId });
+      remoteMediaId = await uploadPhotoAsset({ apiUrl, token: await getApiToken(), photo, ownerUserId: memberId });
     } catch {
       setStatus(copy.memberPhotoPending);
     }
@@ -289,7 +318,7 @@ export function FieldMeetingApp() {
     if (!newPersonName.trim()) return;
     const phone = newPersonPhone.trim();
     const nextPerson: LocalMember = {
-      id: Crypto.randomUUID(),
+      id: await uuidv7(),
       groupId: selectedGroup.id,
       displayName: newPersonName.trim(),
       role: "member",
@@ -312,12 +341,13 @@ export function FieldMeetingApp() {
     await saveMembers(nextMembers);
   }
 
-  function addPrayerRequest() {
+  async function addPrayerRequest() {
     if (!newPrayer.trim()) return;
+    const id = await uuidv7();
     setPrayerRequests((value) => [
       ...value,
       {
-        id: Crypto.randomUUID(),
+        id,
         request: newPrayer.trim(),
       },
     ]);
@@ -327,7 +357,7 @@ export function FieldMeetingApp() {
   async function saveDraft(syncNow: boolean) {
     if (!user) return;
     const meeting: LocalMeeting = {
-      id: Crypto.randomUUID(),
+      id: await uuidv7(),
       groupId: selectedGroup.id,
       scheduledStartAt: new Date().toISOString(),
       occurredAt: new Date().toISOString(),
@@ -370,14 +400,15 @@ export function FieldMeetingApp() {
       let uploadedMeetingPhotos = meeting.meetingPhotos;
       try {
         for (const photo of meeting.meetingPhotos) {
-          const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token: user.token, photo, meetingId: meeting.id }));
+          const token = await getApiToken();
+          const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token, photo, meetingId: meeting.id }));
           uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) =>
             candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate,
           );
         }
         await replayMeetingWrite({
           apiUrl,
-          token: user.token,
+          token: await getApiToken(),
           payload: {
             id: meeting.id,
             groupId: meeting.groupId,
@@ -618,7 +649,9 @@ export function FieldMeetingApp() {
             <TextInput onChangeText={setProfileName} placeholder={text.displayName} style={styles.input} value={profileName} />
             <TextInput autoCapitalize="none" keyboardType="email-address" onChangeText={setProfileEmail} placeholder={text.email} style={styles.input} value={profileEmail} />
             <TextInput keyboardType="phone-pad" onChangeText={setProfilePhone} placeholder={text.phone} style={styles.input} value={profilePhone} />
-            <TextInput autoCapitalize="none" multiline onChangeText={setAccessToken} placeholder={text.accessToken} style={styles.textAreaSmall} value={accessToken} />
+            {authLocked ? null : (
+              <TextInput autoCapitalize="none" multiline onChangeText={setAccessToken} placeholder={text.accessToken} style={styles.textAreaSmall} value={accessToken} />
+            )}
             <View style={styles.actions}>
               <Pressable onPress={() => setProfileEditorOpen(false)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.cancel}</Text></Pressable>
               <Pressable onPress={saveProfile} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{text.saveProfile}</Text></Pressable>

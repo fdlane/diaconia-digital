@@ -9,7 +9,7 @@ CREATE TYPE "public"."prayer_request_status" AS ENUM('open', 'answered', 'archiv
 CREATE TYPE "public"."user_role" AS ENUM('admin', 'facilitator', 'chaplain', 'member');--> statement-breakpoint
 CREATE TYPE "public"."user_status" AS ENUM('invited', 'active', 'disabled');--> statement-breakpoint
 CREATE TABLE "audit_events" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"actor_user_id" uuid,
 	"action" text NOT NULL,
 	"entity_type" text NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE "audit_events" (
 );
 --> statement-breakpoint
 CREATE TABLE "group_memberships" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"group_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
 	"position" "group_position",
@@ -31,7 +31,7 @@ CREATE TABLE "group_memberships" (
 );
 --> statement-breakpoint
 CREATE TABLE "groups" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"name" text NOT NULL,
 	"community" text NOT NULL,
 	"facilitator_id" uuid NOT NULL,
@@ -43,9 +43,10 @@ CREATE TABLE "groups" (
 );
 --> statement-breakpoint
 CREATE TABLE "invitations" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"user_id" uuid NOT NULL,
-	"email" text NOT NULL,
+	"phone" text NOT NULL,
+	"email" text,
 	"token_hash" text NOT NULL,
 	"status" "invitation_status" DEFAULT 'pending' NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
@@ -56,7 +57,7 @@ CREATE TABLE "invitations" (
 );
 --> statement-breakpoint
 CREATE TABLE "media_assets" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"type" "media_asset_type" NOT NULL,
 	"owner_user_id" uuid,
 	"group_id" uuid,
@@ -70,7 +71,7 @@ CREATE TABLE "media_assets" (
 );
 --> statement-breakpoint
 CREATE TABLE "meeting_attendance" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"meeting_id" uuid NOT NULL,
 	"user_id" uuid NOT NULL,
 	"status" "attendance_status" NOT NULL,
@@ -80,7 +81,7 @@ CREATE TABLE "meeting_attendance" (
 );
 --> statement-breakpoint
 CREATE TABLE "meetings" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"group_id" uuid NOT NULL,
 	"facilitator_id" uuid NOT NULL,
 	"chaplain_user_id" uuid,
@@ -107,7 +108,7 @@ CREATE TABLE "meetings" (
 );
 --> statement-breakpoint
 CREATE TABLE "prayer_requests" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"meeting_id" uuid NOT NULL,
 	"request" text NOT NULL,
 	"status" "prayer_request_status" DEFAULT 'open' NOT NULL,
@@ -116,12 +117,12 @@ CREATE TABLE "prayer_requests" (
 );
 --> statement-breakpoint
 CREATE TABLE "users" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT uuidv7() NOT NULL,
 	"auth_provider" text DEFAULT 'clerk' NOT NULL,
 	"auth_subject" text,
 	"display_name" text NOT NULL,
-	"email" text NOT NULL,
-	"phone" text,
+	"email" text,
+	"phone" text NOT NULL,
 	"role" "user_role" DEFAULT 'member' NOT NULL,
 	"status" "user_status" DEFAULT 'invited' NOT NULL,
 	"profile_photo_media_id" uuid,
@@ -156,6 +157,7 @@ CREATE UNIQUE INDEX "group_memberships_active_position_idx" ON "group_membership
 CREATE INDEX "groups_facilitator_id_idx" ON "groups" USING btree ("facilitator_id");--> statement-breakpoint
 CREATE INDEX "groups_chaplain_user_id_idx" ON "groups" USING btree ("chaplain_user_id");--> statement-breakpoint
 CREATE INDEX "invitations_user_id_idx" ON "invitations" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "invitations_phone_idx" ON "invitations" USING btree ("phone");--> statement-breakpoint
 CREATE INDEX "invitations_email_idx" ON "invitations" USING btree ("email");--> statement-breakpoint
 CREATE UNIQUE INDEX "invitations_token_hash_idx" ON "invitations" USING btree ("token_hash");--> statement-breakpoint
 CREATE UNIQUE INDEX "invitations_pending_user_idx" ON "invitations" USING btree ("user_id") WHERE "invitations"."status" = 'pending';--> statement-breakpoint
@@ -171,6 +173,7 @@ CREATE INDEX "meetings_chaplain_user_id_idx" ON "meetings" USING btree ("chaplai
 CREATE INDEX "meetings_status_idx" ON "meetings" USING btree ("status");--> statement-breakpoint
 CREATE INDEX "prayer_requests_meeting_id_idx" ON "prayer_requests" USING btree ("meeting_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "users_auth_provider_subject_idx" ON "users" USING btree ("auth_provider","auth_subject") WHERE "users"."auth_subject" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "users_email_idx" ON "users" USING btree ("email");--> statement-breakpoint
+CREATE UNIQUE INDEX "users_active_phone_idx" ON "users" USING btree ("phone") WHERE "users"."status" <> 'disabled';--> statement-breakpoint
+CREATE UNIQUE INDEX "users_email_idx" ON "users" USING btree ("email") WHERE "users"."email" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "users_role_idx" ON "users" USING btree ("role");--> statement-breakpoint
 CREATE INDEX "users_status_idx" ON "users" USING btree ("status");
