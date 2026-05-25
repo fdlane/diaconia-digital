@@ -2,7 +2,12 @@ packages:
   - "apps/*"
   - "packages/*"
 allowBuilds:
+  '@clerk/shared': true
   '@rocicorp/zero-sqlite3': true
+  browser-tabs-lock: true
+  bufferutil: true
+  core-js: true
   esbuild: true
   protobufjs: true
   sharp: true
+  utf-8-validate: true

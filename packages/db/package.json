@@ -13,6 +13,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file=../../.env --import tsx src/seed.ts",
+    "db:reset": "node --env-file=../../.env --import tsx src/reset.ts",
     "zero:generate": "zero-deploy-permissions --schema-path ./src/zero/schema.ts --output-file ./src/zero/permissions.sql --output-format sql --app-id diaconia_digital"
   },
   "dependencies": {

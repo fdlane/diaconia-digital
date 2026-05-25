@@ -13,6 +13,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@clerk/nextjs": "^7.4.1",
     "@diaconia/shared": "workspace:*",
     "@types/leaflet": "^1.9.21",
     "leaflet": "^1.9.4",

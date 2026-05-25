@@ -97,14 +97,14 @@ export function MemberFormPage({ id }: { id?: string }) {
     const body = isEdit
       ? JSON.stringify({
           displayName: form.displayName,
-          email: form.email,
-          phone: form.phone || null,
+          email: form.email || null,
+          phone: form.phone,
           role: form.role,
         })
       : JSON.stringify({
           displayName: form.displayName,
-          email: form.email,
-          phone: form.phone || null,
+          email: form.email || null,
+          phone: form.phone,
           role: form.role,
           authSubject: form.authSubject || undefined,
         });
@@ -205,6 +205,7 @@ export function MemberFormPage({ id }: { id?: string }) {
                 id="f-phone"
                 onChange={field("phone")}
                 placeholder="+595 981 000 000"
+                required
                 value={form.phone}
               />
             </div>

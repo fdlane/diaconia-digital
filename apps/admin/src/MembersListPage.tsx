@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
-import { t } from "./adminLabels";
+import { localizeRouteError, t } from "./adminLabels";
 import { ChevronRightIcon, PlusIcon, UsersIcon } from "./icons";
 import { AvatarCircle } from "./AvatarCircle";
 
@@ -25,26 +25,35 @@ type AdminUser = {
 };
 
 export function MembersListPage() {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
 
   const [members, setMembers] = useState<AdminUser[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const loadedTokenRef = useRef("");
 
   useEffect(() => {
+    if (!isLoaded || !token || loadedTokenRef.current === token) return;
+    loadedTokenRef.current = token;
     void load();
-  }, [token]);
+  }, [isLoaded, token]);
 
   async function load() {
+    if (!token) {
+      setErrorMsg(l.authMissingSession);
+      setStatus("error");
+      return;
+    }
+
     setStatus("loading");
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     try {
       const res = await fetch(`${apiUrl}/users`, { headers });
       if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${res.status}`);
+        const payload = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
+        setErrorMsg(localizeRouteError(payload, l, res.status));
         setStatus("error");
         return;
       }

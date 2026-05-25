@@ -266,14 +266,12 @@ export function MeetingDetailPage({ id }: { id: string }) {
                       {meeting.latitude.toFixed(6)}, {meeting.longitude.toFixed(6)}
                     </span>
                     <br />
-                    <a
-                      href={`https://www.openstreetmap.org/?mlat=${meeting.latitude}&mlon=${meeting.longitude}&zoom=16`}
-                      rel="noreferrer"
+                    <Link
+                      href={`/meetings?view=map&meeting=${encodeURIComponent(meeting.id)}&zoom=19`}
                       style={{ color: "var(--brand)", fontSize: "0.875rem" }}
-                      target="_blank"
                     >
-                      {l.viewOnMap} ↗
-                    </a>
+                      {l.viewOnMap}
+                    </Link>
                   </span>
                 </div>
               ) : null}

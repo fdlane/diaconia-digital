@@ -11,12 +11,27 @@ describe("admin user validation", () => {
     expect(
       createUserSchema.parse({
         displayName: "Chaplain Maria",
-        email: "maria@example.com",
+        phone: "+595981000000",
         role: "chaplain",
       }).role,
     ).toBe("chaplain");
 
     expect(updateUserSchema.parse({ role: "chaplain" }).role).toBe("chaplain");
+  });
+
+  it("normalizes Paraguay phone numbers and allows optional email", () => {
+    const created = createUserSchema.parse({
+      displayName: "Maria",
+      phone: "0981 000 000",
+    });
+
+    expect(created.email).toBeUndefined();
+    expect(created.phone).toBe("+595981000000");
+
+    expect(updateUserSchema.parse({ email: null, phone: "595981000001" })).toMatchObject({
+      email: null,
+      phone: "+595981000001",
+    });
   });
 });
 

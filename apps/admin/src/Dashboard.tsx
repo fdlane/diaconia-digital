@@ -1,17 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
-import { CalendarIcon, MeetingReportIcon, PrayerIcon, UsersIcon } from "./icons";
+import { DeferredMeetingLocationsMap } from "./DeferredMeetingLocationsMap";
+import { CalendarIcon, MeetingReportIcon, PrayerIcon } from "./icons";
+import type { AdminMeeting } from "./meetingTypes";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
-type AdminMeeting = {
-  id: string;
-  heldAt: string;
-  submittedAt: string | null;
-};
 
 type PrayerRequest = { id: string; status: string };
 
@@ -25,7 +21,7 @@ type StatCardProps = {
 
 function StatCard({ icon, iconColor, value, label, description }: StatCardProps) {
   return (
-    <div className="stat-card">
+    <div className="stat-card dashboard-stat-card">
       <div className={`stat-card-icon ${iconColor}`}>{icon}</div>
       <div className="stat-card-value">{value}</div>
       <div className="stat-card-label">{label}</div>
@@ -35,19 +31,23 @@ function StatCard({ icon, iconColor, value, label, description }: StatCardProps)
 }
 
 export function Dashboard() {
-  const { token, currentUser, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
+  const loadedTokenRef = useRef("");
 
+  const [meetings, setMeetings] = useState<AdminMeeting[]>([]);
   const [plannedCount, setPlannedCount] = useState<number | "…">("…");
   const [reportsCount, setReportsCount] = useState<number | "…">("…");
   const [openPrayersCount, setOpenPrayersCount] = useState<number | "…">("…");
 
   useEffect(() => {
-    void loadStats();
-  }, [token]);
+    if (!isLoaded || !token || loadedTokenRef.current === token) return;
+    loadedTokenRef.current = token;
+    void loadStats(token);
+  }, [isLoaded, token]);
 
-  async function loadStats() {
-    const headers = token ? { authorization: `Bearer ${token}` } : {};
+  async function loadStats(activeToken: string) {
+    const headers = { authorization: `Bearer ${activeToken}` };
 
     try {
       const res = await fetch(`${apiUrl}/meetings`, { headers });
@@ -55,6 +55,7 @@ export function Dashboard() {
 
       const data = (await res.json()) as { meetings: AdminMeeting[] };
       const meetings = data.meetings;
+      setMeetings(meetings);
 
       setPlannedCount(meetings.filter((s) => !s.submittedAt).length);
       setReportsCount(meetings.filter((s) => s.submittedAt).length);
@@ -76,30 +77,36 @@ export function Dashboard() {
       );
       setOpenPrayersCount(counts.reduce((sum, n) => sum + n, 0));
     } catch {
+      setMeetings([]);
       setPlannedCount(0);
       setReportsCount(0);
       setOpenPrayersCount(0);
     }
   }
 
-  const firstName = currentUser?.displayName.split(" ")[0];
-  const greeting = firstName ? l.greeting(firstName) : l.greetingFallback;
-
-  const today = new Intl.DateTimeFormat(locale === "es" ? "es-PY" : "en", {
-    weekday: "long",
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date());
+  const statsLoading = plannedCount === "…" || reportsCount === "…" || openPrayersCount === "…";
+  const activeMeetingsWithLocation = useMemo(
+    () =>
+      meetings.filter(
+        (meeting) =>
+          meeting.status !== "cancelled" &&
+          !meeting.submittedAt &&
+          meeting.latitude != null &&
+          meeting.longitude != null,
+      ),
+    [meetings],
+  );
 
   return (
-    <div>
-      <div className="page-header">
-        <h1 className="page-title">{greeting}</h1>
-        <p className="page-subtitle">{today}</p>
-      </div>
+    <div className="dashboard-page">
+      {statsLoading ? (
+        <div className="dashboard-loading" role="status" aria-live="polite">
+          <span className="loading-dot" />
+          <span>{l.loading}</span>
+        </div>
+      ) : null}
 
-      <div className="stat-cards">
+      <div className="stat-cards dashboard-stat-cards">
         <StatCard
           description={l.plannedMeetingsDesc}
           icon={<CalendarIcon size={20} />}
@@ -123,21 +130,25 @@ export function Dashboard() {
         />
       </div>
 
-      <div className="card">
+      <div className="card dashboard-map-card">
         <div className="card-header">
-          <span className="card-title">{l.quickLinks}</span>
+          <span className="card-title">{l.activeMeetingsMap}</span>
         </div>
-        <div className="card-body">
-          <div className="quick-links">
-            <a className="quick-link" href="/meetings">
-              <CalendarIcon size={18} />
-              {l.viewAllMeetings}
-            </a>
-            <a className="quick-link" href="/members">
-              <UsersIcon size={18} />
-              {l.viewMembers}
-            </a>
-          </div>
+        <div className="card-body dashboard-map-body">
+          {activeMeetingsWithLocation.length > 0 ? (
+            <DeferredMeetingLocationsMap
+              fitBoundsMaxZoom={12}
+              height="var(--dashboard-map-height)"
+              locale={locale}
+              loadingLabel={l.loading}
+              meetings={activeMeetingsWithLocation}
+              stewardLabel={l.loanSteward}
+              unavailableLabel={l.mapUnavailable}
+              viewDetailsLabel={l.viewMeetingDetail}
+            />
+          ) : (
+            <p className="text-sm text-muted">{l.noActiveMeetingLocations}</p>
+          )}
         </div>
       </div>
     </div>

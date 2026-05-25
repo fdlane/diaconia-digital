@@ -53,15 +53,6 @@ export function ProfilePage() {
                 {currentUser.phone || l.noPhone}
               </span>
             </div>
-            <div className="detail-field">
-              <span className="detail-label">{l.avatarUrl}</span>
-              <span
-                className={`detail-value text-sm${currentUser.avatarUrl ? "" : " muted"}`}
-                style={{ wordBreak: "break-all" }}
-              >
-                {currentUser.avatarUrl || "—"}
-              </span>
-            </div>
           </div>
         </div>
       </div>

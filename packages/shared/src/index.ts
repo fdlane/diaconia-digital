@@ -42,13 +42,34 @@ export type LocationSource = z.infer<typeof locationSourceSchema>;
 
 const nullableDateTime = z.string().datetime().nullable();
 
+export function normalizePhoneNumber(value: string): string {
+  const trimmed = value.trim();
+  const digits = trimmed.replace(/\D/g, "");
+
+  if (trimmed.startsWith("+")) {
+    return `+${digits}`;
+  }
+
+  if (digits.startsWith("595")) {
+    return `+${digits}`;
+  }
+
+  return `+595${digits.replace(/^0+/, "")}`;
+}
+
+export const phoneNumberSchema = z
+  .string()
+  .min(4)
+  .transform(normalizePhoneNumber)
+  .refine((value) => /^\+[1-9]\d{7,14}$/.test(value), "Phone must be a valid E.164 number");
+
 export const userSchema = z.object({
   id: z.string().uuid(),
   authProvider: z.string().min(1).default("clerk"),
   authSubject: z.string().min(1).nullable(),
   displayName: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().min(4).nullable(),
+  email: z.string().email().nullable(),
+  phone: phoneNumberSchema,
   role: roleSchema,
   status: userStatusSchema,
   profilePhotoMediaId: z.string().uuid().nullable(),
@@ -60,7 +81,8 @@ export type User = z.infer<typeof userSchema>;
 export const invitationSchema = z.object({
   id: z.string().uuid(),
   userId: z.string().uuid(),
-  email: z.string().email(),
+  phone: phoneNumberSchema,
+  email: z.string().email().nullable(),
   status: invitationStatusSchema,
   expiresAt: z.string().datetime(),
   acceptedAt: nullableDateTime,

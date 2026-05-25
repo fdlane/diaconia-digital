@@ -2,12 +2,14 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
 import { useAuth } from "./AuthContext";
-import { t } from "./adminLabels";
+import { localizeRouteError, t } from "./adminLabels";
 import { ChevronRightIcon, DownloadIcon, FilterIcon, PlusIcon } from "./icons";
+import { defaultSelectedMapZoom, parseMapZoom } from "./mapUrlState";
+import type { AdminMeeting } from "./meetingTypes";
 
 const MeetingsMap = dynamic(() => import("./MeetingsMap").then((m) => ({ default: m.MeetingsMap })), {
   ssr: false,
@@ -18,21 +20,6 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type Group = { id: string; name: string; community: string };
 
-export type AdminMeeting = {
-  id: string;
-  heldAt: string;
-  submittedAt: string | null;
-  chaplainId: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  groupName: string;
-  community: string;
-  facilitatorName: string;
-  notes: string;
-  followUpCategory: string;
-  followUpNotes: string;
-};
-
 type MeetingMedia = { id: string; type: string; url: string };
 type PrayerRequest = {
   id: string;
@@ -41,18 +28,22 @@ type PrayerRequest = {
 };
 
 export function MeetingsList() {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedMeetingId = searchParams.get("meeting") ?? "";
+  const selectedMapZoom = parseMapZoom(searchParams.get("zoom"));
+  const viewMode = searchParams.get("view") === "map" ? "map" : "list";
 
   const [meetings, setMeetings] = useState<AdminMeeting[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [mediaByMeeting, setMediaByMeeting] = useState<Record<string, MeetingMedia[]>>({});
-  const [prayersByMeeting, setPrayersByMeeting] = useState<Record<string, PrayerRequest[]>>({});
   const [filters, setFilters] = useState({ from: "", to: "", groupId: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [statusMsg, setStatusMsg] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const loadedGroupsTokenRef = useRef("");
+  const loadedMeetingsKeyRef = useRef("");
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -63,12 +54,22 @@ export function MeetingsList() {
   }, [filters]);
 
   useEffect(() => {
+    if (!isLoaded || !token || loadedGroupsTokenRef.current === token) return;
+    loadedGroupsTokenRef.current = token;
     void loadGroups();
+  }, [isLoaded, token]);
+
+  useEffect(() => {
+    if (!isLoaded || !token) return;
+    const requestKey = `${token}:${query}`;
+    if (loadedMeetingsKeyRef.current === requestKey) return;
+    loadedMeetingsKeyRef.current = requestKey;
     void loadMeetings();
-  }, [token]);
+  }, [isLoaded, token, query]);
 
   async function loadGroups() {
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    if (!token) return;
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     try {
       const res = await fetch(`${apiUrl}/groups`, { headers });
       if (!res.ok) return;
@@ -78,12 +79,16 @@ export function MeetingsList() {
   }
 
   async function loadMeetings() {
+    if (!token) {
+      setStatus("error");
+      setStatusMsg(l.authMissingSession);
+      return;
+    }
+
     setStatus("loading");
     setStatusMsg(l.loadingMeetings);
 
-    const headers: Record<string, string> = token
-      ? { authorization: `Bearer ${token}` }
-      : {};
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
 
     try {
       const res = await fetch(
@@ -93,11 +98,12 @@ export function MeetingsList() {
 
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as {
+          code?: string;
           error?: string;
           detail?: string;
         } | null;
         setStatus("error");
-        setStatusMsg(payload?.detail ?? payload?.error ?? `Error ${res.status}`);
+        setStatusMsg(payload?.detail ?? localizeRouteError(payload, l, res.status));
         return;
       }
 
@@ -106,43 +112,10 @@ export function MeetingsList() {
         warning?: string;
       };
       setMeetings(data.meetings);
-      setMediaByMeeting({});
-      setPrayersByMeeting({});
-
-      let failures = 0;
-
-      const [mediaEntries, prayerEntries] = await Promise.all([
-        Promise.all(
-          data.meetings.map(async (s) => {
-            try {
-              const r = await fetch(`${apiUrl}/meetings/${s.id}/media`, { headers });
-              if (!r.ok) { failures++; return [s.id, []] as const; }
-              const p = (await r.json()) as { media: MeetingMedia[] };
-              return [s.id, p.media] as const;
-            } catch { failures++; return [s.id, []] as const; }
-          }),
-        ),
-        Promise.all(
-          data.meetings.map(async (s) => {
-            try {
-              const r = await fetch(
-                `${apiUrl}/meetings/${s.id}/prayer-requests`,
-                { headers },
-              );
-              if (!r.ok) { failures++; return [s.id, []] as const; }
-              const p = (await r.json()) as { prayerRequests: PrayerRequest[] };
-              return [s.id, p.prayerRequests] as const;
-            } catch { failures++; return [s.id, []] as const; }
-          }),
-        ),
-      ]);
-
-      setMediaByMeeting(Object.fromEntries(mediaEntries));
-      setPrayersByMeeting(Object.fromEntries(prayerEntries));
 
       const base = data.warning ?? l.meetingsCount(data.meetings.length);
       setStatus("done");
-      setStatusMsg(failures ? `${base} · ${failures} detail loads failed` : base);
+      setStatusMsg(base);
     } catch (err) {
       setStatus("error");
       setStatusMsg(err instanceof Error ? err.message : "Error");
@@ -194,6 +167,52 @@ export function MeetingsList() {
     );
   }
 
+  const setRouteState = useCallback((next: { view?: "list" | "map"; meeting?: string | null; zoom?: number | null }) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (next.view) {
+      if (next.view === "map") {
+        params.set("view", "map");
+      } else {
+        params.delete("view");
+        params.delete("meeting");
+        params.delete("zoom");
+      }
+    }
+
+    if (next.meeting !== undefined) {
+      if (next.meeting) {
+        params.set("meeting", next.meeting);
+        params.set("view", "map");
+        params.set("zoom", String(next.zoom ?? selectedMapZoom ?? defaultSelectedMapZoom));
+      } else {
+        params.delete("meeting");
+        params.delete("zoom");
+      }
+    }
+
+    if (next.zoom !== undefined) {
+      if (next.zoom) {
+        params.set("zoom", String(next.zoom));
+      } else {
+        params.delete("zoom");
+      }
+    }
+
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
+  }, [pathname, router, searchParams]);
+
+  const setMapZoom = useCallback((zoom: number) => {
+    if (selectedMapZoom === zoom) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", "map");
+    params.set("zoom", String(zoom));
+
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [pathname, router, searchParams, selectedMapZoom]);
+
   return (
     <div>
       <div className="page-header">
@@ -214,7 +233,7 @@ export function MeetingsList() {
             <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
               <button
                 className={`btn ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setViewMode("list")}
+                onClick={() => setRouteState({ view: "list" })}
                 style={{ borderRadius: 0, border: "none" }}
                 type="button"
               >
@@ -222,7 +241,7 @@ export function MeetingsList() {
               </button>
               <button
                 className={`btn ${viewMode === "map" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setViewMode("map")}
+                onClick={() => setRouteState({ view: "map" })}
                 style={{ borderRadius: 0, border: "none", borderLeft: "1px solid var(--border)" }}
                 type="button"
               >
@@ -296,8 +315,16 @@ export function MeetingsList() {
         {viewMode === "map" ? (
           <div style={{ padding: "1rem" }}>
             <MeetingsMap
-              onSelect={(id) => router.push(`/meetings/${id}`)}
+              height="max(28rem, calc(100dvh - var(--appbar-height) - 22rem))"
+              locale={locale}
               meetings={meetings}
+              onSelect={(id) => setRouteState({ meeting: id, zoom: selectedMapZoom ?? defaultSelectedMapZoom })}
+              onZoomChange={setMapZoom}
+              selectedMeetingId={selectedMeetingId}
+              selectedZoom={selectedMapZoom}
+              stewardLabel={l.loanSteward}
+              unavailableLabel={l.mapUnavailable}
+              viewDetailsLabel={l.viewMeetingDetail}
             />
             {meetings.filter((s) => s.latitude != null).length === 0 && status === "done" ? (
               <p className="text-sm text-muted" style={{ marginTop: "0.75rem", textAlign: "center" }}>
@@ -350,24 +377,16 @@ export function MeetingsList() {
                     ) : null}
                   </td>
                   <td>
-                    <div className="thumbs">
-                      {(mediaByMeeting[meeting.id] ?? []).map((m) => (
-                        <img alt={l.meetingPhoto} key={m.id} src={m.url} />
-                      ))}
-                    </div>
+                    <span className="badge badge-default">{meeting.mediaCount ?? 0}</span>
                   </td>
                   <td>
-                    <div className="prayer-list">
-                      {(prayersByMeeting[meeting.id] ?? []).map((pr) => (
-                        <div className="prayer-card" key={pr.id}>
-                          <p>{pr.request}</p>
-                          <span className="prayer-status">{pr.status}</span>
-                        </div>
-                      ))}
-                      {!(prayersByMeeting[meeting.id] ?? []).length ? (
-                        <span className="text-muted text-sm">{l.noRequests}</span>
-                      ) : null}
-                    </div>
+                    {(meeting.prayerRequestCount ?? 0) > 0 ? (
+                      <span className="badge badge-default">
+                        {meeting.openPrayerRequestCount ?? 0}/{meeting.prayerRequestCount ?? 0}
+                      </span>
+                    ) : (
+                      <span className="text-muted text-sm">{l.noRequests}</span>
+                    )}
                   </td>
                   <td className="text-sm text-muted">
                     {meeting.notes || l.noNotes}

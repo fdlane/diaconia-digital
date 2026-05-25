@@ -3,12 +3,39 @@ import type { SupportedLocale } from "@diaconia/shared";
 const adminLabels = {
   es: {
     // Sign in
-    signInSubtitle: "Pegá tu token de acceso, o continuá sin token en desarrollo local.",
+    signInSubtitle: "Ingresá con tu número de WhatsApp, Google o Apple. Solo usuarios invitados pueden acceder.",
     accessTokenLabel: "Token de acceso",
-    accessTokenPlaceholder: "Pegá el token (opcional en desarrollo local)",
+    accessTokenPlaceholder: "Token de desarrollo",
     signingIn: "Ingresando…",
     signIn: "Ingresar",
-    invalidToken: "Token inválido. Verificá tu token de acceso e intentá de nuevo.",
+    invalidToken: "No se pudo validar la sesión. Intentá de nuevo.",
+    authTitle: "Diaconia",
+    authSubtitle: "Por favor ingresá para continuar",
+    socialOr: "o",
+    phoneNumber: "Número de teléfono",
+    verificationCode: "Código de verificación",
+    verificationCodePlaceholder: "Ingresá el código",
+    sendingCode: "Enviando código…",
+    continue: "Continuar",
+    verifying: "Verificando…",
+    verify: "Verificar",
+    useDifferentNumber: "Usar otro número",
+    appleSignIn: "Apple",
+    googleSignIn: "Google",
+    phoneCountry: "País del teléfono",
+    authGenericError: "No se pudo completar el ingreso. Intentá de nuevo.",
+    authAccountNotFound: "No encontramos una cuenta para ese número.",
+    authInvalidCode: "El código no es válido. Verificá el código e intentá de nuevo.",
+    authMissingPhone: "Ingresá un número de teléfono válido.",
+    authAlreadySignedIn: "Ya hay una sesión iniciada. Salí de esa sesión e intentá de nuevo.",
+    authInviteRequired: "Tu cuenta existe, pero todavía no está habilitada para acceder a Diaconia.",
+    authAdminRequired: "Tu cuenta no tiene rol de administrador.",
+    authMissingClerkConfig: "Falta configurar el inicio de sesión de Clerk.",
+    authTokenTemplateError: "No se pudo crear un token de sesión. Verificá la plantilla JWT de Clerk.",
+    authSessionLoadFailed: "No se pudo cargar la sesión.",
+    authTryAgain: "Intentar de nuevo",
+    authInvalidSession: "Tu sesión expiró o no es válida. Salí e ingresá de nuevo.",
+    authMissingSession: "Iniciá sesión para continuar.",
 
     // Nav
     dashboard: "Inicio",
@@ -40,6 +67,8 @@ const adminLabels = {
     openPrayerRequestsDesc: "Pedidos sin respuesta",
     meetingReports: "Informes de reunión",
     meetingReportsDesc: "Informes enviados por facilitadores",
+    activeMeetingsMap: "Reuniones",
+    noActiveMeetingLocations: "No hay reuniones activas con ubicación registrada.",
     quickLinks: "Accesos rápidos",
     viewAllMeetings: "Ver todas las reuniones",
     viewMembers: "Ver miembros",
@@ -142,6 +171,7 @@ const adminLabels = {
     longitude: "Longitud",
     noLocation: "Sin ubicación registrada",
     viewOnMap: "Ver en mapa",
+    mapUnavailable: "El mapa no está disponible en este momento.",
     mapView: "Mapa",
     listView: "Lista",
 
@@ -180,6 +210,7 @@ const adminLabels = {
     editMeeting: "Editar reunión",
     deleteMeeting: "Eliminar reunión",
     meetingDetail: "Detalle de la reunión",
+    viewMeetingDetail: "Ver detalle completo",
     backToMeetings: "Volver a reuniones",
     meetingSaved: "Reunión guardada",
     meetingDeleted: "Reunión eliminada",
@@ -208,12 +239,39 @@ const adminLabels = {
 
   en: {
     // Sign in
-    signInSubtitle: "Paste an access token, or continue without one in local dev.",
+    signInSubtitle: "Sign in with your WhatsApp phone number, Google, or Apple. Invited users only.",
     accessTokenLabel: "Access token",
-    accessTokenPlaceholder: "Paste bearer token (optional for local dev)",
+    accessTokenPlaceholder: "Development token",
     signingIn: "Signing in…",
     signIn: "Sign in",
-    invalidToken: "Invalid token. Check your access token and try again.",
+    invalidToken: "Could not validate the session. Try again.",
+    authTitle: "Diaconia",
+    authSubtitle: "Please sign in to continue",
+    socialOr: "or",
+    phoneNumber: "Phone number",
+    verificationCode: "Verification code",
+    verificationCodePlaceholder: "Enter the code",
+    sendingCode: "Sending code…",
+    continue: "Continue",
+    verifying: "Verifying…",
+    verify: "Verify",
+    useDifferentNumber: "Use a different number",
+    appleSignIn: "Apple",
+    googleSignIn: "Google",
+    phoneCountry: "Phone country",
+    authGenericError: "Could not complete sign in. Try again.",
+    authAccountNotFound: "Could not find an account for that number.",
+    authInvalidCode: "The code is not valid. Check the code and try again.",
+    authMissingPhone: "Enter a valid phone number.",
+    authAlreadySignedIn: "You are already signed in. Sign out of that session and try again.",
+    authInviteRequired: "Your account exists, but it is not enabled for Diaconia access yet.",
+    authAdminRequired: "Your account does not have the administrator role.",
+    authMissingClerkConfig: "Clerk sign-in is not configured.",
+    authTokenTemplateError: "Could not create a session token. Check the Clerk JWT template.",
+    authSessionLoadFailed: "Could not load the session.",
+    authTryAgain: "Try again",
+    authInvalidSession: "Your session expired or is not valid. Sign out and sign in again.",
+    authMissingSession: "Sign in to continue.",
 
     // Nav
     dashboard: "Dashboard",
@@ -245,6 +303,8 @@ const adminLabels = {
     openPrayerRequestsDesc: "Prayer requests still open",
     meetingReports: "Meeting Reports",
     meetingReportsDesc: "Reports submitted by facilitators",
+    activeMeetingsMap: "Meetings",
+    noActiveMeetingLocations: "No active meetings have a location recorded.",
     quickLinks: "Quick Links",
     viewAllMeetings: "View all meetings",
     viewMembers: "View members",
@@ -346,6 +406,7 @@ const adminLabels = {
     longitude: "Longitude",
     noLocation: "No location recorded",
     viewOnMap: "View on map",
+    mapUnavailable: "The map is not available right now.",
     mapView: "Map",
     listView: "List",
 
@@ -384,6 +445,7 @@ const adminLabels = {
     editMeeting: "Edit Meeting",
     deleteMeeting: "Delete Meeting",
     meetingDetail: "Meeting Details",
+    viewMeetingDetail: "View full details",
     backToMeetings: "Back to Meetings",
     meetingSaved: "Meeting saved",
     meetingDeleted: "Meeting deleted",
@@ -414,4 +476,24 @@ const adminLabels = {
 export type AdminLabels = (typeof adminLabels)["es"];
 export function t(locale: SupportedLocale): AdminLabels {
   return adminLabels[locale] as AdminLabels;
+}
+
+export function localizeRouteError(
+  payload: { error?: string; code?: string } | null,
+  labels: AdminLabels,
+  status?: number,
+) {
+  if (payload?.code === "UNAUTHENTICATED" || /invalid bearer token/i.test(payload?.error ?? "")) {
+    return labels.authInvalidSession;
+  }
+
+  if (/missing bearer token/i.test(payload?.error ?? "")) {
+    return labels.authMissingSession;
+  }
+
+  if (payload?.code === "INVITE_REQUIRED" || /invited active user required/i.test(payload?.error ?? "")) {
+    return labels.authInviteRequired;
+  }
+
+  return payload?.error ?? (status ? `Error ${status}` : labels.authGenericError);
 }

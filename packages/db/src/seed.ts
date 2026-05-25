@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { createDatabase } from "./client";
+import { pathToFileURL } from "node:url";
+import { createDatabaseClient, type Database } from "./client";
 import {
   groupMemberships,
   groups,
@@ -10,31 +11,123 @@ import {
   users,
 } from "./schema";
 
-const db = createDatabase();
+const adminId = "019e606b-ce98-7134-b1d1-958703c36595";
+const dewayneAdminId = "019e606b-ce9a-7217-a2af-a9729b4d1107";
+const kelsieAdminId = "019e606b-ce9a-7217-a2af-ae7ac4769a81";
+const facilitatorId = "019e606b-ce9a-7217-a2af-b3aff656a78b";
+const chaplainId = "019e606b-ce9a-7217-a2af-b6db0b3fa660";
+const mariaId = "019e606b-ce9a-7217-a2af-bb021acfe955";
+const anaId = "019e606b-ce9a-7217-a2af-bd89eb528287";
+const rosaId = "019e606b-ce9a-7217-a2af-c16b10a2e4f0";
+const firstGroupId = "019e606b-ce9a-7217-a2af-c8c18b19c27e";
+const secondGroupId = "019e606b-ce9a-7217-a2af-cd113443806a";
+const completedMeetingId = "019e606b-ce9a-7217-a2af-d099fc127b08";
+const scheduledMeetingId = "019e606b-ce9a-7217-a2af-d54756e0158f";
 
-const adminId = "55faf062-c862-4449-85a8-a97e14886b1d";
-const dewayneAdminId = "e4c237c0-ef29-4da1-9d16-3bad8b45892c";
-const kelsieAdminId = "dee633cf-f57d-47d1-94c0-0bb321dcaecf";
-const facilitatorId = "87bb00ed-6a12-451d-93b5-77ab36bded73";
-const chaplainId = "fc96a375-777c-4613-8d35-f2b0e9bd2d25";
-const mariaId = "48e2e5fb-c82e-47e9-b1ca-37eaf17123c1";
-const anaId = "2d61cf91-f83d-4be9-9d85-476d099a4a43";
-const rosaId = "f4e90aa1-c43e-4f3d-b42a-c537a49148fc";
-const firstGroupId = "2a86f82b-5f8a-405e-9074-9dc8e4cd32db";
-const secondGroupId = "9f34b54d-3d61-4cd6-b308-6a933e2ee2fb";
-const completedMeetingId = "2e249c51-14ea-4c5a-85fa-3f7adcd8359a";
-const scheduledMeetingId = "4925327e-0845-4f2d-b1d5-d7293f911111";
+const meetingsNearAsuAirport = [
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000001",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-04T14:30:00.000Z"),
+    latitude: "-25.2670000",
+    longitude: "-57.4870000",
+    locationName: "Luque Centro",
+    address: "Luque, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000002",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-06T14:30:00.000Z"),
+    latitude: "-25.2738000",
+    longitude: "-57.5300000",
+    locationName: "Parque Nu Guasu",
+    address: "Luque, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000003",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-09T14:30:00.000Z"),
+    latitude: "-25.1675000",
+    longitude: "-57.5525000",
+    locationName: "Mariano Roque Alonso",
+    address: "Mariano Roque Alonso, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000004",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-11T14:30:00.000Z"),
+    latitude: "-25.1688000",
+    longitude: "-57.4778000",
+    locationName: "Limpio",
+    address: "Limpio, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000005",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-13T14:30:00.000Z"),
+    latitude: "-25.3397000",
+    longitude: "-57.5089000",
+    locationName: "San Lorenzo",
+    address: "San Lorenzo, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000006",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-16T14:30:00.000Z"),
+    latitude: "-25.3196000",
+    longitude: "-57.5434000",
+    locationName: "Fernando de la Mora",
+    address: "Fernando de la Mora, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000007",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-18T14:30:00.000Z"),
+    latitude: "-25.3550000",
+    longitude: "-57.4458000",
+    locationName: "Capiata",
+    address: "Capiata, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000008",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-20T14:30:00.000Z"),
+    latitude: "-25.3120000",
+    longitude: "-57.3849000",
+    locationName: "Aregua",
+    address: "Aregua, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000009",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-23T14:30:00.000Z"),
+    latitude: "-25.3466000",
+    longitude: "-57.6065000",
+    locationName: "Lambare",
+    address: "Lambare, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000010",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-25T14:30:00.000Z"),
+    latitude: "-25.3726000",
+    longitude: "-57.5908000",
+    locationName: "Villa Elisa",
+    address: "Villa Elisa, Paraguay",
+  },
+];
 
 function tokenHash(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-const now = new Date();
-const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14);
+export async function seedDatabase(db: Database) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14);
 
-await db
-  .insert(users)
-  .values([
+  await db
+    .insert(users)
+    .values([
     {
       id: adminId,
       authProvider: "clerk",
@@ -53,7 +146,7 @@ await db
       authSubject: "local-dewayne-lane",
       displayName: "F. DeWayne Lane",
       email: "dewayne.lane@diaconia.local",
-      phone: "+595000000001",
+      phone: "+18653350788",
       role: "admin",
       status: "active",
       invitedAt: now,
@@ -65,7 +158,7 @@ await db
       authSubject: "local-kelsie-jeon",
       displayName: "Kelsie Jeon",
       email: "kelsie.jeon@diaconia.local",
-      phone: "+595000000002",
+      phone: "+595975241834",
       role: "admin",
       status: "active",
       invitedAt: now,
@@ -125,14 +218,15 @@ await db
       status: "invited",
       invitedAt: now,
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(invitations)
-  .values([
+  await db
+    .insert(invitations)
+    .values([
     {
       userId: mariaId,
+      phone: "+595981000001",
       email: "maria.gonzalez@diaconia.local",
       tokenHash: tokenHash("demo-maria-invite"),
       expiresAt,
@@ -140,6 +234,7 @@ await db
     },
     {
       userId: anaId,
+      phone: "+595981000002",
       email: "ana.martinez@diaconia.local",
       tokenHash: tokenHash("demo-ana-invite"),
       expiresAt,
@@ -147,17 +242,18 @@ await db
     },
     {
       userId: rosaId,
+      phone: "+595981000003",
       email: "rosa.benitez@diaconia.local",
       tokenHash: tokenHash("demo-rosa-invite"),
       expiresAt,
       invitedByUserId: adminId,
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(groups)
-  .values([
+  await db
+    .insert(groups)
+    .values([
     {
       id: firstGroupId,
       name: "Grupo Mujeres Emprendedoras",
@@ -172,23 +268,23 @@ await db
       facilitatorId,
       chaplainUserId: chaplainId,
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(groupMemberships)
-  .values([
+  await db
+    .insert(groupMemberships)
+    .values([
     { groupId: firstGroupId, userId: facilitatorId },
     { groupId: firstGroupId, userId: mariaId, position: "president" },
     { groupId: firstGroupId, userId: anaId, position: "secretary" },
     { groupId: secondGroupId, userId: facilitatorId },
     { groupId: secondGroupId, userId: rosaId, position: "treasurer" },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(meetings)
-  .values([
+  await db
+    .insert(meetings)
+    .values([
     {
       id: completedMeetingId,
       groupId: firstGroupId,
@@ -216,27 +312,34 @@ await db
       chaplainUserId: chaplainId,
       scheduledStartAt: new Date("2026-06-02T14:30:00.000Z"),
       status: "scheduled",
-      latitude: "-27.3306",
-      longitude: "-55.8667",
-      locationName: "Capilla San Miguel",
-      address: "Itapua, Paraguay",
+      latitude: "-25.2712003",
+      longitude: "-57.496089",
+      locationName: "Diaconia",
+      address: "Asuncion, Paraguay",
       locationSource: "manual",
     },
-  ])
-  .onConflictDoNothing();
+    ...meetingsNearAsuAirport.map((meeting) => ({
+      ...meeting,
+      facilitatorId,
+      chaplainUserId: chaplainId,
+      status: "scheduled" as const,
+      locationSource: "manual" as const,
+    })),
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(meetingAttendance)
-  .values([
+  await db
+    .insert(meetingAttendance)
+    .values([
     { meetingId: completedMeetingId, userId: facilitatorId, status: "present" },
     { meetingId: completedMeetingId, userId: mariaId, status: "present" },
     { meetingId: completedMeetingId, userId: anaId, status: "excused" },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(prayerRequests)
-  .values([
+  await db
+    .insert(prayerRequests)
+    .values([
     {
       meetingId: completedMeetingId,
       request: "Orar por sabiduria en las decisiones del grupo.",
@@ -245,7 +348,18 @@ await db
       meetingId: completedMeetingId,
       request: "Orar por salud y fortaleza para las familias.",
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-console.log("Seeded Diaconia greenfield demo data.");
+  console.log("Seeded Diaconia greenfield demo data.");
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { db, pool } = createDatabaseClient();
+
+  try {
+    await seedDatabase(db);
+  } finally {
+    await pool.end();
+  }
+}

@@ -24,7 +24,8 @@ import { serve } from "@hono/node-server";
 import { and, desc, eq, gte, inArray, lte, or, sql } from "drizzle-orm";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
+import { v7 as uuidv7 } from "uuid";
 import { z } from "zod";
 import { createUserSchema, updateUserSchema } from "./adminValidation.js";
 import { authMiddleware, type AppBindings } from "./auth.js";
@@ -61,6 +62,7 @@ api.get("/health", (c) =>
 
 api.get("/openapi.json", (c) => c.json(openApiDocument));
 
+api.use("/me", authMiddleware(config));
 api.use("/me/*", authMiddleware(config));
 api.use("/media/*", authMiddleware(config));
 api.use("/meetings", authMiddleware(config));
@@ -86,12 +88,23 @@ async function getActor(c: ApiContext): Promise<DbUser | null> {
 
   if (bySubject) return bySubject;
 
-  if (!authUser.email) return null;
+  if (!authUser.phone && !authUser.email) return null;
 
+  const authUserPhoneDigits = authUser.phone?.replace(/\D/g, "") ?? "";
   const [invited] = await db
     .select()
     .from(users)
-    .where(and(eq(users.email, authUser.email), eq(users.status, "invited")))
+    .where(
+      and(
+        or(
+          authUserPhoneDigits
+            ? sql`regexp_replace(${users.phone}, '[^0-9]', '', 'g') = ${authUserPhoneDigits}`
+            : undefined,
+          authUser.email ? sql`lower(${users.email}) = ${authUser.email}` : undefined,
+        ),
+        inArray(users.status, ["invited", "active"]),
+      ),
+    )
     .limit(1);
 
   if (!invited) return null;
@@ -122,9 +135,29 @@ async function getActor(c: ApiContext): Promise<DbUser | null> {
 }
 
 async function requireActor(c: ApiContext) {
+  const authUser = c.get("authUser");
   const actor = await getActor(c);
   if (!actor || actor.status !== "active") {
-    return { actor: null, response: c.json({ error: "Invited active user required" }, 403) };
+    return {
+      actor: null,
+      response: c.json(
+        {
+          error: "Invited active user required",
+          code: "INVITE_REQUIRED",
+          ...(process.env.NODE_ENV !== "production"
+            ? {
+                details: {
+                  email: authUser.email,
+                  hasEmailClaim: Boolean(authUser.email),
+                  hasPhoneClaim: Boolean(authUser.phone),
+                  phone: authUser.phone,
+                },
+              }
+            : {}),
+        },
+        403,
+      ),
+    };
   }
   return { actor, response: null };
 }
@@ -133,7 +166,10 @@ async function requireAdmin(c: ApiContext) {
   const result = await requireActor(c);
   if (result.response) return result;
   if (result.actor!.role !== "admin") {
-    return { actor: result.actor, response: c.json({ error: "Admin role required" }, 403) };
+    return {
+      actor: result.actor,
+      response: c.json({ error: "Admin role required", code: "ADMIN_REQUIRED" }, 403),
+    };
   }
   return result;
 }
@@ -160,6 +196,25 @@ function hashToken(token: string) {
 function createInviteToken() {
   return randomBytes(32).toString("base64url");
 }
+
+api.get("/me", async (c) => {
+  const { actor, response } = await requireActor(c);
+  if (response) return response;
+
+  return c.json({
+    user: {
+      id: actor!.id,
+      displayName: actor!.displayName,
+      email: actor!.email,
+      phone: actor!.phone,
+      role: actor!.role,
+      status: actor!.status,
+      profilePhotoMediaId: actor!.profilePhotoMediaId,
+      authProvider: actor!.authProvider,
+      authSubject: actor!.authSubject,
+    },
+  });
+});
 
 function meetingResponse(row: {
   id: string;
@@ -247,7 +302,7 @@ api.post("/media/uploads", async (c) => {
     return c.json({ error: "Invalid upload request", details: body.error.flatten() }, 400);
   }
 
-  const mediaId = randomUUID();
+  const mediaId = uuidv7();
   const extension = body.data.contentType.split("/")[1] ?? "jpg";
   const objectKey = `foundation/${body.data.type}/${mediaId}.${extension}`;
 
@@ -425,7 +480,7 @@ api.post("/users", async (c) => {
   const body = createUserSchema.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
 
-  const userId = randomUUID();
+  const userId = uuidv7();
   const inviteToken = createInviteToken();
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14);
@@ -436,8 +491,8 @@ api.post("/users", async (c) => {
       authProvider: "clerk",
       authSubject: body.data.authSubject ?? null,
       displayName: body.data.displayName,
-      email: body.data.email,
-      phone: body.data.phone ?? null,
+      email: body.data.email ?? null,
+      phone: body.data.phone,
       role: body.data.role,
       status: body.data.authSubject ? "active" : body.data.status,
       invitedAt: now,
@@ -446,7 +501,8 @@ api.post("/users", async (c) => {
 
     await tx.insert(invitations).values({
       userId,
-      email: body.data.email,
+      phone: body.data.phone,
+      email: body.data.email ?? null,
       tokenHash: hashToken(inviteToken),
       status: body.data.authSubject ? "accepted" : "pending",
       expiresAt,
@@ -572,7 +628,7 @@ api.post("/groups", async (c) => {
   if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
 
   const chaplainUserId = body.data.chaplainUserId ?? body.data.chaplainId ?? null;
-  const groupId = randomUUID();
+  const groupId = uuidv7();
   await db.transaction(async (tx) => {
     await tx.insert(groups).values({
       id: groupId,
@@ -738,7 +794,7 @@ api.post("/groups/:groupId/memberships", async (c) => {
   const body = schema.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
 
-  const membershipId = randomUUID();
+  const membershipId = uuidv7();
   await db.insert(groupMemberships).values({
     id: membershipId,
     groupId,
@@ -825,6 +881,9 @@ api.get("/meetings", async (c) => {
     groupName: groups.name,
     community: groups.community,
     facilitatorName: users.displayName,
+    mediaCount: sql<number>`cast(count(distinct ${mediaAssets.id}) as integer)`,
+    prayerRequestCount: sql<number>`cast(count(distinct ${prayerRequests.id}) as integer)`,
+    openPrayerRequestCount: sql<number>`cast(count(distinct case when ${prayerRequests.status} = 'open' then ${prayerRequests.id} end) as integer)`,
   };
 
   const query = db
@@ -832,6 +891,9 @@ api.get("/meetings", async (c) => {
     .from(meetings)
     .innerJoin(groups, eq(meetings.groupId, groups.id))
     .innerJoin(users, eq(meetings.facilitatorId, users.id))
+    .leftJoin(mediaAssets, eq(mediaAssets.meetingId, meetings.id))
+    .leftJoin(prayerRequests, eq(prayerRequests.meetingId, meetings.id))
+    .groupBy(meetings.id, groups.name, groups.community, users.displayName)
     .orderBy(desc(meetings.scheduledStartAt))
     .limit(100);
 
@@ -847,7 +909,7 @@ api.post("/meetings", async (c) => {
   const raw = (await c.req.json()) as Record<string, unknown>;
   const body = createMeetingInputSchema.safeParse({
     ...raw,
-    id: raw.id ?? randomUUID(),
+    id: raw.id ?? uuidv7(),
     scheduledStartAt: raw.scheduledStartAt ?? raw.heldAt,
     status: raw.status ?? "completed",
     attendance: raw.attendance ?? [],
