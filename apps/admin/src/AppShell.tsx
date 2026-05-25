@@ -10,6 +10,7 @@ import {
   CalendarIcon,
   DashboardIcon,
   DotsVerticalIcon,
+  GroupsIcon,
   LogOutIcon,
   MenuIcon,
   SettingsIcon,
@@ -30,94 +31,21 @@ function Avatar({ user }: { user: CurrentUserProfile }) {
   );
 }
 
-function ProfileEditor({
-  initial,
-  onSave,
-  onClose,
-  locale,
-}: {
-  initial: CurrentUserProfile;
-  onSave: (p: CurrentUserProfile) => void;
-  onClose: () => void;
-  locale: import("@diaconia/shared").SupportedLocale;
-}) {
-  const l = t(locale);
-  const [draft, setDraft] = useState(initial);
-
-  function update(field: keyof CurrentUserProfile) {
-    return (e: React.ChangeEvent<HTMLInputElement>) =>
-      setDraft((prev) => ({ ...prev, [field]: e.target.value }));
-  }
-
-  return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        aria-label={l.editProfile}
-        className="modal"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-      >
-        <div className="modal-header">
-          <h2>{l.editProfile}</h2>
-          <button
-            aria-label={l.cancel}
-            className="icon-btn"
-            onClick={onClose}
-            type="button"
-          >
-            ×
-          </button>
-        </div>
-        <div className="modal-body">
-          <div className="form-field">
-            <label htmlFor="pe-name">{l.displayName}</label>
-            <input id="pe-name" onChange={update("displayName")} value={draft.displayName} />
-          </div>
-          <div className="form-field">
-            <label htmlFor="pe-email">{l.email}</label>
-            <input id="pe-email" onChange={update("email")} type="email" value={draft.email} />
-          </div>
-          <div className="form-field">
-            <label htmlFor="pe-phone">{l.phone}</label>
-            <input id="pe-phone" onChange={update("phone")} value={draft.phone} />
-          </div>
-          <div className="form-field">
-            <label htmlFor="pe-avatar">{l.avatarUrl}</label>
-            <input id="pe-avatar" onChange={update("avatarUrl")} value={draft.avatarUrl} />
-          </div>
-        </div>
-        <div className="modal-footer">
-          <button className="btn btn-secondary" onClick={onClose} type="button">
-            {l.cancel}
-          </button>
-          <button
-            className="btn btn-primary"
-            onClick={() => onSave(draft)}
-            type="button"
-          >
-            {l.saveProfile}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { currentUser, isLoaded, signOut, updateProfile, locale, setLocale } = useAuth();
+  const { currentUser, isLoaded, signOut, locale, setLocale } = useAuth();
   const l = t(locale);
   const pathname = usePathname();
   const router = useRouter();
 
   const navItems = [
     { href: "/", label: l.dashboard, Icon: DashboardIcon },
+    { href: "/groups", label: l.groups, Icon: GroupsIcon },
     { href: "/meetings", label: l.meetings, Icon: CalendarIcon },
     { href: "/members", label: l.members, Icon: UsersIcon },
   ];
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [dotsOpen, setDotsOpen] = useState(false);
-  const [profileEditorOpen, setProfileEditorOpen] = useState(false);
   const dotsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -137,11 +65,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setDotsOpen(false);
     signOut();
     router.push("/");
-  }
-
-  function handleSaveProfile(profile: CurrentUserProfile) {
-    updateProfile(profile);
-    setProfileEditorOpen(false);
   }
 
   function isActive(href: string) {
@@ -202,18 +125,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <span>{currentUser.email || currentUser.phone || "Diaconia Admin"}</span>
                 </div>
                 <div className="context-menu-divider" />
-                <button
+                <Link
                   className="context-menu-item"
-                  onClick={() => {
-                    setDotsOpen(false);
-                    setProfileEditorOpen(true);
-                  }}
+                  href="/profile"
+                  onClick={() => setDotsOpen(false)}
                   role="menuitem"
-                  type="button"
                 >
                   <UserIcon size={16} />
                   {l.profile}
-                </button>
+                </Link>
                 <button
                   className="context-menu-item danger"
                   onClick={handleSignOut}
@@ -280,14 +200,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <main className="main-content">{children}</main>
       </div>
 
-      {profileEditorOpen ? (
-        <ProfileEditor
-          initial={currentUser}
-          locale={locale}
-          onClose={() => setProfileEditorOpen(false)}
-          onSave={handleSaveProfile}
-        />
-      ) : null}
     </div>
   );
 }

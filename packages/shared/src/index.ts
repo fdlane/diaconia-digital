@@ -3,8 +3,11 @@ import { z } from "zod";
 export const supportedLocales = ["es", "en"] as const;
 export type SupportedLocale = (typeof supportedLocales)[number];
 
-export const roleSchema = z.enum(["facilitator", "admin"]);
+export const roleSchema = z.enum(["facilitator", "admin", "chaplain"]);
 export type Role = z.infer<typeof roleSchema>;
+
+export const groupPositionSchema = z.enum(["president", "secretary", "treasurer"]);
+export type GroupPosition = z.infer<typeof groupPositionSchema>;
 
 export const mediaAssetTypeSchema = z.enum([
   "user_profile_photo",
@@ -45,6 +48,7 @@ export const groupSchema = z.object({
   name: z.string().min(1),
   community: z.string().min(1),
   facilitatorId: z.string().uuid(),
+  chaplainId: z.string().uuid().nullable(),
   active: z.boolean(),
 });
 export type Group = z.infer<typeof groupSchema>;
@@ -54,6 +58,7 @@ export const attendeeSchema = z.object({
   groupId: z.string().uuid(),
   displayName: z.string().min(1),
   phone: z.string().min(4).nullable(),
+  position: groupPositionSchema.nullable(),
   profilePhotoMediaId: z.string().uuid().nullable(),
   active: z.boolean(),
 });
@@ -63,7 +68,10 @@ export const sessionSchema = z.object({
   id: z.string().uuid(),
   groupId: z.string().uuid(),
   facilitatorId: z.string().uuid(),
+  chaplainId: z.string().uuid().nullable(),
   heldAt: z.string().datetime(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
   notes: z.string().max(4000).default(""),
   followUpCategory: followUpCategorySchema.default("none"),
   followUpNotes: z.string().max(2000).default(""),

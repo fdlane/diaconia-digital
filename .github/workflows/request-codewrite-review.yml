@@ -1,0 +1,71 @@
+name: Request codewrite review
+
+on:
+  pull_request:
+    types: [review_requested]
+
+jobs:
+  request-review:
+    if: github.event.requested_reviewer.login == 'fdlane-codewrite'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Build signed Hermes webhook payload
+        id: payload
+        env:
+          ACTION: ${{ github.event.action }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          REPOSITORY: ${{ github.repository }}
+          REQUESTED_REVIEWER: ${{ github.event.requested_reviewer.login }}
+          WEBHOOK_SECRET: ${{ secrets.HERMES_CODEWRITE_WEBHOOK_SECRET }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          import hmac
+          import json
+          import os
+          from pathlib import Path
+
+          payload = {
+              "event": "pull_request",
+              "action": os.environ["ACTION"],
+              "repository": os.environ["REPOSITORY"],
+              "pull_request": {
+                  "number": int(os.environ["PR_NUMBER"]),
+                  "html_url": os.environ["PR_URL"],
+                  "title": os.environ["PR_TITLE"],
+                  "user": {"login": os.environ["AUTHOR"]},
+                  "head": {
+                      "ref": os.environ["HEAD_REF"],
+                      "sha": os.environ["HEAD_SHA"],
+                  },
+                  "base": {"ref": os.environ["BASE_REF"]},
+              },
+              "requested_reviewer": {"login": os.environ["REQUESTED_REVIEWER"]},
+          }
+
+          body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
+          secret = os.environ["WEBHOOK_SECRET"].encode()
+          signature = "sha256=" + hmac.new(secret, body, hashlib.sha256).hexdigest()
+
+          Path("payload.json").write_bytes(body)
+          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as out:
+              out.write(f"signature={signature}\n")
+          PY
+
+      - name: Trigger Hermes reviewer
+        env:
+          HERMES_WEBHOOK_URL: ${{ secrets.HERMES_CODEWRITE_WEBHOOK_URL }}
+          SIGNATURE: ${{ steps.payload.outputs.signature }}
+        run: |
+          curl --fail --show-error --silent \
+            --request POST "$HERMES_WEBHOOK_URL" \
+            --header "Content-Type: application/json" \
+            --header "X-GitHub-Event: pull_request" \
+            --header "X-Hub-Signature-256: $SIGNATURE" \
+            --data-binary @payload.json

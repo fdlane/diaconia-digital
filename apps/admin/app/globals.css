@@ -545,6 +545,64 @@ textarea:focus {
   object-fit: cover;
 }
 
+/* ─── Avatar Edit ────────────────────────────────────── */
+
+.avatar-edit-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  margin-bottom: 1.75rem;
+}
+
+.avatar-camera-btn {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  background: var(--brand);
+  color: #fff;
+  border: 2px solid var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+}
+
+.avatar-camera-btn:hover:not(:disabled) {
+  background: var(--brand-dark, color-mix(in srgb, var(--brand) 80%, #000));
+}
+
+.avatar-camera-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+/* ─── Avatar Hero ────────────────────────────────────── */
+
+.avatar-hero {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.avatar-hero-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.avatar-hero-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: var(--text);
+}
+
 /* ─── Locale Toggle ──────────────────────────────────── */
 
 .locale-toggle {
@@ -1029,5 +1087,283 @@ tbody td {
 @media (min-width: 769px) and (max-width: 1100px) {
   .stat-cards {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ─── Textarea override ──────────────────────────────── */
+
+textarea {
+  height: auto !important;
+  min-height: 5rem;
+  padding: 0.5rem 0.75rem !important;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* ─── Danger Button ──────────────────────────────────── */
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink-2);
+  border: 1px solid var(--border-strong);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--brand);
+  padding: 0;
+  height: auto;
+  font-weight: 500;
+  cursor: pointer;
+  font-size: 0.875rem;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.btn-link:hover:not(:disabled) {
+  text-decoration: underline;
+  opacity: 1;
+}
+
+.btn-link:disabled {
+  opacity: 0.5;
+}
+
+/* ─── Page Header Row ────────────────────────────────── */
+
+.page-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+}
+
+.page-header-row .page-header {
+  margin-bottom: 0;
+}
+
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+/* ─── Breadcrumb ─────────────────────────────────────── */
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  color: var(--ink-muted);
+  margin-bottom: 1.25rem;
+}
+
+.breadcrumb a {
+  color: var(--brand);
+  font-weight: 500;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-sep {
+  color: var(--border-strong);
+  font-size: 0.75rem;
+}
+
+/* ─── Detail View ────────────────────────────────────── */
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.25rem 2.5rem;
+}
+
+.detail-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.detail-label {
+  font-size: 0.69rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-muted);
+}
+
+.detail-value {
+  font-size: 0.9375rem;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.detail-value.muted {
+  color: var(--ink-muted);
+  font-style: italic;
+}
+
+/* ─── Form Layout ────────────────────────────────────── */
+
+.form-page {
+  max-width: 680px;
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+}
+
+.form-section + .form-section {
+  border-top: 1px solid var(--border);
+}
+
+.form-section-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-muted);
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}
+
+.form-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+/* ─── Inline Confirm ─────────────────────────────────── */
+
+.inline-confirm {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.875rem;
+  background: var(--danger-bg);
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.inline-confirm-msg {
+  flex: 1;
+  font-weight: 500;
+}
+
+/* ─── Table Row Links ────────────────────────────────── */
+
+tbody tr.row-link {
+  cursor: pointer;
+}
+
+tbody tr.row-link:hover {
+  background: var(--brand-light);
+}
+
+.row-action-cell {
+  width: 2.5rem;
+  text-align: right !important;
+  color: var(--ink-muted);
+}
+
+/* ─── Empty State ────────────────────────────────────── */
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3.5rem 2rem;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.empty-state-icon {
+  opacity: 0.25;
+  margin-bottom: 0.25rem;
+}
+
+.empty-state-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.empty-state-desc {
+  font-size: 0.875rem;
+  color: var(--ink-muted);
+  max-width: 280px;
+}
+
+/* ─── Status / Info Banner ───────────────────────────── */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius);
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+.banner-error {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+}
+
+.banner-success {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid #a7f3d0;
+}
+
+/* ─── Responsive Adjustments ─────────────────────────── */
+
+@media (max-width: 768px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header-row {
+    flex-direction: column;
+  }
+
+  .page-header-actions {
+    width: 100%;
   }
 }

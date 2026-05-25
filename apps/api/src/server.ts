@@ -14,14 +14,20 @@ import {
 import {
   createMediaUploadInputSchema,
   createSessionInputSchema,
+  followUpCategorySchema,
   type CreateMediaUploadResponse,
 } from "@diaconia/shared";
 import { serve } from "@hono/node-server";
-import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import {
+  createUserSchema,
+  updateUserSchema,
+  validateRole,
+} from "./adminValidation.js";
 import { authMiddleware, requireAdmin, type AppBindings } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { openApiDocument } from "./openapi.js";
@@ -40,7 +46,7 @@ api.use(
   cors({
     origin: config.allowedOrigins,
     allowHeaders: ["authorization", "content-type"],
-    allowMethods: ["GET", "POST", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   }),
 );
 
@@ -290,6 +296,7 @@ api.get("/admin/sessions", async (c) => {
   ].filter((filter): filter is NonNullable<typeof filter> => Boolean(filter));
 
   try {
+    const facilitators = users;
     const selectedColumns = {
       id: sessions.id,
       heldAt: sessions.heldAt,
@@ -297,9 +304,12 @@ api.get("/admin/sessions", async (c) => {
       followUpCategory: sessions.followUpCategory,
       followUpNotes: sessions.followUpNotes,
       submittedAt: sessions.submittedAt,
+      chaplainId: sessions.chaplainId,
+      latitude: sessions.latitude,
+      longitude: sessions.longitude,
       groupName: groups.name,
       community: groups.community,
-      facilitatorName: users.displayName,
+      facilitatorName: facilitators.displayName,
     };
 
     const rows = filters.length
@@ -307,7 +317,7 @@ api.get("/admin/sessions", async (c) => {
           .select(selectedColumns)
           .from(sessions)
           .innerJoin(groups, eq(sessions.groupId, groups.id))
-          .innerJoin(users, eq(sessions.facilitatorId, users.id))
+          .innerJoin(facilitators, eq(sessions.facilitatorId, facilitators.id))
           .where(and(...filters))
           .orderBy(desc(sessions.heldAt))
           .limit(100)
@@ -315,7 +325,7 @@ api.get("/admin/sessions", async (c) => {
           .select(selectedColumns)
           .from(sessions)
           .innerJoin(groups, eq(sessions.groupId, groups.id))
-          .innerJoin(users, eq(sessions.facilitatorId, users.id))
+          .innerJoin(facilitators, eq(sessions.facilitatorId, facilitators.id))
           .orderBy(desc(sessions.heldAt))
           .limit(100);
 
@@ -324,6 +334,8 @@ api.get("/admin/sessions", async (c) => {
         ...row,
         heldAt: row.heldAt.toISOString(),
         submittedAt: row.submittedAt?.toISOString() ?? null,
+        latitude: row.latitude ? parseFloat(row.latitude) : null,
+        longitude: row.longitude ? parseFloat(row.longitude) : null,
       })),
     });
   } catch (error) {
@@ -526,6 +538,614 @@ api.get("/admin/groups/:groupId/attendees", async (c) => {
     .orderBy(attendees.displayName);
 
   return c.json({ attendees: rows });
+});
+
+api.post("/admin/groups/:groupId/attendees", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const groupId = c.req.param("groupId");
+  const [group] = await db.select({ id: groups.id }).from(groups).where(eq(groups.id, groupId)).limit(1);
+  if (!group) return c.json({ error: "Group not found" }, 404);
+
+  const schema = z.object({
+    displayName: z.string().min(1),
+    phone: z.string().min(4).nullable().optional(),
+    position: z.enum(["president", "secretary", "treasurer"]).nullable().optional(),
+  });
+
+  const body = schema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  const attendeeId = randomUUID();
+  await db.insert(attendees).values({
+    id: attendeeId,
+    groupId,
+    displayName: body.data.displayName,
+    phone: body.data.phone ?? null,
+    position: body.data.position ?? null,
+  });
+
+  return c.json({ id: attendeeId, status: "created" }, 201);
+});
+
+api.put("/admin/groups/:groupId/attendees/:attendeeId", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const groupId = c.req.param("groupId");
+  const attendeeId = c.req.param("attendeeId");
+
+  const [existing] = await db
+    .select({ id: attendees.id })
+    .from(attendees)
+    .where(and(eq(attendees.id, attendeeId), eq(attendees.groupId, groupId)))
+    .limit(1);
+  if (!existing) return c.json({ error: "Attendee not found" }, 404);
+
+  const schema = z.object({
+    displayName: z.string().min(1).optional(),
+    phone: z.string().min(4).nullable().optional(),
+    position: z.enum(["president", "secretary", "treasurer"]).nullable().optional(),
+    active: z.boolean().optional(),
+  });
+
+  const body = schema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  await db.update(attendees).set({ ...body.data, updatedAt: new Date() }).where(eq(attendees.id, attendeeId));
+  return c.json({ status: "updated" });
+});
+
+/* ── Admin: Users CRUD ─────────────────────────────────── */
+
+api.get("/admin/users", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  try {
+    const rows = await db
+      .select({
+        id: users.id,
+        displayName: users.displayName,
+        email: users.email,
+        phone: users.phone,
+        role: users.role,
+        cognitoSub: users.cognitoSub,
+        createdAt: users.createdAt,
+        groupId: groups.id,
+        groupName: groups.name,
+        community: groups.community,
+        sessionCount: sql<number>`cast(count(distinct ${sessions.id}) as integer)`,
+      })
+      .from(users)
+      .leftJoin(groups, eq(groups.facilitatorId, users.id))
+      .leftJoin(sessions, eq(sessions.facilitatorId, users.id))
+      .groupBy(users.id, groups.id)
+      .orderBy(users.displayName);
+
+    return c.json({
+      users: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })),
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown error";
+    console.error("admin_users_query_failed", error);
+    if (process.env.NODE_ENV !== "production") {
+      return c.json({ users: [], warning: `Database not ready: ${detail}` });
+    }
+    return c.json({ error: "Failed to list users" }, 503);
+  }
+});
+
+api.get("/admin/users/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const userId = c.req.param("id");
+
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) return c.json({ error: "User not found" }, 404);
+
+  const userGroups = await db.select().from(groups).where(eq(groups.facilitatorId, userId));
+
+  const countRows = await db
+    .select({ sessionCount: sql<number>`cast(count(*) as integer)` })
+    .from(sessions)
+    .where(eq(sessions.facilitatorId, userId));
+  const sessionCount = countRows[0]?.sessionCount ?? 0;
+
+  return c.json({
+    user: {
+      id: user.id,
+      cognitoSub: user.cognitoSub,
+      displayName: user.displayName,
+      email: user.email,
+      phone: user.phone,
+      role: user.role,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    },
+    groups: userGroups.map((g) => ({
+      ...g,
+      createdAt: g.createdAt.toISOString(),
+      updatedAt: g.updatedAt.toISOString(),
+    })),
+    sessionCount,
+  });
+});
+
+api.post("/admin/users", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const body = createUserSchema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  const userId = randomUUID();
+  const cognitoSub = body.data.cognitoSub ?? `admin-created:${userId}`;
+
+  if (body.data.cognitoSub) {
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.cognitoSub, cognitoSub))
+      .limit(1);
+    if (existing) return c.json({ error: "Cognito sub already in use" }, 409);
+  }
+
+  await db.insert(users).values({
+    id: userId,
+    cognitoSub,
+    displayName: body.data.displayName,
+    email: body.data.email ?? null,
+    phone: body.data.phone ?? null,
+    role: body.data.role,
+  });
+
+  return c.json({ id: userId, status: "created" }, 201);
+});
+
+api.put("/admin/users/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const userId = c.req.param("id");
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!existing) return c.json({ error: "User not found" }, 404);
+
+  const body = updateUserSchema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  await db.update(users).set({ ...body.data, updatedAt: new Date() }).where(eq(users.id, userId));
+  return c.json({ status: "updated" });
+});
+
+api.delete("/admin/users/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const userId = c.req.param("id");
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!existing) return c.json({ error: "User not found" }, 404);
+
+  const [hasGroup] = await db
+    .select({ id: groups.id })
+    .from(groups)
+    .where(eq(groups.facilitatorId, userId))
+    .limit(1);
+  if (hasGroup) return c.json({ error: "Cannot delete a user who facilitates a group" }, 409);
+
+  const [hasSession] = await db
+    .select({ id: sessions.id })
+    .from(sessions)
+    .where(eq(sessions.facilitatorId, userId))
+    .limit(1);
+  if (hasSession) return c.json({ error: "Cannot delete a user who has submitted sessions" }, 409);
+
+  await db.delete(users).where(eq(users.id, userId));
+  return c.json({ status: "deleted" });
+});
+
+/* ── Admin: Single Session Detail + Update + Delete ────── */
+
+api.get("/admin/sessions/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const sessionId = c.req.param("id");
+
+  const facilitators = users;
+  const [session] = await db
+    .select({
+      id: sessions.id,
+      groupId: sessions.groupId,
+      facilitatorId: sessions.facilitatorId,
+      chaplainId: sessions.chaplainId,
+      heldAt: sessions.heldAt,
+      latitude: sessions.latitude,
+      longitude: sessions.longitude,
+      notes: sessions.notes,
+      followUpCategory: sessions.followUpCategory,
+      followUpNotes: sessions.followUpNotes,
+      submittedAt: sessions.submittedAt,
+      createdAt: sessions.createdAt,
+      groupName: groups.name,
+      community: groups.community,
+      facilitatorName: facilitators.displayName,
+    })
+    .from(sessions)
+    .innerJoin(groups, eq(sessions.groupId, groups.id))
+    .innerJoin(facilitators, eq(sessions.facilitatorId, facilitators.id))
+    .where(eq(sessions.id, sessionId))
+    .limit(1);
+
+  if (!session) return c.json({ error: "Session not found" }, 404);
+
+  const chaplainRows = session.chaplainId
+    ? await db
+        .select({ displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, session.chaplainId))
+        .limit(1)
+    : [];
+
+  const attendance = await db
+    .select({
+      id: attendanceRecords.id,
+      attendeeId: attendanceRecords.attendeeId,
+      status: attendanceRecords.status,
+      attendeeName: attendees.displayName,
+    })
+    .from(attendanceRecords)
+    .innerJoin(attendees, eq(attendanceRecords.attendeeId, attendees.id))
+    .where(eq(attendanceRecords.sessionId, sessionId))
+    .orderBy(attendees.displayName);
+
+  const prayers = await db
+    .select()
+    .from(prayerRequests)
+    .where(eq(prayerRequests.sessionId, sessionId))
+    .orderBy(prayerRequests.createdAt);
+
+  return c.json({
+    session: {
+      ...session,
+      chaplainName: chaplainRows[0]?.displayName ?? null,
+      heldAt: session.heldAt.toISOString(),
+      submittedAt: session.submittedAt?.toISOString() ?? null,
+      createdAt: session.createdAt.toISOString(),
+      latitude: session.latitude ? parseFloat(session.latitude) : null,
+      longitude: session.longitude ? parseFloat(session.longitude) : null,
+    },
+    attendance,
+    prayerRequests: prayers.map((pr) => ({
+      id: pr.id,
+      attendeeId: pr.attendeeId,
+      requesterName: pr.requesterName,
+      request: pr.request,
+      status: pr.status,
+      createdAt: pr.createdAt.toISOString(),
+    })),
+  });
+});
+
+api.post("/admin/sessions", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const schema = z.object({
+    groupId: z.string().uuid(),
+    chaplainId: z.string().uuid().nullable().optional(),
+    heldAt: z.string().datetime(),
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
+    notes: z.string().max(4000).default(""),
+    followUpCategory: followUpCategorySchema.default("none"),
+    followUpNotes: z.string().max(2000).default(""),
+  });
+
+  const body = schema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  const [group] = await db.select().from(groups).where(eq(groups.id, body.data.groupId)).limit(1);
+  if (!group) return c.json({ error: "Group not found" }, 404);
+
+  if (body.data.chaplainId) {
+    const [chaplain] = await db.select({ id: users.id }).from(users).where(eq(users.id, body.data.chaplainId)).limit(1);
+    if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+  }
+
+  const sessionId = randomUUID();
+  await db.insert(sessions).values({
+    id: sessionId,
+    groupId: body.data.groupId,
+    facilitatorId: group.facilitatorId,
+    chaplainId: body.data.chaplainId ?? null,
+    heldAt: new Date(body.data.heldAt),
+    latitude: body.data.latitude != null ? String(body.data.latitude) : null,
+    longitude: body.data.longitude != null ? String(body.data.longitude) : null,
+    notes: body.data.notes,
+    followUpCategory: body.data.followUpCategory,
+    followUpNotes: body.data.followUpNotes,
+    submittedAt: new Date(),
+  });
+
+  return c.json({ id: sessionId, status: "created" }, 201);
+});
+
+api.put("/admin/sessions/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const sessionId = c.req.param("id");
+  const [existing] = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!existing) return c.json({ error: "Session not found" }, 404);
+
+  const schema = z.object({
+    groupId: z.string().uuid().optional(),
+    chaplainId: z.string().uuid().nullable().optional(),
+    heldAt: z.string().datetime().optional(),
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
+    notes: z.string().max(4000).optional(),
+    followUpCategory: followUpCategorySchema.optional(),
+    followUpNotes: z.string().max(2000).optional(),
+  });
+
+  const body = schema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  if (body.data.chaplainId) {
+    const [chaplain] = await db.select({ id: users.id }).from(users).where(eq(users.id, body.data.chaplainId)).limit(1);
+    if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+  }
+
+  const update: Record<string, unknown> = { updatedAt: new Date() };
+  if (body.data.groupId !== undefined) update.groupId = body.data.groupId;
+  if (body.data.chaplainId !== undefined) update.chaplainId = body.data.chaplainId;
+  if (body.data.heldAt !== undefined) update.heldAt = new Date(body.data.heldAt);
+  if (body.data.latitude !== undefined) update.latitude = body.data.latitude != null ? String(body.data.latitude) : null;
+  if (body.data.longitude !== undefined) update.longitude = body.data.longitude != null ? String(body.data.longitude) : null;
+  if (body.data.notes !== undefined) update.notes = body.data.notes;
+  if (body.data.followUpCategory !== undefined) update.followUpCategory = body.data.followUpCategory;
+  if (body.data.followUpNotes !== undefined) update.followUpNotes = body.data.followUpNotes;
+
+  await db.update(sessions).set(update).where(eq(sessions.id, sessionId));
+  return c.json({ status: "updated" });
+});
+
+api.delete("/admin/sessions/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const sessionId = c.req.param("id");
+  const [existing] = await db.select({ id: sessions.id }).from(sessions).where(eq(sessions.id, sessionId)).limit(1);
+  if (!existing) return c.json({ error: "Session not found" }, 404);
+
+  await db.transaction(async (tx) => {
+    await tx.delete(attendanceRecords).where(eq(attendanceRecords.sessionId, sessionId));
+    await tx.delete(prayerRequests).where(eq(prayerRequests.sessionId, sessionId));
+    await tx.update(mediaAssets).set({ sessionId: null }).where(eq(mediaAssets.sessionId, sessionId));
+    await tx.delete(sessions).where(eq(sessions.id, sessionId));
+  });
+
+  return c.json({ status: "deleted" });
+});
+
+/* ── Admin: Chaplains list ─────────────────────────────── */
+
+api.get("/admin/chaplains", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const rows = await db
+    .select({ id: users.id, displayName: users.displayName, email: users.email, phone: users.phone })
+    .from(users)
+    .where(eq(users.role, "chaplain"))
+    .orderBy(users.displayName);
+
+  return c.json({ chaplains: rows });
+});
+
+/* ── Admin: Groups CRUD ────────────────────────────────── */
+
+api.get("/admin/groups/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const groupId = c.req.param("id");
+
+  const [group] = await db
+    .select({
+      id: groups.id,
+      name: groups.name,
+      community: groups.community,
+      active: groups.active,
+      facilitatorId: groups.facilitatorId,
+      facilitatorName: users.displayName,
+      facilitatorEmail: users.email,
+      chaplainId: groups.chaplainId,
+      createdAt: groups.createdAt,
+    })
+    .from(groups)
+    .innerJoin(users, eq(groups.facilitatorId, users.id))
+    .where(eq(groups.id, groupId))
+    .limit(1);
+
+  if (!group) return c.json({ error: "Group not found" }, 404);
+
+  const chaplainRows = group.chaplainId
+    ? await db
+        .select({ displayName: users.displayName, email: users.email })
+        .from(users)
+        .where(eq(users.id, group.chaplainId))
+        .limit(1)
+    : [];
+
+  const countRows = await db
+    .select({ sessionCount: sql<number>`cast(count(*) as integer)` })
+    .from(sessions)
+    .where(eq(sessions.groupId, groupId));
+
+  const groupAttendees = await db
+    .select({
+      id: attendees.id,
+      displayName: attendees.displayName,
+      phone: attendees.phone,
+      position: attendees.position,
+      active: attendees.active,
+    })
+    .from(attendees)
+    .where(eq(attendees.groupId, groupId))
+    .orderBy(attendees.displayName);
+
+  return c.json({
+    group: {
+      ...group,
+      chaplainName: chaplainRows[0]?.displayName ?? null,
+      chaplainEmail: chaplainRows[0]?.email ?? null,
+      createdAt: group.createdAt.toISOString(),
+    },
+    sessionCount: countRows[0]?.sessionCount ?? 0,
+    attendees: groupAttendees,
+  });
+});
+
+api.get("/admin/groups", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  try {
+    const facilitators = users;
+    const rows = await db
+      .select({
+        id: groups.id,
+        name: groups.name,
+        community: groups.community,
+        active: groups.active,
+        facilitatorId: groups.facilitatorId,
+        facilitatorName: facilitators.displayName,
+        chaplainId: groups.chaplainId,
+        createdAt: groups.createdAt,
+      })
+      .from(groups)
+      .innerJoin(facilitators, eq(groups.facilitatorId, facilitators.id))
+      .orderBy(groups.name);
+
+    return c.json({ groups: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown error";
+    console.error("admin_groups_query_failed", error);
+    if (process.env.NODE_ENV !== "production") {
+      return c.json({ groups: [], warning: `Database not ready: ${detail}` });
+    }
+    return c.json({ error: "Failed to list groups" }, 503);
+  }
+});
+
+api.post("/admin/groups", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const schema = z.object({
+    name: z.string().min(1),
+    community: z.string().min(1),
+    facilitatorId: z.string().uuid(),
+    chaplainId: z.string().uuid().nullable().optional(),
+    active: z.boolean().default(true),
+  });
+
+  const body = schema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  const [facilitator] = await db
+    .select({ id: users.id, role: users.role })
+    .from(users)
+    .where(eq(users.id, body.data.facilitatorId))
+    .limit(1);
+  if (!facilitator) return c.json({ error: "Facilitator not found" }, 404);
+  const facilitatorRoleError = validateRole(facilitator, "facilitator", "Facilitator");
+  if (facilitatorRoleError) return c.json({ error: facilitatorRoleError }, 400);
+
+  if (body.data.chaplainId) {
+    const [chaplain] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, body.data.chaplainId))
+      .limit(1);
+    if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+    const chaplainRoleError = validateRole(chaplain, "chaplain", "Chaplain");
+    if (chaplainRoleError) return c.json({ error: chaplainRoleError }, 400);
+  }
+
+  const groupId = randomUUID();
+  await db.insert(groups).values({
+    id: groupId,
+    name: body.data.name,
+    community: body.data.community,
+    facilitatorId: body.data.facilitatorId,
+    chaplainId: body.data.chaplainId ?? null,
+    active: body.data.active,
+  });
+
+  return c.json({ id: groupId, status: "created" }, 201);
+});
+
+api.put("/admin/groups/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const groupId = c.req.param("id");
+  const [existing] = await db.select({ id: groups.id }).from(groups).where(eq(groups.id, groupId)).limit(1);
+  if (!existing) return c.json({ error: "Group not found" }, 404);
+
+  const schema = z.object({
+    name: z.string().min(1).optional(),
+    community: z.string().min(1).optional(),
+    facilitatorId: z.string().uuid().optional(),
+    chaplainId: z.string().uuid().nullable().optional(),
+    active: z.boolean().optional(),
+  });
+
+  const body = schema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  if (body.data.facilitatorId) {
+    const [facilitator] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, body.data.facilitatorId))
+      .limit(1);
+    if (!facilitator) return c.json({ error: "Facilitator not found" }, 404);
+    const facilitatorRoleError = validateRole(facilitator, "facilitator", "Facilitator");
+    if (facilitatorRoleError) return c.json({ error: facilitatorRoleError }, 400);
+  }
+
+  if (body.data.chaplainId) {
+    const [chaplain] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, body.data.chaplainId))
+      .limit(1);
+    if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+    const chaplainRoleError = validateRole(chaplain, "chaplain", "Chaplain");
+    if (chaplainRoleError) return c.json({ error: chaplainRoleError }, 400);
+  }
+
+  await db.update(groups).set({ ...body.data, updatedAt: new Date() }).where(eq(groups.id, groupId));
+  return c.json({ status: "updated" });
+});
+
+api.delete("/admin/groups/:id", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const groupId = c.req.param("id");
+  const [existing] = await db.select({ id: groups.id }).from(groups).where(eq(groups.id, groupId)).limit(1);
+  if (!existing) return c.json({ error: "Group not found" }, 404);
+
+  await db.update(groups).set({ active: false, updatedAt: new Date() }).where(eq(groups.id, groupId));
+  return c.json({ status: "deactivated" });
 });
 
 app.route("/", api);

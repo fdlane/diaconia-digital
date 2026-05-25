@@ -31,10 +31,8 @@ export function MenuIcon(props: IconProps) {
 export function DashboardIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <rect height="7" rx="1" width="7" x="3" y="3" />
-      <rect height="7" rx="1" width="7" x="14" y="3" />
-      <rect height="7" rx="1" width="7" x="3" y="14" />
-      <rect height="7" rx="1" width="7" x="14" y="14" />
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <polyline points="9 22 9 12 15 12 15 22" />
     </Icon>
   );
 }
@@ -133,6 +131,94 @@ export function FilterIcon(props: IconProps) {
   return (
     <Icon {...props}>
       <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+    </Icon>
+  );
+}
+
+export function PlusIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <line x1="12" x2="12" y1="5" y2="19" />
+      <line x1="5" x2="19" y1="12" y2="12" />
+    </Icon>
+  );
+}
+
+export function EditIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+    </Icon>
+  );
+}
+
+export function TrashIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    </Icon>
+  );
+}
+
+export function ArrowLeftIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <line x1="19" x2="5" y1="12" y2="12" />
+      <polyline points="12 19 5 12 12 5" />
+    </Icon>
+  );
+}
+
+export function ChevronRightIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <polyline points="9 18 15 12 9 6" />
+    </Icon>
+  );
+}
+
+export function CheckIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <polyline points="20 6 9 17 4 12" />
+    </Icon>
+  );
+}
+
+export function GroupsIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <polygon points="12 2 20 7 4 7" />
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <line x1="6" y1="11" x2="6" y2="18" />
+      <line x1="10" y1="11" x2="10" y2="18" />
+      <line x1="14" y1="11" x2="14" y2="18" />
+      <line x1="18" y1="11" x2="18" y2="18" />
+      <line x1="3" y1="18" x2="21" y2="18" />
+      <line x1="2" y1="22" x2="22" y2="22" />
+    </Icon>
+  );
+}
+
+export function AlertIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10.29 3a1.732 1.732 0 0 1 3.42 0L21 21H3L10.29 3z" />
+      <line x1="12" x2="12" y1="9" y2="13" />
+      <line x1="12" x2="12.01" y1="17" y2="17" />
+    </Icon>
+  );
+}
+
+export function CameraIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <circle cx="12" cy="13" r="3" />
     </Icon>
   );
 }
