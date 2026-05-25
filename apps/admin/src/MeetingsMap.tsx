@@ -71,10 +71,10 @@ export function MeetingsMap({
       }).addTo(map);
 
       const icon = L.divIcon({
-        html: `<div style="width:12px;height:12px;border-radius:50%;background:var(--brand,#2e3192);border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.4)"></div>`,
+        html: `<div style="width:18px;height:18px;border-radius:50%;background:#2e3192;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div>`,
         className: "",
-        iconSize: [12, 12],
-        iconAnchor: [6, 6],
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
       });
 
       const bounds: [number, number][] = [];
