@@ -23,6 +23,11 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import {
+  createUserSchema,
+  updateUserSchema,
+  validateRole,
+} from "./adminValidation.js";
 import { authMiddleware, requireAdmin, type AppBindings } from "./auth.js";
 import { loadConfig } from "./config.js";
 import { openApiDocument } from "./openapi.js";
@@ -594,21 +599,6 @@ api.put("/admin/groups/:groupId/attendees/:attendeeId", async (c) => {
 
 /* ── Admin: Users CRUD ─────────────────────────────────── */
 
-const createUserSchema = z.object({
-  displayName: z.string().min(1),
-  email: z.string().email().nullable().optional(),
-  phone: z.string().min(4).nullable().optional(),
-  role: z.enum(["facilitator", "admin"]).default("facilitator"),
-  cognitoSub: z.string().optional(),
-});
-
-const updateUserSchema = z.object({
-  displayName: z.string().min(1).optional(),
-  email: z.string().email().nullable().optional(),
-  phone: z.string().min(4).nullable().optional(),
-  role: z.enum(["facilitator", "admin"]).optional(),
-});
-
 api.get("/admin/users", async (c) => {
   const forbidden = requireAdmin(c);
   if (forbidden) return forbidden;
@@ -1069,11 +1059,13 @@ api.post("/admin/groups", async (c) => {
   if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
 
   const [facilitator] = await db
-    .select({ id: users.id })
+    .select({ id: users.id, role: users.role })
     .from(users)
     .where(eq(users.id, body.data.facilitatorId))
     .limit(1);
   if (!facilitator) return c.json({ error: "Facilitator not found" }, 404);
+  const facilitatorRoleError = validateRole(facilitator, "facilitator", "Facilitator");
+  if (facilitatorRoleError) return c.json({ error: facilitatorRoleError }, 400);
 
   if (body.data.chaplainId) {
     const [chaplain] = await db
@@ -1082,6 +1074,8 @@ api.post("/admin/groups", async (c) => {
       .where(eq(users.id, body.data.chaplainId))
       .limit(1);
     if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+    const chaplainRoleError = validateRole(chaplain, "chaplain", "Chaplain");
+    if (chaplainRoleError) return c.json({ error: chaplainRoleError }, 400);
   }
 
   const groupId = randomUUID();
@@ -1118,20 +1112,24 @@ api.put("/admin/groups/:id", async (c) => {
 
   if (body.data.facilitatorId) {
     const [facilitator] = await db
-      .select({ id: users.id })
+      .select({ id: users.id, role: users.role })
       .from(users)
       .where(eq(users.id, body.data.facilitatorId))
       .limit(1);
     if (!facilitator) return c.json({ error: "Facilitator not found" }, 404);
+    const facilitatorRoleError = validateRole(facilitator, "facilitator", "Facilitator");
+    if (facilitatorRoleError) return c.json({ error: facilitatorRoleError }, 400);
   }
 
   if (body.data.chaplainId) {
     const [chaplain] = await db
-      .select({ id: users.id })
+      .select({ id: users.id, role: users.role })
       .from(users)
       .where(eq(users.id, body.data.chaplainId))
       .limit(1);
     if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+    const chaplainRoleError = validateRole(chaplain, "chaplain", "Chaplain");
+    if (chaplainRoleError) return c.json({ error: chaplainRoleError }, 400);
   }
 
   await db.update(groups).set({ ...body.data, updatedAt: new Date() }).where(eq(groups.id, groupId));

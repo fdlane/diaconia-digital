@@ -9,8 +9,8 @@ import { ArrowLeftIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-type MemberOption = { id: string; displayName: string; email: string | null };
-type ChaplainOption = { id: string; displayName: string; email: string | null };
+type MemberOption = { id: string; displayName: string; email: string | null; role: string };
+type ChaplainOption = { id: string; displayName: string; email: string | null; role: string };
 
 type FormState = {
   name: string;
@@ -57,11 +57,11 @@ export function GroupFormPage({ id }: { id?: string }) {
       }
 
       const usersData = (await usersRes.json()) as { users: MemberOption[] };
-      setMembers(usersData.users);
+      setMembers(usersData.users.filter((user) => user.role === "facilitator"));
 
       if (chaplainsRes.ok) {
         const chaplainsData = (await chaplainsRes.json()) as { chaplains: ChaplainOption[] };
-        setChaplains(chaplainsData.chaplains);
+        setChaplains(chaplainsData.chaplains.filter((user) => user.role === "chaplain"));
       }
 
       if (groupRes) {

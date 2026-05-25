@@ -9,12 +9,14 @@ import { ArrowLeftIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+type UserRole = "facilitator" | "admin" | "chaplain";
+
 type UserDetail = {
   id: string;
   displayName: string;
   email: string | null;
   phone: string | null;
-  role: "facilitator" | "admin";
+  role: UserRole;
   cognitoSub: string;
 };
 
@@ -22,7 +24,7 @@ type FormState = {
   displayName: string;
   email: string;
   phone: string;
-  role: "facilitator" | "admin";
+  role: UserRole;
   cognitoSub: string;
 };
 
@@ -212,6 +214,7 @@ export function MemberFormPage({ id }: { id?: string }) {
               <select id="f-role" onChange={field("role")} value={form.role}>
                 <option value="facilitator">{l.roleFacilitator}</option>
                 <option value="admin">{l.roleAdmin}</option>
+                <option value="chaplain">{locale === "es" ? "Capellán" : "Chaplain"}</option>
               </select>
             </div>
 
