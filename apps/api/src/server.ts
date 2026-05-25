@@ -291,6 +291,7 @@ api.get("/admin/sessions", async (c) => {
   ].filter((filter): filter is NonNullable<typeof filter> => Boolean(filter));
 
   try {
+    const facilitators = users;
     const selectedColumns = {
       id: sessions.id,
       heldAt: sessions.heldAt,
@@ -298,9 +299,12 @@ api.get("/admin/sessions", async (c) => {
       followUpCategory: sessions.followUpCategory,
       followUpNotes: sessions.followUpNotes,
       submittedAt: sessions.submittedAt,
+      chaplainId: sessions.chaplainId,
+      latitude: sessions.latitude,
+      longitude: sessions.longitude,
       groupName: groups.name,
       community: groups.community,
-      facilitatorName: users.displayName,
+      facilitatorName: facilitators.displayName,
     };
 
     const rows = filters.length
@@ -308,7 +312,7 @@ api.get("/admin/sessions", async (c) => {
           .select(selectedColumns)
           .from(sessions)
           .innerJoin(groups, eq(sessions.groupId, groups.id))
-          .innerJoin(users, eq(sessions.facilitatorId, users.id))
+          .innerJoin(facilitators, eq(sessions.facilitatorId, facilitators.id))
           .where(and(...filters))
           .orderBy(desc(sessions.heldAt))
           .limit(100)
@@ -316,7 +320,7 @@ api.get("/admin/sessions", async (c) => {
           .select(selectedColumns)
           .from(sessions)
           .innerJoin(groups, eq(sessions.groupId, groups.id))
-          .innerJoin(users, eq(sessions.facilitatorId, users.id))
+          .innerJoin(facilitators, eq(sessions.facilitatorId, facilitators.id))
           .orderBy(desc(sessions.heldAt))
           .limit(100);
 
@@ -325,6 +329,8 @@ api.get("/admin/sessions", async (c) => {
         ...row,
         heldAt: row.heldAt.toISOString(),
         submittedAt: row.submittedAt?.toISOString() ?? null,
+        latitude: row.latitude ? parseFloat(row.latitude) : null,
+        longitude: row.longitude ? parseFloat(row.longitude) : null,
       })),
     });
   } catch (error) {
@@ -529,6 +535,63 @@ api.get("/admin/groups/:groupId/attendees", async (c) => {
   return c.json({ attendees: rows });
 });
 
+api.post("/admin/groups/:groupId/attendees", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const groupId = c.req.param("groupId");
+  const [group] = await db.select({ id: groups.id }).from(groups).where(eq(groups.id, groupId)).limit(1);
+  if (!group) return c.json({ error: "Group not found" }, 404);
+
+  const schema = z.object({
+    displayName: z.string().min(1),
+    phone: z.string().min(4).nullable().optional(),
+    position: z.enum(["president", "secretary", "treasurer"]).nullable().optional(),
+  });
+
+  const body = schema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  const attendeeId = randomUUID();
+  await db.insert(attendees).values({
+    id: attendeeId,
+    groupId,
+    displayName: body.data.displayName,
+    phone: body.data.phone ?? null,
+    position: body.data.position ?? null,
+  });
+
+  return c.json({ id: attendeeId, status: "created" }, 201);
+});
+
+api.put("/admin/groups/:groupId/attendees/:attendeeId", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const groupId = c.req.param("groupId");
+  const attendeeId = c.req.param("attendeeId");
+
+  const [existing] = await db
+    .select({ id: attendees.id })
+    .from(attendees)
+    .where(and(eq(attendees.id, attendeeId), eq(attendees.groupId, groupId)))
+    .limit(1);
+  if (!existing) return c.json({ error: "Attendee not found" }, 404);
+
+  const schema = z.object({
+    displayName: z.string().min(1).optional(),
+    phone: z.string().min(4).nullable().optional(),
+    position: z.enum(["president", "secretary", "treasurer"]).nullable().optional(),
+    active: z.boolean().optional(),
+  });
+
+  const body = schema.safeParse(await c.req.json());
+  if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
+
+  await db.update(attendees).set({ ...body.data, updatedAt: new Date() }).where(eq(attendees.id, attendeeId));
+  return c.json({ status: "updated" });
+});
+
 /* ── Admin: Users CRUD ─────────────────────────────────── */
 
 const createUserSchema = z.object({
@@ -701,12 +764,16 @@ api.get("/admin/sessions/:id", async (c) => {
 
   const sessionId = c.req.param("id");
 
+  const facilitators = users;
   const [session] = await db
     .select({
       id: sessions.id,
       groupId: sessions.groupId,
       facilitatorId: sessions.facilitatorId,
+      chaplainId: sessions.chaplainId,
       heldAt: sessions.heldAt,
+      latitude: sessions.latitude,
+      longitude: sessions.longitude,
       notes: sessions.notes,
       followUpCategory: sessions.followUpCategory,
       followUpNotes: sessions.followUpNotes,
@@ -714,15 +781,23 @@ api.get("/admin/sessions/:id", async (c) => {
       createdAt: sessions.createdAt,
       groupName: groups.name,
       community: groups.community,
-      facilitatorName: users.displayName,
+      facilitatorName: facilitators.displayName,
     })
     .from(sessions)
     .innerJoin(groups, eq(sessions.groupId, groups.id))
-    .innerJoin(users, eq(sessions.facilitatorId, users.id))
+    .innerJoin(facilitators, eq(sessions.facilitatorId, facilitators.id))
     .where(eq(sessions.id, sessionId))
     .limit(1);
 
   if (!session) return c.json({ error: "Session not found" }, 404);
+
+  const chaplainRows = session.chaplainId
+    ? await db
+        .select({ displayName: users.displayName })
+        .from(users)
+        .where(eq(users.id, session.chaplainId))
+        .limit(1)
+    : [];
 
   const attendance = await db
     .select({
@@ -745,9 +820,12 @@ api.get("/admin/sessions/:id", async (c) => {
   return c.json({
     session: {
       ...session,
+      chaplainName: chaplainRows[0]?.displayName ?? null,
       heldAt: session.heldAt.toISOString(),
       submittedAt: session.submittedAt?.toISOString() ?? null,
       createdAt: session.createdAt.toISOString(),
+      latitude: session.latitude ? parseFloat(session.latitude) : null,
+      longitude: session.longitude ? parseFloat(session.longitude) : null,
     },
     attendance,
     prayerRequests: prayers.map((pr) => ({
@@ -767,7 +845,10 @@ api.post("/admin/sessions", async (c) => {
 
   const schema = z.object({
     groupId: z.string().uuid(),
+    chaplainId: z.string().uuid().nullable().optional(),
     heldAt: z.string().datetime(),
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
     notes: z.string().max(4000).default(""),
     followUpCategory: followUpCategorySchema.default("none"),
     followUpNotes: z.string().max(2000).default(""),
@@ -779,12 +860,20 @@ api.post("/admin/sessions", async (c) => {
   const [group] = await db.select().from(groups).where(eq(groups.id, body.data.groupId)).limit(1);
   if (!group) return c.json({ error: "Group not found" }, 404);
 
+  if (body.data.chaplainId) {
+    const [chaplain] = await db.select({ id: users.id }).from(users).where(eq(users.id, body.data.chaplainId)).limit(1);
+    if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+  }
+
   const sessionId = randomUUID();
   await db.insert(sessions).values({
     id: sessionId,
     groupId: body.data.groupId,
     facilitatorId: group.facilitatorId,
+    chaplainId: body.data.chaplainId ?? null,
     heldAt: new Date(body.data.heldAt),
+    latitude: body.data.latitude != null ? String(body.data.latitude) : null,
+    longitude: body.data.longitude != null ? String(body.data.longitude) : null,
     notes: body.data.notes,
     followUpCategory: body.data.followUpCategory,
     followUpNotes: body.data.followUpNotes,
@@ -804,7 +893,10 @@ api.put("/admin/sessions/:id", async (c) => {
 
   const schema = z.object({
     groupId: z.string().uuid().optional(),
+    chaplainId: z.string().uuid().nullable().optional(),
     heldAt: z.string().datetime().optional(),
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
     notes: z.string().max(4000).optional(),
     followUpCategory: followUpCategorySchema.optional(),
     followUpNotes: z.string().max(2000).optional(),
@@ -813,9 +905,17 @@ api.put("/admin/sessions/:id", async (c) => {
   const body = schema.safeParse(await c.req.json());
   if (!body.success) return c.json({ error: "Invalid request", details: body.error.flatten() }, 400);
 
+  if (body.data.chaplainId) {
+    const [chaplain] = await db.select({ id: users.id }).from(users).where(eq(users.id, body.data.chaplainId)).limit(1);
+    if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+  }
+
   const update: Record<string, unknown> = { updatedAt: new Date() };
   if (body.data.groupId !== undefined) update.groupId = body.data.groupId;
+  if (body.data.chaplainId !== undefined) update.chaplainId = body.data.chaplainId;
   if (body.data.heldAt !== undefined) update.heldAt = new Date(body.data.heldAt);
+  if (body.data.latitude !== undefined) update.latitude = body.data.latitude != null ? String(body.data.latitude) : null;
+  if (body.data.longitude !== undefined) update.longitude = body.data.longitude != null ? String(body.data.longitude) : null;
   if (body.data.notes !== undefined) update.notes = body.data.notes;
   if (body.data.followUpCategory !== undefined) update.followUpCategory = body.data.followUpCategory;
   if (body.data.followUpNotes !== undefined) update.followUpNotes = body.data.followUpNotes;
@@ -842,6 +942,21 @@ api.delete("/admin/sessions/:id", async (c) => {
   return c.json({ status: "deleted" });
 });
 
+/* ── Admin: Chaplains list ─────────────────────────────── */
+
+api.get("/admin/chaplains", async (c) => {
+  const forbidden = requireAdmin(c);
+  if (forbidden) return forbidden;
+
+  const rows = await db
+    .select({ id: users.id, displayName: users.displayName, email: users.email, phone: users.phone })
+    .from(users)
+    .where(eq(users.role, "chaplain"))
+    .orderBy(users.displayName);
+
+  return c.json({ chaplains: rows });
+});
+
 /* ── Admin: Groups CRUD ────────────────────────────────── */
 
 api.get("/admin/groups/:id", async (c) => {
@@ -859,6 +974,7 @@ api.get("/admin/groups/:id", async (c) => {
       facilitatorId: groups.facilitatorId,
       facilitatorName: users.displayName,
       facilitatorEmail: users.email,
+      chaplainId: groups.chaplainId,
       createdAt: groups.createdAt,
     })
     .from(groups)
@@ -868,19 +984,38 @@ api.get("/admin/groups/:id", async (c) => {
 
   if (!group) return c.json({ error: "Group not found" }, 404);
 
+  const chaplainRows = group.chaplainId
+    ? await db
+        .select({ displayName: users.displayName, email: users.email })
+        .from(users)
+        .where(eq(users.id, group.chaplainId))
+        .limit(1)
+    : [];
+
   const countRows = await db
     .select({ sessionCount: sql<number>`cast(count(*) as integer)` })
     .from(sessions)
     .where(eq(sessions.groupId, groupId));
 
   const groupAttendees = await db
-    .select({ id: attendees.id, displayName: attendees.displayName, phone: attendees.phone, active: attendees.active })
+    .select({
+      id: attendees.id,
+      displayName: attendees.displayName,
+      phone: attendees.phone,
+      position: attendees.position,
+      active: attendees.active,
+    })
     .from(attendees)
     .where(eq(attendees.groupId, groupId))
     .orderBy(attendees.displayName);
 
   return c.json({
-    group: { ...group, createdAt: group.createdAt.toISOString() },
+    group: {
+      ...group,
+      chaplainName: chaplainRows[0]?.displayName ?? null,
+      chaplainEmail: chaplainRows[0]?.email ?? null,
+      createdAt: group.createdAt.toISOString(),
+    },
     sessionCount: countRows[0]?.sessionCount ?? 0,
     attendees: groupAttendees,
   });
@@ -891,6 +1026,7 @@ api.get("/admin/groups", async (c) => {
   if (forbidden) return forbidden;
 
   try {
+    const facilitators = users;
     const rows = await db
       .select({
         id: groups.id,
@@ -898,11 +1034,12 @@ api.get("/admin/groups", async (c) => {
         community: groups.community,
         active: groups.active,
         facilitatorId: groups.facilitatorId,
-        facilitatorName: users.displayName,
+        facilitatorName: facilitators.displayName,
+        chaplainId: groups.chaplainId,
         createdAt: groups.createdAt,
       })
       .from(groups)
-      .innerJoin(users, eq(groups.facilitatorId, users.id))
+      .innerJoin(facilitators, eq(groups.facilitatorId, facilitators.id))
       .orderBy(groups.name);
 
     return c.json({ groups: rows.map((r) => ({ ...r, createdAt: r.createdAt.toISOString() })) });
@@ -924,6 +1061,7 @@ api.post("/admin/groups", async (c) => {
     name: z.string().min(1),
     community: z.string().min(1),
     facilitatorId: z.string().uuid(),
+    chaplainId: z.string().uuid().nullable().optional(),
     active: z.boolean().default(true),
   });
 
@@ -937,12 +1075,22 @@ api.post("/admin/groups", async (c) => {
     .limit(1);
   if (!facilitator) return c.json({ error: "Facilitator not found" }, 404);
 
+  if (body.data.chaplainId) {
+    const [chaplain] = await db
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(eq(users.id, body.data.chaplainId))
+      .limit(1);
+    if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
+  }
+
   const groupId = randomUUID();
   await db.insert(groups).values({
     id: groupId,
     name: body.data.name,
     community: body.data.community,
     facilitatorId: body.data.facilitatorId,
+    chaplainId: body.data.chaplainId ?? null,
     active: body.data.active,
   });
 
@@ -961,6 +1109,7 @@ api.put("/admin/groups/:id", async (c) => {
     name: z.string().min(1).optional(),
     community: z.string().min(1).optional(),
     facilitatorId: z.string().uuid().optional(),
+    chaplainId: z.string().uuid().nullable().optional(),
     active: z.boolean().optional(),
   });
 
@@ -974,6 +1123,15 @@ api.put("/admin/groups/:id", async (c) => {
       .where(eq(users.id, body.data.facilitatorId))
       .limit(1);
     if (!facilitator) return c.json({ error: "Facilitator not found" }, 404);
+  }
+
+  if (body.data.chaplainId) {
+    const [chaplain] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.id, body.data.chaplainId))
+      .limit(1);
+    if (!chaplain) return c.json({ error: "Chaplain not found" }, 404);
   }
 
   await db.update(groups).set({ ...body.data, updatedAt: new Date() }).where(eq(groups.id, groupId));

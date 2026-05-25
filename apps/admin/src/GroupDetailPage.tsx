@@ -18,6 +18,9 @@ type GroupDetail = {
   facilitatorId: string;
   facilitatorName: string;
   facilitatorEmail: string | null;
+  chaplainId: string | null;
+  chaplainName: string | null;
+  chaplainEmail: string | null;
   createdAt: string;
 };
 
@@ -25,6 +28,7 @@ type Attendee = {
   id: string;
   displayName: string;
   phone: string | null;
+  position: "president" | "secretary" | "treasurer" | null;
   active: boolean;
 };
 
@@ -195,6 +199,28 @@ export function GroupDetailPage({ id }: { id: string }) {
                 </span>
               </div>
               <div className="detail-field">
+                <span className="detail-label">{l.chaplainAssigned}</span>
+                <span className="detail-value">
+                  {group.chaplainName ? (
+                    <>
+                      {group.chaplainId ? (
+                        <Link href={`/members/${group.chaplainId}`} style={{ color: "var(--brand)" }}>
+                          {group.chaplainName}
+                        </Link>
+                      ) : group.chaplainName}
+                      {group.chaplainEmail ? (
+                        <>
+                          <br />
+                          <span className="text-sm text-muted">{group.chaplainEmail}</span>
+                        </>
+                      ) : null}
+                    </>
+                  ) : (
+                    <span className="text-muted">{l.noChaplain}</span>
+                  )}
+                </span>
+              </div>
+              <div className="detail-field">
                 <span className="detail-label">{l.colCreated}</span>
                 <span className="detail-value">{formatDisplayDate(group.createdAt, locale)}</span>
               </div>
@@ -229,6 +255,31 @@ export function GroupDetailPage({ id }: { id: string }) {
           </div>
         </div>
 
+        {/* Steering Committee */}
+        {attendees.some((a) => a.position) ? (
+          <div className="card">
+            <div className="card-header">
+              <span className="card-title">{l.steeringCommittee}</span>
+            </div>
+            <div className="card-body">
+              <div className="detail-grid">
+                {(["president", "secretary", "treasurer"] as const).map((pos) => {
+                  const member = attendees.find((a) => a.position === pos);
+                  const label = pos === "president" ? l.positionPresident : pos === "secretary" ? l.positionSecretary : l.positionTreasurer;
+                  return (
+                    <div className="detail-field" key={pos}>
+                      <span className="detail-label">{label}</span>
+                      <span className="detail-value">
+                        {member ? member.displayName : <span className="text-muted">—</span>}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="card">
           <div className="card-header">
             <span className="card-title">{l.groupAttendees}</span>
@@ -241,6 +292,7 @@ export function GroupDetailPage({ id }: { id: string }) {
               <thead>
                 <tr>
                   <th>{l.colName}</th>
+                  <th>{l.assignPosition}</th>
                   <th>{l.colPhone}</th>
                   <th>{l.colStatus}</th>
                 </tr>
@@ -249,6 +301,15 @@ export function GroupDetailPage({ id }: { id: string }) {
                 {attendees.map((a) => (
                   <tr key={a.id}>
                     <td>{a.displayName}</td>
+                    <td>
+                      {a.position ? (
+                        <span className="badge badge-default">
+                          {a.position === "president" ? l.positionPresident : a.position === "secretary" ? l.positionSecretary : l.positionTreasurer}
+                        </span>
+                      ) : (
+                        <span className="text-muted text-sm">—</span>
+                      )}
+                    </td>
                     <td className="text-muted">{a.phone ?? l.noPhone}</td>
                     <td>
                       <span className={`badge ${a.active ? "badge-success" : "badge-muted"}`}>
@@ -259,7 +320,7 @@ export function GroupDetailPage({ id }: { id: string }) {
                 ))}
                 {!attendees.length ? (
                   <tr>
-                    <td className="table-empty" colSpan={3}>{l.noGroupAttendees}</td>
+                    <td className="table-empty" colSpan={4}>{l.noGroupAttendees}</td>
                   </tr>
                 ) : null}
               </tbody>

@@ -10,15 +10,17 @@ import { ArrowLeftIcon } from "./icons";
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type MemberOption = { id: string; displayName: string; email: string | null };
+type ChaplainOption = { id: string; displayName: string; email: string | null };
 
 type FormState = {
   name: string;
   community: string;
   facilitatorId: string;
+  chaplainId: string;
   active: boolean;
 };
 
-const empty: FormState = { name: "", community: "", facilitatorId: "", active: true };
+const empty: FormState = { name: "", community: "", facilitatorId: "", chaplainId: "", active: true };
 
 export function GroupFormPage({ id }: { id?: string }) {
   const { token, locale } = useAuth();
@@ -28,6 +30,7 @@ export function GroupFormPage({ id }: { id?: string }) {
 
   const [form, setForm] = useState<FormState>(empty);
   const [members, setMembers] = useState<MemberOption[]>([]);
+  const [chaplains, setChaplains] = useState<ChaplainOption[]>([]);
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -41,8 +44,9 @@ export function GroupFormPage({ id }: { id?: string }) {
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
 
     try {
-      const [usersRes, groupRes] = await Promise.all([
+      const [usersRes, chaplainsRes, groupRes] = await Promise.all([
         fetch(`${apiUrl}/admin/users`, { headers }),
+        fetch(`${apiUrl}/admin/chaplains`, { headers }),
         isEdit && id ? fetch(`${apiUrl}/admin/groups/${id}`, { headers }) : Promise.resolve(null),
       ]);
 
@@ -55,6 +59,11 @@ export function GroupFormPage({ id }: { id?: string }) {
       const usersData = (await usersRes.json()) as { users: MemberOption[] };
       setMembers(usersData.users);
 
+      if (chaplainsRes.ok) {
+        const chaplainsData = (await chaplainsRes.json()) as { chaplains: ChaplainOption[] };
+        setChaplains(chaplainsData.chaplains);
+      }
+
       if (groupRes) {
         if (!groupRes.ok) {
           setErrorMsg(`Failed to load group: ${groupRes.status}`);
@@ -62,10 +71,10 @@ export function GroupFormPage({ id }: { id?: string }) {
           return;
         }
         const groupData = (await groupRes.json()) as {
-          group: { name: string; community: string; facilitatorId: string; active: boolean };
+          group: { name: string; community: string; facilitatorId: string; chaplainId: string | null; active: boolean };
         };
         const g = groupData.group;
-        setForm({ name: g.name, community: g.community, facilitatorId: g.facilitatorId, active: g.active });
+        setForm({ name: g.name, community: g.community, facilitatorId: g.facilitatorId, chaplainId: g.chaplainId ?? "", active: g.active });
       } else if (usersData.users.length > 0) {
         setForm((prev) => ({ ...prev, facilitatorId: usersData.users[0]!.id }));
       }
@@ -98,6 +107,7 @@ export function GroupFormPage({ id }: { id?: string }) {
       name: form.name,
       community: form.community,
       facilitatorId: form.facilitatorId,
+      chaplainId: form.chaplainId || null,
       active: form.active,
     });
 
@@ -202,6 +212,22 @@ export function GroupFormPage({ id }: { id?: string }) {
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.displayName}{m.email ? ` — ${m.email}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-field">
+              <label htmlFor="f-chaplain">{l.chaplainOptional}</label>
+              <select
+                id="f-chaplain"
+                onChange={field("chaplainId")}
+                value={form.chaplainId}
+              >
+                <option value="">{l.selectChaplain}</option>
+                {chaplains.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.displayName}{ch.email ? ` — ${ch.email}` : ""}
                   </option>
                 ))}
               </select>

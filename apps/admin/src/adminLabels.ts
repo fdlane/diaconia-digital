@@ -115,6 +115,36 @@ const adminLabels = {
     createGroupFirst: "Primero creá un grupo",
     noGroupsForMeeting: "No hay grupos disponibles. Creá un grupo antes de agregar una reunión.",
 
+    // Group leadership
+    steeringCommittee: "Comité directivo",
+    groupPresident: "Presidente/a",
+    groupSecretary: "Secretario/a",
+    groupTreasurer: "Tesorero/a",
+    positionPresident: "Presidente/a",
+    positionSecretary: "Secretario/a",
+    positionTreasurer: "Tesorero/a",
+    noPosition: "Sin cargo",
+    assignPosition: "Asignar cargo",
+
+    // Chaplain
+    chaplain: "Capellán",
+    chaplainAssigned: "Capellán asignado",
+    chaplainAttended: "Capellán presente",
+    noChaplain: "Sin capellán asignado",
+    chaplainOptional: "Capellán (opcional)",
+    selectChaplain: "Seleccionar capellán…",
+    noChaplainAttended: "Sin capellán presente",
+
+    // Location
+    meetingLocation: "Ubicación",
+    locationPin: "Pin de ubicación",
+    latitude: "Latitud",
+    longitude: "Longitud",
+    noLocation: "Sin ubicación registrada",
+    viewOnMap: "Ver en mapa",
+    mapView: "Mapa",
+    listView: "Lista",
+
     // Profile
     myProfile: "Mi perfil",
     editMyProfile: "Editar mi perfil",
@@ -288,6 +318,36 @@ const adminLabels = {
     noGroupAttendees: "No members registered.",
     createGroupFirst: "Create a group first",
     noGroupsForMeeting: "No groups available. Create a group before adding a meeting.",
+
+    // Group leadership
+    steeringCommittee: "Steering Committee",
+    groupPresident: "President",
+    groupSecretary: "Secretary",
+    groupTreasurer: "Treasurer",
+    positionPresident: "President",
+    positionSecretary: "Secretary",
+    positionTreasurer: "Treasurer",
+    noPosition: "No position",
+    assignPosition: "Assign position",
+
+    // Chaplain
+    chaplain: "Chaplain",
+    chaplainAssigned: "Assigned Chaplain",
+    chaplainAttended: "Chaplain Attended",
+    noChaplain: "No chaplain assigned",
+    chaplainOptional: "Chaplain (optional)",
+    selectChaplain: "Select chaplain…",
+    noChaplainAttended: "No chaplain attended",
+
+    // Location
+    meetingLocation: "Location",
+    locationPin: "Location Pin",
+    latitude: "Latitude",
+    longitude: "Longitude",
+    noLocation: "No location recorded",
+    viewOnMap: "View on map",
+    mapView: "Map",
+    listView: "List",
 
     // Profile
     myProfile: "My Profile",

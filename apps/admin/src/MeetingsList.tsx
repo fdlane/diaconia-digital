@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -8,14 +9,22 @@ import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
 import { ChevronRightIcon, DownloadIcon, FilterIcon, PlusIcon } from "./icons";
 
+const MeetingsMap = dynamic(() => import("./MeetingsMap").then((m) => ({ default: m.MeetingsMap })), {
+  ssr: false,
+  loading: () => <div style={{ height: 480, display: "flex", alignItems: "center", justifyContent: "center" }}>Loading map…</div>,
+});
+
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type Group = { id: string; name: string; community: string };
 
-type AdminSession = {
+export type AdminSession = {
   id: string;
   heldAt: string;
   submittedAt: string | null;
+  chaplainId: string | null;
+  latitude: number | null;
+  longitude: number | null;
   groupName: string;
   community: string;
   facilitatorName: string;
@@ -40,12 +49,11 @@ export function MeetingsList() {
   const [sessions, setSessions] = useState<AdminSession[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [mediaBySession, setMediaBySession] = useState<Record<string, SessionMedia[]>>({});
-  const [prayersBySession, setPrayersBySession] = useState<
-    Record<string, PrayerRequest[]>
-  >({});
+  const [prayersBySession, setPrayersBySession] = useState<Record<string, PrayerRequest[]>>({});
   const [filters, setFilters] = useState({ from: "", to: "", groupId: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [statusMsg, setStatusMsg] = useState("");
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -203,7 +211,25 @@ export function MeetingsList() {
             <h1 className="page-title">{l.meetings}</h1>
             <p className="page-subtitle">{l.meetingsSubtitle}</p>
           </div>
-          <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: "0.5rem", flexShrink: 0, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
+              <button
+                className={`btn ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setViewMode("list")}
+                style={{ borderRadius: 0, border: "none" }}
+                type="button"
+              >
+                {l.listView}
+              </button>
+              <button
+                className={`btn ${viewMode === "map" ? "btn-primary" : "btn-ghost"}`}
+                onClick={() => setViewMode("map")}
+                style={{ borderRadius: 0, border: "none", borderLeft: "1px solid var(--border)" }}
+                type="button"
+              >
+                {l.mapView}
+              </button>
+            </div>
             <button className="btn btn-secondary" onClick={exportCsv} type="button">
               <DownloadIcon size={16} />
               {l.exportCsv}
@@ -268,7 +294,21 @@ export function MeetingsList() {
           <span>{statusMsg}</span>
         </div>
 
-        <div className="table-wrapper">
+        {viewMode === "map" ? (
+          <div style={{ padding: "1rem" }}>
+            <MeetingsMap
+              onSelect={(id) => router.push(`/meetings/${id}`)}
+              sessions={sessions}
+            />
+            {sessions.filter((s) => s.latitude != null).length === 0 && status === "done" ? (
+              <p className="text-sm text-muted" style={{ marginTop: "0.75rem", textAlign: "center" }}>
+                {locale === "es" ? "Ninguna reunión tiene ubicación registrada." : "No meetings have a location recorded."}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        <div className="table-wrapper" style={{ display: viewMode === "map" ? "none" : undefined }}>
           <table>
             <thead>
               <tr>

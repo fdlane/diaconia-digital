@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  numeric,
   pgEnum,
   pgTable,
   text,
@@ -12,8 +13,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-export const userRole = pgEnum("user_role", ["facilitator", "admin"]);
+export const userRole = pgEnum("user_role", ["facilitator", "admin", "chaplain"]);
 export const attendanceStatus = pgEnum("attendance_status", ["present", "absent", "excused"]);
+export const groupPosition = pgEnum("group_position", ["president", "secretary", "treasurer"]);
 export const prayerRequestStatus = pgEnum("prayer_request_status", ["open", "answered", "archived"]);
 export const followUpCategory = pgEnum("follow_up_category", [
   "none",
@@ -57,12 +59,14 @@ export const groups = pgTable(
     facilitatorId: uuid("facilitator_id")
       .notNull()
       .references(() => users.id),
+    chaplainId: uuid("chaplain_id").references(() => users.id),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
     facilitatorIdx: index("groups_facilitator_id_idx").on(table.facilitatorId),
+    chaplainIdx: index("groups_chaplain_id_idx").on(table.chaplainId),
   }),
 );
 
@@ -75,6 +79,7 @@ export const attendees = pgTable(
       .references(() => groups.id),
     displayName: text("display_name").notNull(),
     phone: text("phone"),
+    position: groupPosition("position"),
     profilePhotoMediaId: uuid("profile_photo_media_id"),
     active: boolean("active").notNull().default(true),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -82,6 +87,9 @@ export const attendees = pgTable(
   },
   (table) => ({
     groupIdx: index("attendees_group_id_idx").on(table.groupId),
+    groupPositionIdx: uniqueIndex("attendees_group_position_idx")
+      .on(table.groupId, table.position)
+      .where(sql`${table.position} IS NOT NULL`),
   }),
 );
 
@@ -95,7 +103,10 @@ export const sessions = pgTable(
     facilitatorId: uuid("facilitator_id")
       .notNull()
       .references(() => users.id),
+    chaplainId: uuid("chaplain_id").references(() => users.id),
     heldAt: timestamp("held_at", { withTimezone: true }).notNull(),
+    latitude: numeric("latitude", { precision: 10, scale: 7 }),
+    longitude: numeric("longitude", { precision: 10, scale: 7 }),
     notes: text("notes").notNull().default(""),
     followUpCategory: followUpCategory("follow_up_category").notNull().default("none"),
     followUpNotes: text("follow_up_notes").notNull().default(""),
@@ -106,6 +117,7 @@ export const sessions = pgTable(
   (table) => ({
     groupHeldAtIdx: index("sessions_group_held_at_idx").on(table.groupId, table.heldAt),
     facilitatorIdx: index("sessions_facilitator_id_idx").on(table.facilitatorId),
+    chaplainIdx: index("sessions_chaplain_id_idx").on(table.chaplainId),
   }),
 );
 

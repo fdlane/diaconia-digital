@@ -14,7 +14,11 @@ type SessionDetail = {
   id: string;
   groupId: string;
   facilitatorId: string;
+  chaplainId: string | null;
+  chaplainName: string | null;
   heldAt: string;
+  latitude: number | null;
+  longitude: number | null;
   notes: string;
   followUpCategory: string;
   followUpNotes: string;
@@ -248,6 +252,33 @@ export function MeetingDetailPage({ id }: { id: string }) {
                 <span className="detail-label">{l.colDate}</span>
                 <span className="detail-value">{formatDisplayDate(session.heldAt, locale)}</span>
               </div>
+              <div className="detail-field">
+                <span className="detail-label">{l.chaplainAttended}</span>
+                <span className="detail-value">
+                  {session.chaplainName ? session.chaplainName : (
+                    <span className="text-muted">{l.noChaplainAttended}</span>
+                  )}
+                </span>
+              </div>
+              {session.latitude != null && session.longitude != null ? (
+                <div className="detail-field">
+                  <span className="detail-label">{l.locationPin}</span>
+                  <span className="detail-value">
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>
+                      {session.latitude.toFixed(6)}, {session.longitude.toFixed(6)}
+                    </span>
+                    <br />
+                    <a
+                      href={`https://www.openstreetmap.org/?mlat=${session.latitude}&mlon=${session.longitude}&zoom=16`}
+                      rel="noreferrer"
+                      style={{ color: "var(--brand)", fontSize: "0.875rem" }}
+                      target="_blank"
+                    >
+                      {l.viewOnMap} ↗
+                    </a>
+                  </span>
+                </div>
+              ) : null}
               {session.submittedAt ? (
                 <div className="detail-field">
                   <span className="detail-label">{l.submittedAt}</span>

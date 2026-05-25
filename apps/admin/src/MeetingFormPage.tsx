@@ -16,10 +16,15 @@ type Group = {
   active: boolean;
 };
 
+type ChaplainOption = { id: string; displayName: string };
+
 type SessionDetail = {
   id: string;
   groupId: string;
+  chaplainId: string | null;
   heldAt: string;
+  latitude: number | null;
+  longitude: number | null;
   notes: string;
   followUpCategory: string;
   followUpNotes: string;
@@ -27,7 +32,10 @@ type SessionDetail = {
 
 type FormState = {
   groupId: string;
+  chaplainId: string;
   heldAt: string;
+  latitude: string;
+  longitude: string;
   notes: string;
   followUpCategory: string;
   followUpNotes: string;
@@ -35,7 +43,10 @@ type FormState = {
 
 const empty: FormState = {
   groupId: "",
+  chaplainId: "",
   heldAt: "",
+  latitude: "",
+  longitude: "",
   notes: "",
   followUpCategory: "none",
   followUpNotes: "",
@@ -56,6 +67,7 @@ export function MeetingFormPage({ id }: { id?: string }) {
 
   const [form, setForm] = useState<FormState>(empty);
   const [groups, setGroups] = useState<Group[]>([]);
+  const [chaplains, setChaplains] = useState<ChaplainOption[]>([]);
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -69,8 +81,9 @@ export function MeetingFormPage({ id }: { id?: string }) {
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
 
     try {
-      const [groupsRes, sessionRes] = await Promise.all([
+      const [groupsRes, chaplainsRes, sessionRes] = await Promise.all([
         fetch(`${apiUrl}/admin/groups`, { headers }),
+        fetch(`${apiUrl}/admin/chaplains`, { headers }),
         isEdit && id ? fetch(`${apiUrl}/admin/sessions/${id}`, { headers }) : Promise.resolve(null),
       ]);
 
@@ -83,6 +96,11 @@ export function MeetingFormPage({ id }: { id?: string }) {
       const groupsData = (await groupsRes.json()) as { groups: Group[] };
       setGroups(groupsData.groups.filter((g) => g.active));
 
+      if (chaplainsRes.ok) {
+        const chaplainsData = (await chaplainsRes.json()) as { chaplains: ChaplainOption[] };
+        setChaplains(chaplainsData.chaplains);
+      }
+
       if (sessionRes) {
         if (!sessionRes.ok) {
           setErrorMsg(`Failed to load session: ${sessionRes.status}`);
@@ -93,7 +111,10 @@ export function MeetingFormPage({ id }: { id?: string }) {
         const s = sessionData.session;
         setForm({
           groupId: s.groupId,
+          chaplainId: s.chaplainId ?? "",
           heldAt: toDatetimeLocal(s.heldAt),
+          latitude: s.latitude != null ? String(s.latitude) : "",
+          longitude: s.longitude != null ? String(s.longitude) : "",
           notes: s.notes,
           followUpCategory: s.followUpCategory,
           followUpNotes: s.followUpNotes,
@@ -128,7 +149,10 @@ export function MeetingFormPage({ id }: { id?: string }) {
 
     const body = JSON.stringify({
       groupId: form.groupId,
+      chaplainId: form.chaplainId || null,
       heldAt: heldAtIso,
+      latitude: form.latitude ? parseFloat(form.latitude) : null,
+      longitude: form.longitude ? parseFloat(form.longitude) : null,
       notes: form.notes,
       followUpCategory: form.followUpCategory,
       followUpNotes: form.followUpNotes,
@@ -259,6 +283,53 @@ export function MeetingFormPage({ id }: { id?: string }) {
                 type="datetime-local"
                 value={form.heldAt}
               />
+            </div>
+
+            <div className="form-field" style={{ maxWidth: 320 }}>
+              <label htmlFor="f-chaplain">{l.chaplainAttended}</label>
+              <select
+                id="f-chaplain"
+                onChange={field("chaplainId")}
+                value={form.chaplainId}
+              >
+                <option value="">{l.selectChaplain}</option>
+                {chaplains.map((ch) => (
+                  <option key={ch.id} value={ch.id}>{ch.displayName}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-field">
+              <label>{l.locationPin}</label>
+              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <label className="text-sm text-muted" htmlFor="f-lat" style={{ marginBottom: "0.25rem", display: "block" }}>{l.latitude}</label>
+                  <input
+                    id="f-lat"
+                    onChange={field("latitude")}
+                    placeholder="-25.2867"
+                    step="any"
+                    type="number"
+                    value={form.latitude}
+                  />
+                </div>
+                <div style={{ flex: 1, minWidth: 140 }}>
+                  <label className="text-sm text-muted" htmlFor="f-lng" style={{ marginBottom: "0.25rem", display: "block" }}>{l.longitude}</label>
+                  <input
+                    id="f-lng"
+                    onChange={field("longitude")}
+                    placeholder="-57.6478"
+                    step="any"
+                    type="number"
+                    value={form.longitude}
+                  />
+                </div>
+              </div>
+              <p className="text-sm text-muted" style={{ marginTop: "0.375rem" }}>
+                {locale === "es"
+                  ? "Ingresá las coordenadas del pin de ubicación de la reunión"
+                  : "Enter the GPS coordinates for the meeting location pin"}
+              </p>
             </div>
 
             <div className="form-field">
