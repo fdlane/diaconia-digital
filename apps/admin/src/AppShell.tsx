@@ -18,6 +18,7 @@ import {
   UsersIcon,
 } from "./icons";
 import { SignInPage } from "./SignInPage";
+import { desktopSidebarMediaQuery, getInitialSidebarOpen } from "./sidebarState";
 
 function Avatar({ user }: { user: CurrentUserProfile }) {
   return (
@@ -44,9 +45,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { href: "/members", label: l.members, Icon: UsersIcon },
   ];
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() =>
+    getInitialSidebarOpen(typeof window === "undefined" ? undefined : window.matchMedia.bind(window)),
+  );
   const [dotsOpen, setDotsOpen] = useState(false);
   const dotsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const desktopQuery = window.matchMedia(desktopSidebarMediaQuery);
+
+    function handleDesktopQueryChange(event: MediaQueryListEvent) {
+      setSidebarOpen(event.matches);
+    }
+
+    setSidebarOpen(desktopQuery.matches);
+    desktopQuery.addEventListener("change", handleDesktopQueryChange);
+
+    return () => desktopQuery.removeEventListener("change", handleDesktopQueryChange);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
