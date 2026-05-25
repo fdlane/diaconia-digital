@@ -111,3 +111,16 @@ variable "admin_desired_count" {
   type        = number
   default     = 0
 }
+
+variable "clerk_publishable_key" {
+  description = "Clerk publishable key (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) for the admin Next.js app."
+  type        = string
+  default     = ""
+}
+
+variable "clerk_secret_key" {
+  description = "Clerk secret key for the admin Next.js app. Stored in Secrets Manager."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
