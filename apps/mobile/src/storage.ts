@@ -1,12 +1,12 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { SupportedLocale } from "@diaconia/shared";
-import type { LocalAttendee, LocalSession, LocalUser } from "./types";
+import type { LocalMeeting, LocalMember, LocalUser } from "./types";
 
 const keys = {
   user: "diaconia:user",
   locale: "diaconia:locale",
-  attendees: "diaconia:attendees",
-  sessions: "diaconia:sessions",
+  members: "diaconia:members",
+  meetings: "diaconia:meetings",
 };
 
 export async function loadUser() {
@@ -29,20 +29,20 @@ export async function saveLocale(locale: SupportedLocale) {
   await AsyncStorage.setItem(keys.locale, JSON.stringify(locale));
 }
 
-export async function loadAttendees(defaults: LocalAttendee[]) {
-  return readJson<LocalAttendee[]>(keys.attendees, defaults);
+export async function loadMembers(defaults: LocalMember[]) {
+  return readJson<LocalMember[]>(keys.members, defaults);
 }
 
-export async function saveAttendees(attendees: LocalAttendee[]) {
-  await AsyncStorage.setItem(keys.attendees, JSON.stringify(attendees));
+export async function saveMembers(members: LocalMember[]) {
+  await AsyncStorage.setItem(keys.members, JSON.stringify(members));
 }
 
-export async function loadSessions() {
-  return readJson<LocalSession[]>(keys.sessions, []);
+export async function loadMeetings() {
+  return readJson<LocalMeeting[]>(keys.meetings, []);
 }
 
-export async function saveSessions(sessions: LocalSession[]) {
-  await AsyncStorage.setItem(keys.sessions, JSON.stringify(sessions));
+export async function saveMeetings(meetings: LocalMeeting[]) {
+  await AsyncStorage.setItem(keys.meetings, JSON.stringify(meetings));
 }
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {

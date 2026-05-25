@@ -1,9 +1,9 @@
-import type { CreateSessionInput } from "@diaconia/shared";
+import type { CreateMeetingInput } from "@diaconia/shared";
 
-type SyncSessionArgs = {
+type SyncMeetingArgs = {
   apiUrl: string;
   token: string;
-  payload: CreateSessionInput;
+  payload: CreateMeetingInput;
 };
 
 export type UploadPhotoArgs = {
@@ -11,13 +11,13 @@ export type UploadPhotoArgs = {
   token: string;
   photo: {
     uri: string;
-    type: "user_profile_photo" | "attendee_profile_photo" | "meeting_photo";
+    type: "user_profile_photo" | "group_profile_photo" | "meeting_photo";
     contentType: string;
     byteSize: number;
   };
-  attendeeId?: string;
+  groupId?: string;
   ownerUserId?: string;
-  sessionId?: string;
+  meetingId?: string;
 };
 
 export type ZeroRuntimeConfig = {
@@ -34,8 +34,8 @@ export function getZeroRuntimeConfig(): ZeroRuntimeConfig {
   };
 }
 
-export async function replaySessionWrite({ apiUrl, token, payload }: SyncSessionArgs) {
-  const response = await fetch(`${apiUrl}/sessions`, {
+export async function replayMeetingWrite({ apiUrl, token, payload }: SyncMeetingArgs) {
+  const response = await fetch(`${apiUrl}/meetings`, {
     method: "POST",
     headers: {
       authorization: `Bearer ${token}`,
@@ -45,7 +45,7 @@ export async function replaySessionWrite({ apiUrl, token, payload }: SyncSession
   });
 
   if (!response.ok) {
-    throw new Error(`Session sync failed with ${response.status}`);
+    throw new Error(`Meeting sync failed with ${response.status}`);
   }
 
   return response.json() as Promise<{ id: string; status: string }>;
@@ -55,9 +55,9 @@ export async function uploadPhotoAsset({
   apiUrl,
   token,
   photo,
-  attendeeId,
+  groupId,
   ownerUserId,
-  sessionId,
+  meetingId,
 }: UploadPhotoArgs) {
   const uploadResponse = await fetch(`${apiUrl}/media/uploads`, {
     method: "POST",
@@ -69,9 +69,9 @@ export async function uploadPhotoAsset({
       type: photo.type,
       contentType: photo.contentType,
       byteSize: photo.byteSize,
-      attendeeId,
+      groupId,
       ownerUserId,
-      sessionId,
+      meetingId,
     }),
   });
 

@@ -2,7 +2,7 @@ export const openApiDocument = {
   openapi: "3.0.3",
   info: {
     title: "Diaconia Foundation API",
-    version: "0.1.0",
+    version: "0.2.0",
   },
   paths: {
     "/health": {
@@ -23,42 +23,67 @@ export const openApiDocument = {
         },
       },
     },
-    "/sessions": {
+    "/meetings": {
+      get: {
+        summary: "List meetings visible to the authenticated user",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "Meeting list" },
+          "403": { description: "Invited active user required" },
+        },
+      },
       post: {
-        summary: "Submit or replay an offline facilitator session",
+        summary: "Submit or replay an offline field meeting",
         security: [{ bearerAuth: [] }],
         responses: {
-          "201": { description: "Session accepted" },
-          "400": { description: "Invalid session" },
+          "201": { description: "Meeting accepted" },
+          "400": { description: "Invalid meeting" },
         },
       },
     },
-    "/admin/sessions": {
+    "/meetings/{meetingId}": {
       get: {
-        summary: "List submitted sessions for admin review",
+        summary: "Get a meeting report",
         security: [{ bearerAuth: [] }],
         responses: {
-          "200": { description: "Session list" },
-          "403": { description: "Admin role required" },
+          "200": { description: "Meeting detail" },
+          "404": { description: "Meeting not found" },
         },
       },
     },
-    "/admin/sessions/{sessionId}/media": {
+    "/meetings/{meetingId}/media": {
       get: {
-        summary: "List signed media URLs for an admin session report",
+        summary: "List signed media URLs for a meeting report",
         security: [{ bearerAuth: [] }],
         responses: {
-          "200": { description: "Session media list" },
-          "403": { description: "Admin role required" },
+          "200": { description: "Meeting media list" },
         },
       },
     },
-    "/admin/sessions/{sessionId}/prayer-requests": {
+    "/meetings/{meetingId}/prayer-requests": {
       get: {
-        summary: "List public prayer requests for an admin session report",
+        summary: "List text-only prayer requests for a meeting report",
         security: [{ bearerAuth: [] }],
         responses: {
           "200": { description: "Prayer request list" },
+        },
+      },
+    },
+    "/groups": {
+      get: {
+        summary: "List groups visible to the authenticated user",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "Group list" },
+        },
+      },
+    },
+    "/users": {
+      get: {
+        summary: "List users for administration",
+        security: [{ bearerAuth: [] }],
+        responses: {
+          "200": { description: "User list" },
           "403": { description: "Admin role required" },
         },
       },

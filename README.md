@@ -2,7 +2,7 @@
 
 Foundation workspace for the Diaconia and Moiru digital ecosystem.
 
-The first implemented slice is Facilitator Field Sessions inside the broader user mobile experience across iOS, Android, and web:
+The first implemented slice is Facilitator Field Meetings inside the broader user mobile experience across iOS, Android, and web:
 
 - Expo React Native mobile app in `apps/mobile`
 - Next.js admin dashboard in `apps/admin`
@@ -37,4 +37,4 @@ pnpm dev:admin
 pnpm dev:mobile
 ```
 
-The mobile app targets iOS, Android, and web through Expo. The first workflow is facilitator field sessions, but the app is intended to grow into the holistic user experience for Diaconia actors.
+The mobile app targets iOS, Android, and web through Expo. The first workflow is facilitator field meetings, but the app is intended to grow into the holistic user experience for Diaconia actors.

@@ -16,12 +16,12 @@ type AdminUser = {
   email: string | null;
   phone: string | null;
   role: "facilitator" | "admin";
-  cognitoSub: string;
+  authSubject: string;
   createdAt: string;
   groupId: string | null;
   groupName: string | null;
   community: string | null;
-  sessionCount: number;
+  meetingCount: number;
 };
 
 export function MembersListPage() {
@@ -41,7 +41,7 @@ export function MembersListPage() {
     setStatus("loading");
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(`${apiUrl}/admin/users`, { headers });
+      const res = await fetch(`${apiUrl}/users`, { headers });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
         setErrorMsg(payload?.error ?? `Error ${res.status}`);
@@ -107,7 +107,7 @@ export function MembersListPage() {
                 <th>{l.colEmail}</th>
                 <th>{l.colRole}</th>
                 <th>{l.colGroup}</th>
-                <th>{l.colSessions}</th>
+                <th>{l.colMeetings}</th>
                 <th />
               </tr>
             </thead>
@@ -146,7 +146,7 @@ export function MembersListPage() {
                     )}
                   </td>
                   <td>
-                    <span className="badge badge-default">{m.sessionCount}</span>
+                    <span className="badge badge-default">{m.meetingCount}</span>
                   </td>
                   <td className="row-action-cell">
                     <ChevronRightIcon size={16} />

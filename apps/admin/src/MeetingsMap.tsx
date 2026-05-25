@@ -1,14 +1,14 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { AdminSession } from "./MeetingsList";
+import type { AdminMeeting } from "./MeetingsList";
 
 type Props = {
-  sessions: AdminSession[];
+  meetings: AdminMeeting[];
   onSelect: (id: string) => void;
 };
 
-export function MeetingsMap({ sessions, onSelect }: Props) {
+export function MeetingsMap({ meetings, onSelect }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
 
@@ -32,8 +32,8 @@ export function MeetingsMap({ sessions, onSelect }: Props) {
         document.head.appendChild(link);
       }
 
-      const withLocation = sessions.filter(
-        (s): s is AdminSession & { latitude: number; longitude: number } =>
+      const withLocation = meetings.filter(
+        (s): s is AdminMeeting & { latitude: number; longitude: number } =>
           s.latitude != null && s.longitude != null,
       );
 
@@ -84,7 +84,7 @@ export function MeetingsMap({ sessions, onSelect }: Props) {
         mapRef.current = null;
       }
     };
-  }, [sessions]);
+  }, [meetings]);
 
   return (
     <div

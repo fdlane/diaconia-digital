@@ -4,7 +4,7 @@ import { ClientLayout } from "../src/ClientLayout";
 
 export const metadata: Metadata = {
   title: "Diaconia Admin",
-  description: "Foundation dashboard for Diaconia field sessions",
+  description: "Foundation dashboard for Diaconia field meetings",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

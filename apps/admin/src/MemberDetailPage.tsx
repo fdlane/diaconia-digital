@@ -12,7 +12,7 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type UserDetail = {
   id: string;
-  cognitoSub: string;
+  authSubject: string;
   displayName: string;
   email: string | null;
   phone: string | null;
@@ -35,7 +35,7 @@ export function MemberDetailPage({ id }: { id: string }) {
 
   const [user, setUser] = useState<UserDetail | null>(null);
   const [groups, setGroups] = useState<GroupRow[]>([]);
-  const [sessionCount, setSessionCount] = useState(0);
+  const [meetingCount, setMeetingCount] = useState(0);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [deleteState, setDeleteState] = useState<"idle" | "confirming" | "deleting">("idle");
@@ -48,17 +48,17 @@ export function MemberDetailPage({ id }: { id: string }) {
     setStatus("loading");
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(`${apiUrl}/admin/users/${id}`, { headers });
+      const res = await fetch(`${apiUrl}/users/${id}`, { headers });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
         setErrorMsg(payload?.error ?? `Error ${res.status}`);
         setStatus("error");
         return;
       }
-      const data = (await res.json()) as { user: UserDetail; groups: GroupRow[]; sessionCount: number };
+      const data = (await res.json()) as { user: UserDetail; groups: GroupRow[]; meetingCount: number };
       setUser(data.user);
       setGroups(data.groups);
-      setSessionCount(data.sessionCount);
+      setMeetingCount(data.meetingCount);
       setStatus("done");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error");
@@ -72,7 +72,7 @@ export function MemberDetailPage({ id }: { id: string }) {
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     };
     try {
-      const res = await fetch(`${apiUrl}/admin/users/${id}`, { method: "DELETE", headers });
+      const res = await fetch(`${apiUrl}/users/${id}`, { method: "DELETE", headers });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
         setErrorMsg(payload?.error ?? `Error ${res.status}`);
@@ -206,10 +206,10 @@ export function MemberDetailPage({ id }: { id: string }) {
                 </span>
               </div>
               <div className="detail-field">
-                <span className="detail-label">{l.cognitoSub}</span>
+                <span className="detail-label">{l.authSubjectLabel}</span>
                 <span className="detail-value text-sm text-muted"
                   style={{ fontFamily: "monospace", wordBreak: "break-all" }}>
-                  {user.cognitoSub}
+                  {user.authSubject}
                 </span>
               </div>
               <div className="detail-field">
@@ -232,8 +232,8 @@ export function MemberDetailPage({ id }: { id: string }) {
                 <line x1="3" x2="21" y1="10" y2="10" />
               </svg>
             </div>
-            <div className="stat-card-value">{sessionCount}</div>
-            <div className="stat-card-label">{l.colSessions}</div>
+            <div className="stat-card-value">{meetingCount}</div>
+            <div className="stat-card-label">{l.colMeetings}</div>
           </div>
           <div className="stat-card">
             <div className="stat-card-icon purple">

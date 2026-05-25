@@ -18,7 +18,7 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type Group = { id: string; name: string; community: string };
 
-export type AdminSession = {
+export type AdminMeeting = {
   id: string;
   heldAt: string;
   submittedAt: string | null;
@@ -33,10 +33,9 @@ export type AdminSession = {
   followUpNotes: string;
 };
 
-type SessionMedia = { id: string; type: string; url: string };
+type MeetingMedia = { id: string; type: string; url: string };
 type PrayerRequest = {
   id: string;
-  requesterName: string;
   request: string;
   status: string;
 };
@@ -46,10 +45,10 @@ export function MeetingsList() {
   const l = t(locale);
   const router = useRouter();
 
-  const [sessions, setSessions] = useState<AdminSession[]>([]);
+  const [meetings, setMeetings] = useState<AdminMeeting[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [mediaBySession, setMediaBySession] = useState<Record<string, SessionMedia[]>>({});
-  const [prayersBySession, setPrayersBySession] = useState<Record<string, PrayerRequest[]>>({});
+  const [mediaByMeeting, setMediaByMeeting] = useState<Record<string, MeetingMedia[]>>({});
+  const [prayersByMeeting, setPrayersByMeeting] = useState<Record<string, PrayerRequest[]>>({});
   const [filters, setFilters] = useState({ from: "", to: "", groupId: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [statusMsg, setStatusMsg] = useState("");
@@ -65,22 +64,22 @@ export function MeetingsList() {
 
   useEffect(() => {
     void loadGroups();
-    void loadSessions();
+    void loadMeetings();
   }, [token]);
 
   async function loadGroups() {
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(`${apiUrl}/admin/groups`, { headers });
+      const res = await fetch(`${apiUrl}/groups`, { headers });
       if (!res.ok) return;
       const data = (await res.json()) as { groups: Group[] };
       setGroups(data.groups.filter((g) => g.name));
     } catch { /* non-critical */ }
   }
 
-  async function loadSessions() {
+  async function loadMeetings() {
     setStatus("loading");
-    setStatusMsg(l.loadingSessions);
+    setStatusMsg(l.loadingMeetings);
 
     const headers: Record<string, string> = token
       ? { authorization: `Bearer ${token}` }
@@ -88,7 +87,7 @@ export function MeetingsList() {
 
     try {
       const res = await fetch(
-        `${apiUrl}/admin/sessions${query ? `?${query}` : ""}`,
+        `${apiUrl}/meetings${query ? `?${query}` : ""}`,
         { headers },
       );
 
@@ -103,31 +102,31 @@ export function MeetingsList() {
       }
 
       const data = (await res.json()) as {
-        sessions: AdminSession[];
+        meetings: AdminMeeting[];
         warning?: string;
       };
-      setSessions(data.sessions);
-      setMediaBySession({});
-      setPrayersBySession({});
+      setMeetings(data.meetings);
+      setMediaByMeeting({});
+      setPrayersByMeeting({});
 
       let failures = 0;
 
       const [mediaEntries, prayerEntries] = await Promise.all([
         Promise.all(
-          data.sessions.map(async (s) => {
+          data.meetings.map(async (s) => {
             try {
-              const r = await fetch(`${apiUrl}/admin/sessions/${s.id}/media`, { headers });
+              const r = await fetch(`${apiUrl}/meetings/${s.id}/media`, { headers });
               if (!r.ok) { failures++; return [s.id, []] as const; }
-              const p = (await r.json()) as { media: SessionMedia[] };
+              const p = (await r.json()) as { media: MeetingMedia[] };
               return [s.id, p.media] as const;
             } catch { failures++; return [s.id, []] as const; }
           }),
         ),
         Promise.all(
-          data.sessions.map(async (s) => {
+          data.meetings.map(async (s) => {
             try {
               const r = await fetch(
-                `${apiUrl}/admin/sessions/${s.id}/prayer-requests`,
+                `${apiUrl}/meetings/${s.id}/prayer-requests`,
                 { headers },
               );
               if (!r.ok) { failures++; return [s.id, []] as const; }
@@ -138,10 +137,10 @@ export function MeetingsList() {
         ),
       ]);
 
-      setMediaBySession(Object.fromEntries(mediaEntries));
-      setPrayersBySession(Object.fromEntries(prayerEntries));
+      setMediaByMeeting(Object.fromEntries(mediaEntries));
+      setPrayersByMeeting(Object.fromEntries(prayerEntries));
 
-      const base = data.warning ?? l.sessions(data.sessions.length);
+      const base = data.warning ?? l.meetingsCount(data.meetings.length);
       setStatus("done");
       setStatusMsg(failures ? `${base} · ${failures} detail loads failed` : base);
     } catch (err) {
@@ -160,10 +159,10 @@ export function MeetingsList() {
       "notes",
       "followUpNotes",
     ];
-    const rows = sessions.map((s) =>
+    const rows = meetings.map((s) =>
       header
         .map((k) => {
-          const v = String(s[k as keyof AdminSession] ?? "");
+          const v = String(s[k as keyof AdminMeeting] ?? "");
           return `"${v.replaceAll('"', '""')}"`;
         })
         .join(","),
@@ -280,7 +279,7 @@ export function MeetingsList() {
           <div style={{ display: "flex", alignItems: "flex-end" }}>
             <button
               className="btn btn-primary"
-              onClick={() => void loadSessions()}
+              onClick={() => void loadMeetings()}
               type="button"
             >
               <FilterIcon size={15} />
@@ -298,9 +297,9 @@ export function MeetingsList() {
           <div style={{ padding: "1rem" }}>
             <MeetingsMap
               onSelect={(id) => router.push(`/meetings/${id}`)}
-              sessions={sessions}
+              meetings={meetings}
             />
-            {sessions.filter((s) => s.latitude != null).length === 0 && status === "done" ? (
+            {meetings.filter((s) => s.latitude != null).length === 0 && status === "done" ? (
               <p className="text-sm text-muted" style={{ marginTop: "0.75rem", textAlign: "center" }}>
                 {locale === "es" ? "Ninguna reunión tiene ubicación registrada." : "No meetings have a location recorded."}
               </p>
@@ -323,63 +322,62 @@ export function MeetingsList() {
               </tr>
             </thead>
             <tbody>
-              {sessions.map((session) => (
+              {meetings.map((meeting) => (
                 <tr
                   className="row-link"
-                  key={session.id}
-                  onClick={() => router.push(`/meetings/${session.id}`)}
+                  key={meeting.id}
+                  onClick={() => router.push(`/meetings/${meeting.id}`)}
                 >
                   <td style={{ whiteSpace: "nowrap" }}>
-                    {formatDisplayDate(session.heldAt, locale)}
+                    {formatDisplayDate(meeting.heldAt, locale)}
                   </td>
                   <td>
-                    <span style={{ fontWeight: 600 }}>{session.groupName}</span>
-                    {session.community ? (
+                    <span style={{ fontWeight: 600 }}>{meeting.groupName}</span>
+                    {meeting.community ? (
                       <>
                         <br />
-                        <span className="text-muted text-sm">{session.community}</span>
+                        <span className="text-muted text-sm">{meeting.community}</span>
                       </>
                     ) : null}
                   </td>
-                  <td>{session.facilitatorName}</td>
+                  <td>{meeting.facilitatorName}</td>
                   <td>
-                    {getFollowUpBadge(session.followUpCategory)}
-                    {session.followUpNotes ? (
+                    {getFollowUpBadge(meeting.followUpCategory)}
+                    {meeting.followUpNotes ? (
                       <p className="text-sm" style={{ marginTop: "0.35rem" }}>
-                        {session.followUpNotes}
+                        {meeting.followUpNotes}
                       </p>
                     ) : null}
                   </td>
                   <td>
                     <div className="thumbs">
-                      {(mediaBySession[session.id] ?? []).map((m) => (
+                      {(mediaByMeeting[meeting.id] ?? []).map((m) => (
                         <img alt={l.meetingPhoto} key={m.id} src={m.url} />
                       ))}
                     </div>
                   </td>
                   <td>
                     <div className="prayer-list">
-                      {(prayersBySession[session.id] ?? []).map((pr) => (
+                      {(prayersByMeeting[meeting.id] ?? []).map((pr) => (
                         <div className="prayer-card" key={pr.id}>
-                          <strong>{pr.requesterName}</strong>
                           <p>{pr.request}</p>
                           <span className="prayer-status">{pr.status}</span>
                         </div>
                       ))}
-                      {!(prayersBySession[session.id] ?? []).length ? (
+                      {!(prayersByMeeting[meeting.id] ?? []).length ? (
                         <span className="text-muted text-sm">{l.noRequests}</span>
                       ) : null}
                     </div>
                   </td>
                   <td className="text-sm text-muted">
-                    {session.notes || l.noNotes}
+                    {meeting.notes || l.noNotes}
                   </td>
                   <td className="row-action-cell">
                     <ChevronRightIcon size={16} />
                   </td>
                 </tr>
               ))}
-              {!sessions.length && status !== "loading" ? (
+              {!meetings.length && status !== "loading" ? (
                 <tr>
                   <td colSpan={8}>
                     <div className="empty-state">
@@ -392,7 +390,7 @@ export function MeetingsList() {
                           <line x1="3" x2="21" y1="10" y2="10" />
                         </svg>
                       </div>
-                      <p className="empty-state-title">{l.noSessions}</p>
+                      <p className="empty-state-title">{l.noMeetings}</p>
                       <Link className="btn btn-primary" href="/meetings/new">
                         <svg fill="none" height={14} stroke="currentColor" strokeLinecap="round"
                           strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24" width={14}>

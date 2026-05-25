@@ -3,7 +3,7 @@
 import { formatDisplayDate, getProfileInitials, labels, type SupportedLocale } from "@diaconia/shared";
 import { useEffect, useMemo, useState } from "react";
 
-type AdminSession = {
+type AdminMeeting = {
   id: string;
   heldAt: string;
   submittedAt: string | null;
@@ -15,7 +15,7 @@ type AdminSession = {
   followUpNotes: string;
 };
 
-type SessionMedia = {
+type MeetingMedia = {
   id: string;
   type: string;
   url: string;
@@ -23,15 +23,13 @@ type SessionMedia = {
 
 type PrayerRequest = {
   id: string;
-  attendeeId: string | null;
-  requesterName: string;
   request: string;
   status: string;
   createdAt: string;
 };
 
-type AdminSessionsResponse = {
-  sessions: AdminSession[];
+type AdminMeetingsResponse = {
+  meetings: AdminMeeting[];
   warning?: string;
 };
 
@@ -45,7 +43,7 @@ type CurrentUserProfile = {
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const localeStorageKey = "diaconia:admin:locale";
 const profileStorageKey = "diaconia:admin:profile";
-const tokenStorageKey = "diaconia:admin:cognitoToken";
+const tokenStorageKey = "diaconia:admin:accessToken";
 const defaultProfile: CurrentUserProfile = {
   displayName: "Diaconia Admin",
   email: "admin@diaconia.local",
@@ -59,9 +57,9 @@ const localeOptions = [
 
 export function AdminDashboard() {
   const [locale, setLocale] = useState<SupportedLocale>("es");
-  const [sessions, setSessions] = useState<AdminSession[]>([]);
-  const [mediaBySession, setMediaBySession] = useState<Record<string, SessionMedia[]>>({});
-  const [prayerRequestsBySession, setPrayerRequestsBySession] = useState<
+  const [meetings, setMeetings] = useState<AdminMeeting[]>([]);
+  const [mediaByMeeting, setMediaByMeeting] = useState<Record<string, MeetingMedia[]>>({});
+  const [prayerRequestsByMeeting, setPrayerRequestsByMeeting] = useState<
     Record<string, PrayerRequest[]>
   >({});
   const [token, setToken] = useState("");
@@ -88,8 +86,8 @@ export function AdminDashboard() {
     return params.toString();
   }, [filters]);
 
-  async function loadSessions(tokenOverride = token) {
-    setStatus(copy.loadingSessions);
+  async function loadMeetings(tokenOverride = token) {
+    setStatus(copy.loadingMeetings);
     const requestInit = tokenOverride
       ? {
           headers: {
@@ -99,7 +97,7 @@ export function AdminDashboard() {
       : undefined;
 
     try {
-      const response = await fetch(`${apiUrl}/admin/sessions${query ? `?${query}` : ""}`, requestInit);
+      const response = await fetch(`${apiUrl}/meetings${query ? `?${query}` : ""}`, requestInit);
 
       if (!response.ok) {
         const payload = (await response.json().catch(() => null)) as
@@ -109,56 +107,56 @@ export function AdminDashboard() {
         return;
       }
 
-      const payload = (await response.json()) as AdminSessionsResponse;
-      setSessions(payload.sessions);
-      setMediaBySession({});
-      setPrayerRequestsBySession({});
+      const payload = (await response.json()) as AdminMeetingsResponse;
+      setMeetings(payload.meetings);
+      setMediaByMeeting({});
+      setPrayerRequestsByMeeting({});
       let detailFailures = 0;
       const mediaEntries = await Promise.all(
-        payload.sessions.map(async (session) => {
+        payload.meetings.map(async (meeting) => {
           try {
-            const mediaResponse = await fetch(`${apiUrl}/admin/sessions/${session.id}/media`, requestInit);
+            const mediaResponse = await fetch(`${apiUrl}/meetings/${meeting.id}/media`, requestInit);
 
             if (!mediaResponse.ok) {
               detailFailures += 1;
-              return [session.id, []] as const;
+              return [meeting.id, []] as const;
             }
 
-            const mediaPayload = (await mediaResponse.json()) as { media: SessionMedia[] };
-            return [session.id, mediaPayload.media] as const;
+            const mediaPayload = (await mediaResponse.json()) as { media: MeetingMedia[] };
+            return [meeting.id, mediaPayload.media] as const;
           } catch {
             detailFailures += 1;
-            return [session.id, []] as const;
+            return [meeting.id, []] as const;
           }
         }),
       );
       const prayerEntries = await Promise.all(
-        payload.sessions.map(async (session) => {
+        payload.meetings.map(async (meeting) => {
           try {
             const prayerResponse = await fetch(
-              `${apiUrl}/admin/sessions/${session.id}/prayer-requests`,
+              `${apiUrl}/meetings/${meeting.id}/prayer-requests`,
               requestInit,
             );
 
             if (!prayerResponse.ok) {
               detailFailures += 1;
-              return [session.id, []] as const;
+              return [meeting.id, []] as const;
             }
 
             const prayerPayload = (await prayerResponse.json()) as { prayerRequests: PrayerRequest[] };
-            return [session.id, prayerPayload.prayerRequests] as const;
+            return [meeting.id, prayerPayload.prayerRequests] as const;
           } catch {
             detailFailures += 1;
-            return [session.id, []] as const;
+            return [meeting.id, []] as const;
           }
         }),
       );
-      setMediaBySession(Object.fromEntries(mediaEntries));
-      setPrayerRequestsBySession(Object.fromEntries(prayerEntries));
-      const baseStatus = payload.warning ?? `${payload.sessions.length} ${copy.sessions}`;
+      setMediaByMeeting(Object.fromEntries(mediaEntries));
+      setPrayerRequestsByMeeting(Object.fromEntries(prayerEntries));
+      const baseStatus = payload.warning ?? `${payload.meetings.length} ${copy.meetings}`;
       setStatus(detailFailures ? `${baseStatus} · ${detailFailures} detail loads failed` : baseStatus);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : `Error ${copy.loadingSessions}`);
+      setStatus(error instanceof Error ? error.message : `Error ${copy.loadingMeetings}`);
     }
   }
 
@@ -184,19 +182,19 @@ export function AdminDashboard() {
     setProfileMenuOpen(false);
   }
 
-  function signInWithCognito() {
+  function signInWithToken() {
     setCurrentUser(profileDraft);
     window.localStorage.setItem(profileStorageKey, JSON.stringify(profileDraft));
     window.localStorage.setItem(tokenStorageKey, token);
-    void loadSessions(token);
+    void loadMeetings(token);
   }
 
   function signOut() {
     setCurrentUser(null);
     setToken("");
-    setSessions([]);
-    setMediaBySession({});
-    setPrayerRequestsBySession({});
+    setMeetings([]);
+    setMediaByMeeting({});
+    setPrayerRequestsByMeeting({});
     setProfileMenuOpen(false);
     setProfileEditorOpen(false);
     window.localStorage.removeItem(tokenStorageKey);
@@ -214,10 +212,10 @@ export function AdminDashboard() {
       "notes",
       "followUpNotes",
     ];
-    const rows = sessions.map((session) =>
+    const rows = meetings.map((meeting) =>
       header
         .map((key) => {
-          const value = String(session[key as keyof AdminSession] ?? "");
+          const value = String(meeting[key as keyof AdminMeeting] ?? "");
           return `"${value.replaceAll('"', '""')}"`;
         })
         .join(","),
@@ -228,7 +226,7 @@ export function AdminDashboard() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "diaconia-sessions.csv";
+    link.download = "diaconia-meetings.csv";
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -251,7 +249,7 @@ export function AdminDashboard() {
         setCurrentUser(null);
       }
     }
-    void loadSessions(storedToken);
+    void loadMeetings(storedToken);
   }, []);
 
   return (
@@ -299,12 +297,12 @@ export function AdminDashboard() {
                 <div className="profile-menu">
                   <span className="eyebrow">{locale === "es" ? "Mi perfil" : "My profile"}</span>
                   <strong>{currentUser.displayName}</strong>
-                  <span>{currentUser.email || currentUser.phone || "Cognito admin"}</span>
+                  <span>{currentUser.email || currentUser.phone || "Admin demo"}</span>
                   <button className="secondary" onClick={() => setProfileEditorOpen(true)} type="button">
                     {locale === "es" ? "Editar perfil" : "Edit profile"}
                   </button>
                   <button className="danger" onClick={signOut} type="button">
-                    {locale === "es" ? "Cerrar sesión" : "Sign out"}
+                    {locale === "es" ? "Salir" : "Sign out"}
                   </button>
                 </div>
               ) : null}
@@ -316,24 +314,24 @@ export function AdminDashboard() {
       <section className="content">
         {!currentUser ? (
           <div className="signin-panel">
-            <h1>{locale === "es" ? "Iniciar sesión" : "Sign in"}</h1>
+            <h1>{locale === "es" ? "Ingresar" : "Sign in"}</h1>
             <p className="muted">
               {locale === "es"
-                ? "Use un ID token de AWS Cognito cuando el pool esté configurado; localmente puede continuar como admin demo."
-                : "Use an AWS Cognito ID token once the pool is configured; locally you can continue as a demo admin."}
+                ? "Use un token de acceso cuando el proveedor de identidad esté configurado; localmente puede continuar como admin demo."
+                : "Use an access token once the identity provider is configured; locally you can continue as a demo admin."}
             </p>
             <input
-              aria-label={copy.cognitoToken}
+              aria-label={copy.accessToken}
               onChange={(event) => setToken(event.target.value)}
               placeholder={copy.tokenPlaceholder}
               value={token}
             />
-            <button onClick={signInWithCognito} type="button">{copy.signIn}</button>
+            <button onClick={signInWithToken} type="button">{copy.signIn}</button>
           </div>
         ) : null}
         <div className="toolbar" aria-label={copy.filters}>
           <div className="field">
-            <label htmlFor="token">{copy.cognitoToken}</label>
+            <label htmlFor="token">{copy.accessToken}</label>
             <input
               id="token"
               onChange={(event) => setToken(event.target.value)}
@@ -371,7 +369,7 @@ export function AdminDashboard() {
               value={filters.groupId}
             />
           </div>
-          <button onClick={() => void loadSessions()} type="button">
+          <button onClick={() => void loadMeetings()} type="button">
             {copy.filter}
           </button>
         </div>
@@ -392,46 +390,45 @@ export function AdminDashboard() {
               </tr>
             </thead>
             <tbody>
-              {sessions.map((session) => (
-                <tr key={session.id}>
-                  <td>{formatDisplayDate(session.heldAt, locale)}</td>
+              {meetings.map((meeting) => (
+                <tr key={meeting.id}>
+                  <td>{formatDisplayDate(meeting.heldAt, locale)}</td>
                   <td>
-                    <strong>{session.groupName}</strong>
+                    <strong>{meeting.groupName}</strong>
                     <br />
-                    <span className="muted">{session.community}</span>
+                    <span className="muted">{meeting.community}</span>
                   </td>
-                  <td>{session.facilitatorName}</td>
+                  <td>{meeting.facilitatorName}</td>
                   <td>
-                    <span className="badge">{session.followUpCategory}</span>
-                    {session.followUpNotes ? <p>{session.followUpNotes}</p> : null}
+                    <span className="badge">{meeting.followUpCategory}</span>
+                    {meeting.followUpNotes ? <p>{meeting.followUpNotes}</p> : null}
                   </td>
                   <td>
                     <div className="thumbs">
-                      {(mediaBySession[session.id] ?? []).map((media) => (
+                      {(mediaByMeeting[meeting.id] ?? []).map((media) => (
                         <img alt={copy.meetingPhotoAlt} key={media.id} src={media.url} />
                       ))}
                     </div>
                   </td>
                   <td>
                     <div className="prayer-list">
-                      {(prayerRequestsBySession[session.id] ?? []).map((request) => (
+                      {(prayerRequestsByMeeting[meeting.id] ?? []).map((request) => (
                         <article className="prayer-card" key={request.id}>
-                          <strong>{request.requesterName}</strong>
                           <p>{request.request}</p>
                           <span>{request.status}</span>
                         </article>
                       ))}
-                      {!(prayerRequestsBySession[session.id] ?? []).length ? (
+                      {!(prayerRequestsByMeeting[meeting.id] ?? []).length ? (
                         <span className="muted">{locale === "es" ? "Sin peticiones" : "No requests"}</span>
                       ) : null}
                     </div>
                   </td>
-                  <td>{session.notes || copy.noNotes}</td>
+                  <td>{meeting.notes || copy.noNotes}</td>
                 </tr>
               ))}
-              {!sessions.length ? (
+              {!meetings.length ? (
                 <tr>
-                  <td colSpan={7}>{copy.noSessions}</td>
+                  <td colSpan={7}>{copy.noMeetings}</td>
                 </tr>
               ) : null}
             </tbody>
