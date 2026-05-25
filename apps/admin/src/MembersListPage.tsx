@@ -15,7 +15,7 @@ type AdminUser = {
   displayName: string;
   email: string | null;
   phone: string | null;
-  role: "facilitator" | "admin";
+  role: "admin" | "facilitator" | "chaplain" | "member";
   authSubject: string;
   createdAt: string;
   groupId: string | null;
@@ -67,11 +67,10 @@ export function MembersListPage() {
   }
 
   function roleBadge(role: string) {
-    return role === "admin" ? (
-      <span className="badge badge-default">{l.roleAdmin}</span>
-    ) : (
-      <span className="badge badge-muted">{l.roleFacilitator}</span>
-    );
+    if (role === "admin") return <span className="badge badge-default">{l.roleAdmin}</span>;
+    if (role === "chaplain") return <span className="badge badge-muted">{l.chaplain}</span>;
+    if (role === "member") return <span className="badge badge-muted">{l.rolePerson}</span>;
+    return <span className="badge badge-muted">{l.roleFacilitator}</span>;
   }
 
   return (
@@ -82,7 +81,7 @@ export function MembersListPage() {
           <p className="page-subtitle">{l.membersSubtitle}</p>
         </div>
         <div className="page-header-actions">
-          <Link className="btn btn-primary" href="/members/new">
+          <Link className="btn btn-primary" href="/people/new">
             <PlusIcon size={15} />
             {l.newMember}
           </Link>
@@ -95,7 +94,7 @@ export function MembersListPage() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{l.facilitators}</span>
+          <span className="card-title">{l.members}</span>
           {status === "done" ? (
             <span className="text-sm text-muted">{l.membersFound(members.length)}</span>
           ) : null}
@@ -125,7 +124,7 @@ export function MembersListPage() {
                 <tr
                   className="row-link"
                   key={`${m.id}:${m.groupId ?? "unassigned"}`}
-                  onClick={() => router.push(`/members/${m.id}`)}
+                  onClick={() => router.push(`/people/${m.id}`)}
                 >
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: "0.625rem" }}>
@@ -167,8 +166,8 @@ export function MembersListPage() {
                   <td colSpan={6}>
                     <div className="empty-state">
                       <div className="empty-state-icon"><UsersIcon size={40} /></div>
-                      <p className="empty-state-title">{l.noFacilitators}</p>
-                      <Link className="btn btn-primary" href="/members/new">
+                      <p className="empty-state-title">{l.noPeople}</p>
+                      <Link className="btn btn-primary" href="/people/new">
                         <PlusIcon size={14} />{l.newMember}
                       </Link>
                     </div>

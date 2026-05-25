@@ -1,5 +1,5 @@
-import { MemberFormPage } from "../../../src/MemberFormPage";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <MemberFormPage />;
+  redirect("/people/new");
 }

@@ -258,7 +258,7 @@ function meetingPopupHtml(
       <small>${escapeHtml(formatDisplayDate(meeting.heldAt, locale))}</small>
       <span class="map-popup-steward">
         ${escapeHtml(stewardLabel)}:
-        <a data-app-route href="/members/${encodeURIComponent(meeting.facilitatorId)}">${escapeHtml(meeting.facilitatorName)}</a>
+        <a data-app-route href="/people/${encodeURIComponent(meeting.facilitatorId)}">${escapeHtml(meeting.facilitatorName)}</a>
       </span>
       <a class="map-popup-detail-link" data-app-route href="/meetings/${encodeURIComponent(meeting.id)}">${escapeHtml(viewDetailsLabel)}</a>
     </div>

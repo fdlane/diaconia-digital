@@ -136,7 +136,7 @@ export function GroupDetailPage({ id }: { id: string }) {
           <p className="page-subtitle">{group.community}</p>
           <p className="page-subtitle">
             {l.loanSteward}:{" "}
-            <Link href={`/members/${group.facilitatorId}`} style={{ color: "var(--brand)", fontWeight: 600 }}>
+            <Link href={`/people/${group.facilitatorId}`} style={{ color: "var(--brand)", fontWeight: 600 }}>
               {group.facilitatorName}
             </Link>
           </p>
@@ -194,7 +194,7 @@ export function GroupDetailPage({ id }: { id: string }) {
               <div className="detail-field">
                 <span className="detail-label">{l.loanSteward}</span>
                 <span className="detail-value">
-                  <Link href={`/members/${group.facilitatorId}`} style={{ color: "var(--brand)" }}>
+                  <Link href={`/people/${group.facilitatorId}`} style={{ color: "var(--brand)" }}>
                     {group.facilitatorName}
                   </Link>
                   {group.facilitatorEmail ? (
@@ -211,7 +211,7 @@ export function GroupDetailPage({ id }: { id: string }) {
                   {group.chaplainName ? (
                     <>
                       {group.chaplainId ? (
-                        <Link href={`/members/${group.chaplainId}`} style={{ color: "var(--brand)" }}>
+                        <Link href={`/people/${group.chaplainId}`} style={{ color: "var(--brand)" }}>
                           {group.chaplainName}
                         </Link>
                       ) : group.chaplainName}

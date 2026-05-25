@@ -43,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     { href: "/", label: l.dashboard, Icon: DashboardIcon },
     { href: "/groups", label: l.groups, Icon: GroupsIcon },
     { href: "/meetings", label: l.meetings, Icon: CalendarIcon },
-    { href: "/members", label: l.members, Icon: UsersIcon },
+    { href: "/people", label: l.members, Icon: UsersIcon },
   ];
 
   const [sidebarOpen, setSidebarOpen] = useState(() =>

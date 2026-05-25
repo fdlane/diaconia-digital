@@ -40,7 +40,7 @@ const adminLabels = {
     // Nav
     dashboard: "Inicio",
     meetings: "Reuniones",
-    members: "Miembros",
+    members: "Personas",
     settings: "Configuración",
     toggleSidebar: "Abrir/cerrar menú",
 
@@ -71,7 +71,7 @@ const adminLabels = {
     noActiveMeetingLocations: "No hay reuniones activas con ubicación registrada.",
     quickLinks: "Accesos rápidos",
     viewAllMeetings: "Ver todas las reuniones",
-    viewMembers: "Ver miembros",
+    viewMembers: "Ver personas",
 
     // Meetings list
     meetingsSubtitle: "Todas las reuniones de grupos de confianza e informes de campo",
@@ -94,18 +94,19 @@ const adminLabels = {
     noMeetings: "No hay reuniones para mostrar.",
     meetingPhoto: "Foto de reunión",
 
-    // Members
-    membersSubtitle: "Facilitadores y miembros de los grupos",
+    // People
+    membersSubtitle: "Personas que participan, sirven o administran grupos",
     facilitators: "Facilitadores",
     found: (n: number) => `${n} encontrado${n !== 1 ? "s" : ""}`,
     colName: "Nombre",
     colCommunity: "Comunidad",
     colMeetings: "Reuniones",
     noFacilitators: "No se encontraron facilitadores.",
-    groupMembers: "Miembros del grupo",
-    membersComing: "Gestión de miembros próximamente",
+    noPeople: "No se encontraron personas.",
+    groupMembers: "Lista del grupo",
+    membersComing: "Gestión de listas próximamente",
     membersComingDesc:
-      "Las listas de miembros por grupo estarán disponibles aquí cuando la API esté lista.",
+      "Las listas de personas por grupo estarán disponibles aquí cuando la API esté lista.",
 
     // Settings
     settingsSubtitle: "Preferencias y configuración de la aplicación",
@@ -140,7 +141,7 @@ const adminLabels = {
     groupDeleted: "Grupo desactivado",
     groupsFound: (n: number) => `${n} grupo${n !== 1 ? "s" : ""}`,
     noGroups: "No se encontraron grupos.",
-    noGroupMembers: "Sin miembros registrados.",
+    noGroupMembers: "No hay personas registradas.",
     createGroupFirst: "Primero creá un grupo",
     noGroupsForMeeting: "No hay grupos disponibles. Creá un grupo antes de agregar una reunión.",
 
@@ -180,30 +181,31 @@ const adminLabels = {
     editMyProfile: "Editar mi perfil",
     profileSaved: "Perfil guardado",
 
-    // Members CRUD
-    newMember: "Nuevo miembro",
-    editMember: "Editar miembro",
-    deleteMember: "Eliminar miembro",
-    memberDetail: "Detalle del miembro",
-    backToMembers: "Volver a miembros",
+    // People CRUD
+    newMember: "Nueva persona",
+    editMember: "Editar persona",
+    deleteMember: "Eliminar persona",
+    memberDetail: "Detalle de persona",
+    backToMembers: "Volver a personas",
     colEmail: "Correo",
     colPhone: "Teléfono",
     colRole: "Rol",
     colCreated: "Creado",
     roleFacilitator: "Facilitador",
     roleAdmin: "Administrador",
+    rolePerson: "Persona",
     authSubjectLabel: "ID del proveedor de identidad",
     noGroup: "Sin grupo",
     noEmail: "Sin correo",
     noPhone: "Sin teléfono",
-    memberSaved: "Miembro guardado",
-    memberDeleted: "Miembro eliminado",
+    memberSaved: "Persona guardada",
+    memberDeleted: "Persona eliminada",
     confirmDeleteTitle: "¿Eliminar permanentemente?",
     confirmDeleteDesc: "Esta acción no se puede deshacer.",
     deleteBtn: "Sí, eliminar",
     saving: "Guardando…",
     deleting: "Eliminando…",
-    membersFound: (n: number) => `${n} miembro${n !== 1 ? "s" : ""}`,
+    membersFound: (n: number) => `${n} persona${n !== 1 ? "s" : ""}`,
 
     // Meetings CRUD
     newMeeting: "Nueva reunión",
@@ -276,7 +278,7 @@ const adminLabels = {
     // Nav
     dashboard: "Dashboard",
     meetings: "Meetings",
-    members: "Members",
+    members: "People",
     settings: "Settings",
     toggleSidebar: "Toggle sidebar",
 
@@ -307,7 +309,7 @@ const adminLabels = {
     noActiveMeetingLocations: "No active meetings have a location recorded.",
     quickLinks: "Quick Links",
     viewAllMeetings: "View all meetings",
-    viewMembers: "View members",
+    viewMembers: "View people",
 
     // Meetings list
     meetingsSubtitle: "All trust group meetings and field reports",
@@ -330,18 +332,19 @@ const adminLabels = {
     noMeetings: "No meetings to show.",
     meetingPhoto: "Meeting photo",
 
-    // Members
-    membersSubtitle: "Facilitators and group members",
+    // People
+    membersSubtitle: "People who participate, serve, or administer groups",
     facilitators: "Facilitators",
     found: (n: number) => `${n} found`,
     colName: "Name",
     colCommunity: "Community",
     colMeetings: "Meetings",
     noFacilitators: "No facilitators found.",
-    groupMembers: "Group Members",
-    membersComing: "Member management coming soon",
+    noPeople: "No people found.",
+    groupMembers: "Group roster",
+    membersComing: "Roster management coming soon",
     membersComingDesc:
-      "Group-level member lists will be available here once the roster API is ready.",
+      "Group-level people lists will be available here once the roster API is ready.",
 
     // Settings
     settingsSubtitle: "Application preferences and configuration",
@@ -375,7 +378,7 @@ const adminLabels = {
     groupDeleted: "Group deactivated",
     groupsFound: (n: number) => `${n} group${n !== 1 ? "s" : ""}`,
     noGroups: "No groups found.",
-    noGroupMembers: "No members registered.",
+    noGroupMembers: "No one registered.",
     createGroupFirst: "Create a group first",
     noGroupsForMeeting: "No groups available. Create a group before adding a meeting.",
 
@@ -415,30 +418,31 @@ const adminLabels = {
     editMyProfile: "Edit My Profile",
     profileSaved: "Profile saved",
 
-    // Members CRUD
-    newMember: "New Member",
-    editMember: "Edit Member",
-    deleteMember: "Delete Member",
-    memberDetail: "Member Details",
-    backToMembers: "Back to Members",
+    // People CRUD
+    newMember: "New Person",
+    editMember: "Edit Person",
+    deleteMember: "Delete Person",
+    memberDetail: "Person Details",
+    backToMembers: "Back to People",
     colEmail: "Email",
     colPhone: "Phone",
     colRole: "Role",
     colCreated: "Created",
     roleFacilitator: "Facilitator",
     roleAdmin: "Admin",
+    rolePerson: "Person",
     authSubjectLabel: "Identity provider ID",
     noGroup: "No group",
     noEmail: "No email",
     noPhone: "No phone",
-    memberSaved: "Member saved",
-    memberDeleted: "Member deleted",
+    memberSaved: "Person saved",
+    memberDeleted: "Person deleted",
     confirmDeleteTitle: "Delete permanently?",
     confirmDeleteDesc: "This action cannot be undone.",
     deleteBtn: "Yes, delete",
     saving: "Saving…",
     deleting: "Deleting…",
-    membersFound: (n: number) => `${n} member${n !== 1 ? "s" : ""}`,
+    membersFound: (n: number) => `${n} ${n === 1 ? "person" : "people"}`,
 
     // Meetings CRUD
     newMeeting: "New Meeting",

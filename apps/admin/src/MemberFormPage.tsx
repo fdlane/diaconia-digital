@@ -122,7 +122,7 @@ export function MemberFormPage({ id }: { id?: string }) {
       }
 
       const data = isEdit ? null : ((await res.json()) as { id: string });
-      router.push(isEdit ? `/members/${id}` : `/members/${data!.id}`);
+      router.push(isEdit ? `/people/${id}` : `/people/${data!.id}`);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error");
       setSaveStatus("error");
@@ -133,7 +133,7 @@ export function MemberFormPage({ id }: { id?: string }) {
     return (
       <div>
         <nav className="breadcrumb">
-          <Link href="/members">{l.members}</Link>
+          <Link href="/people">{l.members}</Link>
           <span className="breadcrumb-sep">›</span>
           <span>{l.loading}</span>
         </nav>
@@ -148,11 +148,11 @@ export function MemberFormPage({ id }: { id?: string }) {
   return (
     <div className="form-page">
       <nav className="breadcrumb">
-        <Link href="/members">{l.members}</Link>
+        <Link href="/people">{l.members}</Link>
         <span className="breadcrumb-sep">›</span>
         {isEdit ? (
           <>
-            <Link href={`/members/${id}`}>{form.displayName || id}</Link>
+            <Link href={`/people/${id}`}>{form.displayName || id}</Link>
             <span className="breadcrumb-sep">›</span>
           </>
         ) : null}
@@ -164,7 +164,7 @@ export function MemberFormPage({ id }: { id?: string }) {
           <h1 className="page-title">{isEdit ? l.editMember : l.newMember}</h1>
         </div>
         <div className="page-header-actions">
-          <Link className="btn-link" href={isEdit ? `/members/${id}` : "/members"}>
+          <Link className="btn-link" href={isEdit ? `/people/${id}` : "/people"}>
             <ArrowLeftIcon size={14} />{l.cancel}
           </Link>
         </div>
@@ -216,7 +216,7 @@ export function MemberFormPage({ id }: { id?: string }) {
                 <option value="facilitator">{l.roleFacilitator}</option>
                 <option value="admin">{l.roleAdmin}</option>
                 <option value="chaplain">{locale === "es" ? "Capellán" : "Chaplain"}</option>
-                <option value="member">{locale === "es" ? "Miembro" : "Member"}</option>
+                <option value="member">{l.rolePerson}</option>
               </select>
             </div>
 
@@ -237,7 +237,7 @@ export function MemberFormPage({ id }: { id?: string }) {
           </div>
 
           <div className="modal-footer">
-            <Link className="btn-link" href={isEdit ? `/members/${id}` : "/members"}>
+            <Link className="btn-link" href={isEdit ? `/people/${id}` : "/people"}>
               {l.cancel}
             </Link>
             <button className="btn btn-primary" disabled={saveStatus === "saving"} type="submit">

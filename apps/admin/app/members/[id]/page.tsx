@@ -1,6 +1,6 @@
-import { MemberDetailPage } from "../../../src/MemberDetailPage";
+import { redirect } from "next/navigation";
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <MemberDetailPage id={id} />;
+  redirect(`/people/${id}`);
 }
