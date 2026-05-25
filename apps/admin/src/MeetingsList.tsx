@@ -2,8 +2,8 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
 import { useAuth } from "./AuthContext";
 import { localizeRouteError, t } from "./adminLabels";
@@ -22,6 +22,7 @@ export type AdminMeeting = {
   id: string;
   heldAt: string;
   submittedAt: string | null;
+  facilitatorId: string;
   chaplainId: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -47,13 +48,16 @@ export function MeetingsList() {
   const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectedMeetingId = searchParams.get("meeting") ?? "";
+  const viewMode = searchParams.get("view") === "map" ? "map" : "list";
 
   const [meetings, setMeetings] = useState<AdminMeeting[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [filters, setFilters] = useState({ from: "", to: "", groupId: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [statusMsg, setStatusMsg] = useState("");
-  const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const loadedGroupsTokenRef = useRef("");
   const loadedMeetingsKeyRef = useRef("");
 
@@ -179,6 +183,31 @@ export function MeetingsList() {
     );
   }
 
+  const setRouteState = useCallback((next: { view?: "list" | "map"; meeting?: string | null }) => {
+    const params = new URLSearchParams(searchParams.toString());
+
+    if (next.view) {
+      if (next.view === "map") {
+        params.set("view", "map");
+      } else {
+        params.delete("view");
+        params.delete("meeting");
+      }
+    }
+
+    if (next.meeting !== undefined) {
+      if (next.meeting) {
+        params.set("meeting", next.meeting);
+        params.set("view", "map");
+      } else {
+        params.delete("meeting");
+      }
+    }
+
+    const queryString = params.toString();
+    router.push(queryString ? `${pathname}?${queryString}` : pathname);
+  }, [pathname, router, searchParams]);
+
   return (
     <div>
       <div className="page-header">
@@ -199,7 +228,7 @@ export function MeetingsList() {
             <div style={{ display: "flex", border: "1px solid var(--border)", borderRadius: "var(--radius)", overflow: "hidden" }}>
               <button
                 className={`btn ${viewMode === "list" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setViewMode("list")}
+                onClick={() => setRouteState({ view: "list" })}
                 style={{ borderRadius: 0, border: "none" }}
                 type="button"
               >
@@ -207,7 +236,7 @@ export function MeetingsList() {
               </button>
               <button
                 className={`btn ${viewMode === "map" ? "btn-primary" : "btn-ghost"}`}
-                onClick={() => setViewMode("map")}
+                onClick={() => setRouteState({ view: "map" })}
                 style={{ borderRadius: 0, border: "none", borderLeft: "1px solid var(--border)" }}
                 type="button"
               >
@@ -281,8 +310,12 @@ export function MeetingsList() {
         {viewMode === "map" ? (
           <div style={{ padding: "1rem" }}>
             <MeetingsMap
-              onSelect={(id) => router.push(`/meetings/${id}`)}
+              locale={locale}
               meetings={meetings}
+              onSelect={(id) => setRouteState({ meeting: id })}
+              selectedMeetingId={selectedMeetingId}
+              stewardLabel={l.loanSteward}
+              viewDetailsLabel={l.viewMeetingDetail}
             />
             {meetings.filter((s) => s.latitude != null).length === 0 && status === "done" ? (
               <p className="text-sm text-muted" style={{ marginTop: "0.75rem", textAlign: "center" }}>

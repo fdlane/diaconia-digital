@@ -1193,6 +1193,41 @@ tbody td {
   height: 2.75rem;
 }
 
+.map-popup {
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.map-popup strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.map-popup span,
+.map-popup small {
+  color: var(--ink-muted);
+}
+
+.map-popup a {
+  color: var(--brand);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.map-popup-detail-link {
+  margin-top: 0.375rem;
+}
+
+.map-popup-steward a {
+  margin-left: 0.15rem;
+}
+
+.map-popup a:hover {
+  text-decoration: underline;
+}
+
 .signin-logo {
   display: flex;
   justify-content: center;

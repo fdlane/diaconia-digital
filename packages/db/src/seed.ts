@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { createDatabase } from "./client";
+import { pathToFileURL } from "node:url";
+import { createDatabaseClient, type Database } from "./client";
 import {
   groupMemberships,
   groups,
@@ -9,8 +10,6 @@ import {
   prayerRequests,
   users,
 } from "./schema";
-
-const db = createDatabase();
 
 const adminId = "019e606b-ce98-7134-b1d1-958703c36595";
 const dewayneAdminId = "019e606b-ce9a-7217-a2af-a9729b4d1107";
@@ -29,12 +28,13 @@ function tokenHash(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-const now = new Date();
-const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14);
+export async function seedDatabase(db: Database) {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 1000 * 60 * 60 * 24 * 14);
 
-await db
-  .insert(users)
-  .values([
+  await db
+    .insert(users)
+    .values([
     {
       id: adminId,
       authProvider: "clerk",
@@ -125,12 +125,12 @@ await db
       status: "invited",
       invitedAt: now,
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(invitations)
-  .values([
+  await db
+    .insert(invitations)
+    .values([
     {
       userId: mariaId,
       phone: "+595981000001",
@@ -155,12 +155,12 @@ await db
       expiresAt,
       invitedByUserId: adminId,
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(groups)
-  .values([
+  await db
+    .insert(groups)
+    .values([
     {
       id: firstGroupId,
       name: "Grupo Mujeres Emprendedoras",
@@ -175,23 +175,23 @@ await db
       facilitatorId,
       chaplainUserId: chaplainId,
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(groupMemberships)
-  .values([
+  await db
+    .insert(groupMemberships)
+    .values([
     { groupId: firstGroupId, userId: facilitatorId },
     { groupId: firstGroupId, userId: mariaId, position: "president" },
     { groupId: firstGroupId, userId: anaId, position: "secretary" },
     { groupId: secondGroupId, userId: facilitatorId },
     { groupId: secondGroupId, userId: rosaId, position: "treasurer" },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(meetings)
-  .values([
+  await db
+    .insert(meetings)
+    .values([
     {
       id: completedMeetingId,
       groupId: firstGroupId,
@@ -219,27 +219,27 @@ await db
       chaplainUserId: chaplainId,
       scheduledStartAt: new Date("2026-06-02T14:30:00.000Z"),
       status: "scheduled",
-      latitude: "-27.3306",
-      longitude: "-55.8667",
-      locationName: "Capilla San Miguel",
-      address: "Itapua, Paraguay",
+      latitude: "-25.2712003",
+      longitude: "-57.496089",
+      locationName: "Diaconia",
+      address: "Asuncion, Paraguay",
       locationSource: "manual",
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(meetingAttendance)
-  .values([
+  await db
+    .insert(meetingAttendance)
+    .values([
     { meetingId: completedMeetingId, userId: facilitatorId, status: "present" },
     { meetingId: completedMeetingId, userId: mariaId, status: "present" },
     { meetingId: completedMeetingId, userId: anaId, status: "excused" },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-await db
-  .insert(prayerRequests)
-  .values([
+  await db
+    .insert(prayerRequests)
+    .values([
     {
       meetingId: completedMeetingId,
       request: "Orar por sabiduria en las decisiones del grupo.",
@@ -248,7 +248,18 @@ await db
       meetingId: completedMeetingId,
       request: "Orar por salud y fortaleza para las familias.",
     },
-  ])
-  .onConflictDoNothing();
+    ])
+    .onConflictDoNothing();
 
-console.log("Seeded Diaconia greenfield demo data.");
+  console.log("Seeded Diaconia greenfield demo data.");
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const { db, pool } = createDatabaseClient();
+
+  try {
+    await seedDatabase(db);
+  } finally {
+    await pool.end();
+  }
+}

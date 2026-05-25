@@ -17,6 +17,7 @@
     "db:generate": "pnpm --filter @diaconia/db db:generate",
     "db:migrate": "pnpm --filter @diaconia/db db:migrate",
     "db:seed": "pnpm --filter @diaconia/db db:seed",
+    "db:reset": "pnpm --filter @diaconia/db db:reset",
     "zero:generate": "pnpm --filter @diaconia/db zero:generate"
   },
   "devDependencies": {

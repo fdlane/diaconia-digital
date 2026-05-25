@@ -1,16 +1,34 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { formatDisplayDate, type SupportedLocale } from "@diaconia/shared";
 import type { AdminMeeting } from "./MeetingsList";
 
 type Props = {
   meetings: AdminMeeting[];
+  selectedMeetingId: string;
+  locale: SupportedLocale;
+  stewardLabel: string;
+  viewDetailsLabel: string;
   onSelect: (id: string) => void;
 };
 
-export function MeetingsMap({ meetings, onSelect }: Props) {
+export function MeetingsMap({
+  meetings,
+  selectedMeetingId,
+  locale,
+  stewardLabel,
+  viewDetailsLabel,
+  onSelect,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
+  const markersRef = useRef<Record<string, import("leaflet").Marker>>({});
+  const onSelectRef = useRef(onSelect);
+
+  useEffect(() => {
+    onSelectRef.current = onSelect;
+  }, [onSelect]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -24,6 +42,7 @@ export function MeetingsMap({ meetings, onSelect }: Props) {
         mapRef.current.remove();
         mapRef.current = null;
       }
+      markersRef.current = {};
 
       const link = document.createElement("link");
       link.rel = "stylesheet";
@@ -66,10 +85,12 @@ export function MeetingsMap({ meetings, onSelect }: Props) {
         bounds.push([lat, lng]);
 
         const marker = L.marker([lat, lng], { icon }).addTo(map);
-        marker.bindPopup(
-          `<strong>${s.groupName}</strong><br/>${s.community}<br/><small>${new Date(s.heldAt).toLocaleDateString()}</small>`,
-        );
-        marker.on("click", () => onSelect(s.id));
+        marker.bindPopup(meetingPopupHtml(s, locale, stewardLabel, viewDetailsLabel));
+        marker.on("click", () => {
+          onSelectRef.current(s.id);
+          marker.openPopup();
+        });
+        markersRef.current[s.id] = marker;
       });
 
       if (bounds.length > 0) {
@@ -84,7 +105,16 @@ export function MeetingsMap({ meetings, onSelect }: Props) {
         mapRef.current = null;
       }
     };
-  }, [meetings]);
+  }, [meetings, locale, stewardLabel, viewDetailsLabel]);
+
+  useEffect(() => {
+    if (!selectedMeetingId) return;
+    const marker = markersRef.current[selectedMeetingId];
+    if (!marker) return;
+
+    marker.openPopup();
+    mapRef.current?.panTo(marker.getLatLng());
+  }, [selectedMeetingId]);
 
   return (
     <div
@@ -98,4 +128,33 @@ export function MeetingsMap({ meetings, onSelect }: Props) {
       }}
     />
   );
+}
+
+function meetingPopupHtml(
+  meeting: AdminMeeting,
+  locale: SupportedLocale,
+  stewardLabel: string,
+  viewDetailsLabel: string,
+) {
+  return `
+    <div class="map-popup">
+      <strong>${escapeHtml(meeting.groupName)}</strong>
+      <span>${escapeHtml(meeting.community)}</span>
+      <small>${escapeHtml(formatDisplayDate(meeting.heldAt, locale))}</small>
+      <span class="map-popup-steward">
+        ${escapeHtml(stewardLabel)}:
+        <a href="/members/${encodeURIComponent(meeting.facilitatorId)}">${escapeHtml(meeting.facilitatorName)}</a>
+      </span>
+      <a class="map-popup-detail-link" href="/meetings/${encodeURIComponent(meeting.id)}">${escapeHtml(viewDetailsLabel)}</a>
+    </div>
+  `;
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }

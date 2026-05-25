@@ -134,6 +134,12 @@ export function GroupDetailPage({ id }: { id: string }) {
         <div className="page-header">
           <h1 className="page-title">{group.name}</h1>
           <p className="page-subtitle">{group.community}</p>
+          <p className="page-subtitle">
+            {l.loanSteward}:{" "}
+            <Link href={`/members/${group.facilitatorId}`} style={{ color: "var(--brand)", fontWeight: 600 }}>
+              {group.facilitatorName}
+            </Link>
+          </p>
         </div>
         <div className="page-header-actions">
           {deleteState === "confirming" ? (
