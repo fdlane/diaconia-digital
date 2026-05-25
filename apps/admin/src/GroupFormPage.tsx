@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
 import { ArrowLeftIcon } from "./icons";
@@ -38,8 +38,12 @@ export function GroupFormPage({ id }: { id?: string }) {
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const loadedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    const loadKey = id ?? "new";
+    if (loadedKeyRef.current === loadKey) return;
+    loadedKeyRef.current = loadKey;
     void loadData();
   }, [id, token]);
 

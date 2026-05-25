@@ -27,11 +27,11 @@ export function GroupsListPage() {
   const [groups, setGroups] = useState<GroupRow[]>([]);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
-  const loadedTokenRef = useRef("");
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!isLoaded || !token || loadedTokenRef.current === token) return;
-    loadedTokenRef.current = token;
+    if (!isLoaded || !token || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     void load();
   }, [isLoaded, token]);
 

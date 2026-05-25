@@ -42,8 +42,8 @@ export function MeetingsList() {
   const [filters, setFilters] = useState({ from: "", to: "", groupId: "" });
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [statusMsg, setStatusMsg] = useState("");
-  const loadedGroupsTokenRef = useRef("");
-  const loadedMeetingsKeyRef = useRef("");
+  const hasLoadedGroupsRef = useRef(false);
+  const loadedMeetingsKeyRef = useRef<string | null>(null);
 
   const query = useMemo(() => {
     const params = new URLSearchParams();
@@ -54,14 +54,14 @@ export function MeetingsList() {
   }, [filters]);
 
   useEffect(() => {
-    if (!isLoaded || !token || loadedGroupsTokenRef.current === token) return;
-    loadedGroupsTokenRef.current = token;
+    if (!isLoaded || !token || hasLoadedGroupsRef.current) return;
+    hasLoadedGroupsRef.current = true;
     void loadGroups();
   }, [isLoaded, token]);
 
   useEffect(() => {
     if (!isLoaded || !token) return;
-    const requestKey = `${token}:${query}`;
+    const requestKey = query;
     if (loadedMeetingsKeyRef.current === requestKey) return;
     loadedMeetingsKeyRef.current = requestKey;
     void loadMeetings();

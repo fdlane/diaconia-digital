@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/nextjs";
 import type { Role, SupportedLocale, UserStatus } from "@diaconia/shared";
 
@@ -110,6 +110,7 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<SupportedLocale>("es");
   const [isLoaded, setIsLoaded] = useState(false);
   const [accessError, setAccessError] = useState("");
+  const hasLoadedSessionRef = useRef(false);
 
   useEffect(() => {
     const storedLocale = window.localStorage.getItem(LOCALE_KEY);
@@ -119,11 +120,16 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshSession = useCallback(async () => {
+    function markLoaded() {
+      hasLoadedSessionRef.current = true;
+      setIsLoaded(true);
+    }
+
     if (devBypass) {
       setTokenState("");
       setCurrentUser(defaultProfile);
       setAccessError("");
-      setIsLoaded(true);
+      markLoaded();
       return;
     }
 
@@ -133,17 +139,19 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
       setTokenState("");
       setCurrentUser(null);
       setAccessError("");
-      setIsLoaded(true);
+      markLoaded();
       return;
     }
 
-    setIsLoaded(false);
+    if (!hasLoadedSessionRef.current) {
+      setIsLoaded(false);
+    }
     const nextToken = await getClerkToken({ template: jwtTemplate });
     if (!nextToken) {
       setTokenState("");
       setCurrentUser(null);
       setAccessError("JWT_TEMPLATE_ERROR");
-      setIsLoaded(true);
+      markLoaded();
       return;
     }
 
@@ -156,7 +164,7 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
       const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
       setCurrentUser(null);
       setAccessError(payload?.code ?? payload?.error ?? "INVITE_REQUIRED");
-      setIsLoaded(true);
+      markLoaded();
       return;
     }
 
@@ -164,7 +172,7 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
     if (payload.user.role !== "admin") {
       setCurrentUser(null);
       setAccessError("ADMIN_REQUIRED");
-      setIsLoaded(true);
+      markLoaded();
       return;
     }
 
@@ -178,13 +186,14 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
       status: payload.user.status,
     });
     setAccessError("");
-    setIsLoaded(true);
+    markLoaded();
   }, [clerkLoaded, clerkSignedIn, getClerkToken, clerkUser?.imageUrl, clerkUser?.primaryEmailAddress?.emailAddress]);
 
   useEffect(() => {
     void refreshSession().catch((error) => {
       setAccessError(error instanceof Error ? error.message : "SESSION_LOAD_FAILED");
       setCurrentUser(null);
+      hasLoadedSessionRef.current = true;
       setIsLoaded(true);
     });
   }, [refreshSession]);
