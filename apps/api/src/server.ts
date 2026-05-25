@@ -88,15 +88,20 @@ async function getActor(c: ApiContext): Promise<DbUser | null> {
 
   if (bySubject) return bySubject;
 
-  if (!authUser.phone) return null;
+  if (!authUser.phone && !authUser.email) return null;
 
-  const authUserPhoneDigits = authUser.phone.replace(/\D/g, "");
+  const authUserPhoneDigits = authUser.phone?.replace(/\D/g, "") ?? "";
   const [invited] = await db
     .select()
     .from(users)
     .where(
       and(
-        sql`regexp_replace(${users.phone}, '[^0-9]', '', 'g') = ${authUserPhoneDigits}`,
+        or(
+          authUserPhoneDigits
+            ? sql`regexp_replace(${users.phone}, '[^0-9]', '', 'g') = ${authUserPhoneDigits}`
+            : undefined,
+          authUser.email ? sql`lower(${users.email}) = ${authUser.email}` : undefined,
+        ),
         inArray(users.status, ["invited", "active"]),
       ),
     )
@@ -140,7 +145,14 @@ async function requireActor(c: ApiContext) {
           error: "Invited active user required",
           code: "INVITE_REQUIRED",
           ...(process.env.NODE_ENV !== "production"
-            ? { details: { hasPhoneClaim: Boolean(authUser.phone), phone: authUser.phone } }
+            ? {
+                details: {
+                  email: authUser.email,
+                  hasEmailClaim: Boolean(authUser.email),
+                  hasPhoneClaim: Boolean(authUser.phone),
+                  phone: authUser.phone,
+                },
+              }
             : {}),
         },
         403,

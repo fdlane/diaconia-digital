@@ -305,8 +305,20 @@ function getClerkErrorCode(error: unknown) {
 }
 
 function localizeAccessError(error: string, labels: ReturnType<typeof t>) {
-  if (/invited active user required/i.test(error) || /invite_required/i.test(error)) {
+  if (/invited active user required/i.test(error) || /invite_required/i.test(error) || /no tiene acceso a diaconia admin/i.test(error)) {
     return labels.authInviteRequired;
+  }
+  if (/admin role required/i.test(error) || /admin_required/i.test(error) || /rol de administrador/i.test(error)) {
+    return labels.authAdminRequired;
+  }
+  if (/clerk_config_missing/i.test(error) || /NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/i.test(error)) {
+    return labels.authMissingClerkConfig;
+  }
+  if (/jwt_template_error/i.test(error) || /plantilla JWT/i.test(error)) {
+    return labels.authTokenTemplateError;
+  }
+  if (/session_load_failed/i.test(error) || /cargar la sesi[oó]n/i.test(error)) {
+    return labels.authSessionLoadFailed;
   }
   if (/already signed in/i.test(error)) {
     return labels.authAlreadySignedIn;

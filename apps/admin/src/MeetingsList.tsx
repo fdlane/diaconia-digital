@@ -8,6 +8,8 @@ import { formatDisplayDate } from "@diaconia/shared";
 import { useAuth } from "./AuthContext";
 import { localizeRouteError, t } from "./adminLabels";
 import { ChevronRightIcon, DownloadIcon, FilterIcon, PlusIcon } from "./icons";
+import { defaultSelectedMapZoom, parseMapZoom } from "./mapUrlState";
+import type { AdminMeeting } from "./meetingTypes";
 
 const MeetingsMap = dynamic(() => import("./MeetingsMap").then((m) => ({ default: m.MeetingsMap })), {
   ssr: false,
@@ -17,25 +19,6 @@ const MeetingsMap = dynamic(() => import("./MeetingsMap").then((m) => ({ default
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type Group = { id: string; name: string; community: string };
-
-export type AdminMeeting = {
-  id: string;
-  heldAt: string;
-  submittedAt: string | null;
-  facilitatorId: string;
-  chaplainId: string | null;
-  latitude: number | null;
-  longitude: number | null;
-  groupName: string;
-  community: string;
-  facilitatorName: string;
-  notes: string;
-  followUpCategory: string;
-  followUpNotes: string;
-  mediaCount?: number;
-  prayerRequestCount?: number;
-  openPrayerRequestCount?: number;
-};
 
 type MeetingMedia = { id: string; type: string; url: string };
 type PrayerRequest = {
@@ -51,6 +34,7 @@ export function MeetingsList() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectedMeetingId = searchParams.get("meeting") ?? "";
+  const selectedMapZoom = parseMapZoom(searchParams.get("zoom"));
   const viewMode = searchParams.get("view") === "map" ? "map" : "list";
 
   const [meetings, setMeetings] = useState<AdminMeeting[]>([]);
@@ -183,7 +167,7 @@ export function MeetingsList() {
     );
   }
 
-  const setRouteState = useCallback((next: { view?: "list" | "map"; meeting?: string | null }) => {
+  const setRouteState = useCallback((next: { view?: "list" | "map"; meeting?: string | null; zoom?: number | null }) => {
     const params = new URLSearchParams(searchParams.toString());
 
     if (next.view) {
@@ -192,6 +176,7 @@ export function MeetingsList() {
       } else {
         params.delete("view");
         params.delete("meeting");
+        params.delete("zoom");
       }
     }
 
@@ -199,14 +184,34 @@ export function MeetingsList() {
       if (next.meeting) {
         params.set("meeting", next.meeting);
         params.set("view", "map");
+        params.set("zoom", String(next.zoom ?? selectedMapZoom ?? defaultSelectedMapZoom));
       } else {
         params.delete("meeting");
+        params.delete("zoom");
+      }
+    }
+
+    if (next.zoom !== undefined) {
+      if (next.zoom) {
+        params.set("zoom", String(next.zoom));
+      } else {
+        params.delete("zoom");
       }
     }
 
     const queryString = params.toString();
     router.push(queryString ? `${pathname}?${queryString}` : pathname);
   }, [pathname, router, searchParams]);
+
+  const setMapZoom = useCallback((zoom: number) => {
+    if (selectedMapZoom === zoom) return;
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("view", "map");
+    params.set("zoom", String(zoom));
+
+    router.replace(`${pathname}?${params.toString()}`);
+  }, [pathname, router, searchParams, selectedMapZoom]);
 
   return (
     <div>
@@ -310,11 +315,15 @@ export function MeetingsList() {
         {viewMode === "map" ? (
           <div style={{ padding: "1rem" }}>
             <MeetingsMap
+              height="max(28rem, calc(100dvh - var(--appbar-height) - 22rem))"
               locale={locale}
               meetings={meetings}
-              onSelect={(id) => setRouteState({ meeting: id })}
+              onSelect={(id) => setRouteState({ meeting: id, zoom: selectedMapZoom ?? defaultSelectedMapZoom })}
+              onZoomChange={setMapZoom}
               selectedMeetingId={selectedMeetingId}
+              selectedZoom={selectedMapZoom}
               stewardLabel={l.loanSteward}
+              unavailableLabel={l.mapUnavailable}
               viewDetailsLabel={l.viewMeetingDetail}
             />
             {meetings.filter((s) => s.latitude != null).length === 0 && status === "done" ? (

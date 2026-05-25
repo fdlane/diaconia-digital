@@ -18,6 +18,7 @@ export type ApiConfig = {
   clerkAuthorizedParties: string[];
   authDevBypass: boolean;
   authDevSubject: string;
+  authDevEmail: string | null;
   authDevPhone: string;
   allowedOrigins: string[];
 };
@@ -37,6 +38,7 @@ export function loadConfig(env = process.env): ApiConfig {
       .filter(Boolean),
     authDevBypass: env.AUTH_DEV_BYPASS === "true" && env.NODE_ENV !== "production",
     authDevSubject: env.AUTH_DEV_SUBJECT ?? "local-dev-user",
+    authDevEmail: env.AUTH_DEV_EMAIL?.trim().toLowerCase() || null,
     authDevPhone: env.AUTH_DEV_PHONE ?? "+595000000000",
     allowedOrigins: (
       env.ALLOWED_ORIGINS ?? "http://localhost:3000,http://localhost:8081,http://localhost:19006"

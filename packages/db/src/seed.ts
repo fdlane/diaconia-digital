@@ -24,6 +24,99 @@ const secondGroupId = "019e606b-ce9a-7217-a2af-cd113443806a";
 const completedMeetingId = "019e606b-ce9a-7217-a2af-d099fc127b08";
 const scheduledMeetingId = "019e606b-ce9a-7217-a2af-d54756e0158f";
 
+const meetingsNearAsuAirport = [
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000001",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-04T14:30:00.000Z"),
+    latitude: "-25.2670000",
+    longitude: "-57.4870000",
+    locationName: "Luque Centro",
+    address: "Luque, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000002",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-06T14:30:00.000Z"),
+    latitude: "-25.2738000",
+    longitude: "-57.5300000",
+    locationName: "Parque Nu Guasu",
+    address: "Luque, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000003",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-09T14:30:00.000Z"),
+    latitude: "-25.1675000",
+    longitude: "-57.5525000",
+    locationName: "Mariano Roque Alonso",
+    address: "Mariano Roque Alonso, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000004",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-11T14:30:00.000Z"),
+    latitude: "-25.1688000",
+    longitude: "-57.4778000",
+    locationName: "Limpio",
+    address: "Limpio, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000005",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-13T14:30:00.000Z"),
+    latitude: "-25.3397000",
+    longitude: "-57.5089000",
+    locationName: "San Lorenzo",
+    address: "San Lorenzo, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000006",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-16T14:30:00.000Z"),
+    latitude: "-25.3196000",
+    longitude: "-57.5434000",
+    locationName: "Fernando de la Mora",
+    address: "Fernando de la Mora, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000007",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-18T14:30:00.000Z"),
+    latitude: "-25.3550000",
+    longitude: "-57.4458000",
+    locationName: "Capiata",
+    address: "Capiata, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000008",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-20T14:30:00.000Z"),
+    latitude: "-25.3120000",
+    longitude: "-57.3849000",
+    locationName: "Aregua",
+    address: "Aregua, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000009",
+    groupId: firstGroupId,
+    scheduledStartAt: new Date("2026-06-23T14:30:00.000Z"),
+    latitude: "-25.3466000",
+    longitude: "-57.6065000",
+    locationName: "Lambare",
+    address: "Lambare, Paraguay",
+  },
+  {
+    id: "019e606b-ce9b-7000-a2af-010000000010",
+    groupId: secondGroupId,
+    scheduledStartAt: new Date("2026-06-25T14:30:00.000Z"),
+    latitude: "-25.3726000",
+    longitude: "-57.5908000",
+    locationName: "Villa Elisa",
+    address: "Villa Elisa, Paraguay",
+  },
+];
+
 function tokenHash(value: string) {
   return createHash("sha256").update(value).digest("hex");
 }
@@ -225,6 +318,13 @@ export async function seedDatabase(db: Database) {
       address: "Asuncion, Paraguay",
       locationSource: "manual",
     },
+    ...meetingsNearAsuAirport.map((meeting) => ({
+      ...meeting,
+      facilitatorId,
+      chaplainUserId: chaplainId,
+      status: "scheduled" as const,
+      locationSource: "manual" as const,
+    })),
     ])
     .onConflictDoNothing();
 

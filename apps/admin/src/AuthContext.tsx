@@ -83,7 +83,7 @@ function DevAuthProvider({ children }: { children: ReactNode }) {
       token: "",
       currentUser,
       isLoaded: true,
-      accessError: devBypass ? "" : "Falta configurar NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY.",
+      accessError: devBypass ? "" : "CLERK_CONFIG_MISSING",
       locale,
       setToken: () => undefined,
       setLocale,
@@ -142,7 +142,7 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
     if (!nextToken) {
       setTokenState("");
       setCurrentUser(null);
-      setAccessError("No se pudo crear un token de sesion. Verifique la plantilla JWT de Clerk.");
+      setAccessError("JWT_TEMPLATE_ERROR");
       setIsLoaded(true);
       return;
     }
@@ -155,7 +155,7 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
       setCurrentUser(null);
-      setAccessError(payload?.error ?? "Este usuario no tiene acceso a Diaconia Admin.");
+      setAccessError(payload?.code ?? payload?.error ?? "INVITE_REQUIRED");
       setIsLoaded(true);
       return;
     }
@@ -163,7 +163,7 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
     const payload = (await response.json()) as MeResponse;
     if (payload.user.role !== "admin") {
       setCurrentUser(null);
-      setAccessError("Se requiere rol de administrador.");
+      setAccessError("ADMIN_REQUIRED");
       setIsLoaded(true);
       return;
     }
@@ -183,7 +183,7 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshSession().catch((error) => {
-      setAccessError(error instanceof Error ? error.message : "No se pudo cargar la sesion.");
+      setAccessError(error instanceof Error ? error.message : "SESSION_LOAD_FAILED");
       setCurrentUser(null);
       setIsLoaded(true);
     });

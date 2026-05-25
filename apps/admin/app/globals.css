@@ -367,6 +367,13 @@ a {
 
 /* ─── Stat Cards ─────────────────────────────────────── */
 
+.dashboard-page {
+  --dashboard-map-height: max(20rem, calc(100dvh - var(--appbar-height) - 17rem));
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--appbar-height) - 4rem);
+}
+
 .stat-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -434,6 +441,41 @@ a {
   margin-top: 0.2rem;
 }
 
+.dashboard-stat-cards {
+  gap: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-stat-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.75rem;
+  row-gap: 0.1rem;
+  align-items: center;
+  padding: 0.875rem 1rem;
+}
+
+.dashboard-stat-card .stat-card-icon {
+  grid-row: 1 / 4;
+  width: 2rem;
+  height: 2rem;
+  margin-bottom: 0;
+}
+
+.dashboard-stat-card .stat-card-value {
+  font-size: 1.5rem;
+  margin-bottom: 0;
+}
+
+.dashboard-stat-card .stat-card-label {
+  font-size: 0.8125rem;
+}
+
+.dashboard-stat-card .stat-card-desc {
+  font-size: 0.75rem;
+  margin-top: 0;
+}
+
 .dashboard-loading {
   display: inline-flex;
   align-items: center;
@@ -441,6 +483,24 @@ a {
   margin-bottom: 1rem;
   color: var(--ink-muted);
   font-size: 0.875rem;
+}
+
+.dashboard-map-card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 28rem;
+}
+
+.dashboard-map-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.dashboard-map-body > * {
+  flex: 1;
+  min-height: 0;
 }
 
 /* ─── Card ───────────────────────────────────────────── */
@@ -1363,6 +1423,10 @@ tbody td {
 /* ─── Responsive ─────────────────────────────────────── */
 
 @media (max-width: 768px) {
+  .dashboard-page {
+    --dashboard-map-height: max(18rem, calc(100dvh - var(--appbar-height) - 15rem));
+  }
+
   .main-content {
     padding: 1.25rem;
   }
@@ -1408,6 +1472,18 @@ tbody td {
 
   .form-field input {
     width: 100%;
+  }
+}
+
+@media (max-height: 720px) {
+  .dashboard-page {
+    --dashboard-map-height: max(14rem, calc(100dvh - var(--appbar-height) - 14rem));
+  }
+}
+
+@media (max-height: 560px) {
+  .dashboard-page {
+    --dashboard-map-height: max(11rem, calc(100dvh - var(--appbar-height) - 12rem));
   }
 }
 

@@ -21,6 +21,7 @@ function config(overrides: Partial<ApiConfig> = {}): ApiConfig {
     clerkAuthorizedParties: ["http://localhost:3000"],
     authDevBypass: false,
     authDevSubject: "local-dev-user",
+    authDevEmail: null,
     authDevPhone: "+595000000000",
     allowedOrigins: ["http://localhost:3000"],
     ...overrides,
@@ -52,6 +53,7 @@ describe("authMiddleware", () => {
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
       sub: "local-dev-user",
+      email: null,
       phone: "+595000000000",
     });
   });
@@ -66,7 +68,11 @@ describe("authMiddleware", () => {
   });
 
   it("verifies Clerk JWTs with the configured audience and authorized parties", async () => {
-    verifyToken.mockResolvedValue({ sub: "user_123", phone_number: "0981000000" });
+    verifyToken.mockResolvedValue({
+      sub: "user_123",
+      email: "ADMIN@DIACONIA.LOCAL",
+      phone_number: "0981000000",
+    });
 
     const response = await appWithAuth().request("/protected", {
       headers: { authorization: "Bearer token" },
@@ -81,6 +87,7 @@ describe("authMiddleware", () => {
     });
     await expect(response.json()).resolves.toEqual({
       sub: "user_123",
+      email: "admin@diaconia.local",
       phone: "+595981000000",
     });
   });

@@ -5,6 +5,7 @@ import type { ApiConfig } from "./config.js";
 
 export type AuthUser = {
   sub: string;
+  email: string | null;
   phone: string | null;
 };
 
@@ -16,6 +17,9 @@ export type AppBindings = {
 
 type IdentityJwtPayload = {
   sub?: unknown;
+  email?: unknown;
+  email_address?: unknown;
+  primary_email_address?: unknown;
   phone_number?: unknown;
 };
 
@@ -42,6 +46,16 @@ function normalizeClaimPhone(value: unknown) {
   }
 }
 
+function normalizeClaimEmail(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value !== "string") continue;
+    const normalized = value.trim().toLowerCase();
+    if (normalized.includes("@")) return normalized;
+  }
+
+  return null;
+}
+
 export function authMiddleware(config: ApiConfig): MiddlewareHandler<AppBindings> {
   return async (c, next) => {
     const token = bearerToken(c.req.header("authorization"));
@@ -49,6 +63,7 @@ export function authMiddleware(config: ApiConfig): MiddlewareHandler<AppBindings
     if (config.authDevBypass) {
       c.set("authUser", {
         sub: config.authDevSubject,
+        email: config.authDevEmail,
         phone: config.authDevPhone,
       });
       await next();
@@ -77,6 +92,7 @@ export function authMiddleware(config: ApiConfig): MiddlewareHandler<AppBindings
 
       c.set("authUser", {
         sub: payload.sub,
+        email: normalizeClaimEmail(payload.email, payload.email_address, payload.primary_email_address),
         phone: normalizeClaimPhone(payload.phone_number),
       });
       await next();
