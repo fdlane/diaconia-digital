@@ -9,63 +9,109 @@ jobs:
     if: github.event.requested_reviewer.login == 'fdlane-codewrite'
     runs-on: ubuntu-latest
     steps:
-      - name: Build signed Hermes webhook payload
-        id: payload
+      - name: Validate Slack configuration
         env:
-          ACTION: ${{ github.event.action }}
+          SLACK_BOT_TOKEN: ${{ secrets.FDLANE_SLACK_BOT_TOKEN }}
+        run: |
+          if [[ -z "$SLACK_BOT_TOKEN" ]]; then
+            echo "::error::Missing FDLANE_SLACK_BOT_TOKEN secret. Add a Slack bot token for the fdlane workspace as a repository or organization Actions secret, and make sure it is available to this repository."
+            exit 1
+          fi
+
+      - name: Build Slack message payload
+        env:
           AUTHOR: ${{ github.event.pull_request.user.login }}
           BASE_REF: ${{ github.event.pull_request.base.ref }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HERMES_SLACK_BOT_USER_ID: ${{ secrets.HERMES_SLACK_BOT_USER_ID }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           REPOSITORY: ${{ github.repository }}
-          REQUESTED_REVIEWER: ${{ github.event.requested_reviewer.login }}
-          WEBHOOK_SECRET: ${{ secrets.HERMES_CODEWRITE_WEBHOOK_SECRET }}
+          SLACK_CHANNEL_ID: D0B3KUUAUGZ
         run: |
           python - <<'PY'
-          import hashlib
-          import hmac
           import json
           import os
           from pathlib import Path
 
+          hermes_bot_user_id = os.environ.get("HERMES_SLACK_BOT_USER_ID", "").strip()
+          hermes_mention = f"<@{hermes_bot_user_id}>" if hermes_bot_user_id else "@hermes"
+          pr_label = f"{os.environ['REPOSITORY']}#{os.environ['PR_NUMBER']}"
+
           payload = {
-              "event": "pull_request",
-              "action": os.environ["ACTION"],
-              "repository": os.environ["REPOSITORY"],
-              "pull_request": {
-                  "number": int(os.environ["PR_NUMBER"]),
-                  "html_url": os.environ["PR_URL"],
-                  "title": os.environ["PR_TITLE"],
-                  "user": {"login": os.environ["AUTHOR"]},
-                  "head": {
-                      "ref": os.environ["HEAD_REF"],
-                      "sha": os.environ["HEAD_SHA"],
+              "channel": os.environ["SLACK_CHANNEL_ID"],
+              "text": (
+                  f"{hermes_mention} review requested for "
+                  f"<{os.environ['PR_URL']}|{pr_label}>: {os.environ['PR_TITLE']}"
+              ),
+              "link_names": True,
+              "unfurl_links": False,
+              "unfurl_media": False,
+              "blocks": [
+                  {
+                      "type": "section",
+                      "text": {
+                          "type": "mrkdwn",
+                          "text": (
+                              f"{hermes_mention} review requested for "
+                              f"<{os.environ['PR_URL']}|{pr_label}>"
+                          ),
+                      },
                   },
-                  "base": {"ref": os.environ["BASE_REF"]},
-              },
-              "requested_reviewer": {"login": os.environ["REQUESTED_REVIEWER"]},
+                  {
+                      "type": "section",
+                      "fields": [
+                          {
+                              "type": "mrkdwn",
+                              "text": f"*Title:*\n{os.environ['PR_TITLE']}",
+                          },
+                          {
+                              "type": "mrkdwn",
+                              "text": f"*Author:*\n{os.environ['AUTHOR']}",
+                          },
+                          {
+                              "type": "mrkdwn",
+                              "text": (
+                                  f"*Branch:*\n{os.environ['HEAD_REF']} -> "
+                                  f"{os.environ['BASE_REF']}"
+                              ),
+                          },
+                          {
+                              "type": "mrkdwn",
+                              "text": f"*Head SHA:*\n`{os.environ['HEAD_SHA']}`",
+                          },
+                      ],
+                  },
+              ],
           }
 
-          body = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode()
-          secret = os.environ["WEBHOOK_SECRET"].encode()
-          signature = "sha256=" + hmac.new(secret, body, hashlib.sha256).hexdigest()
-
-          Path("payload.json").write_bytes(body)
-          with Path(os.environ["GITHUB_OUTPUT"]).open("a", encoding="utf-8") as out:
-              out.write(f"signature={signature}\n")
+          Path("slack-payload.json").write_text(
+              json.dumps(payload, separators=(",", ":"), ensure_ascii=False),
+              encoding="utf-8",
+          )
           PY
 
-      - name: Trigger Hermes reviewer
+      - name: Send Slack review request
         env:
-          HERMES_WEBHOOK_URL: ${{ secrets.HERMES_CODEWRITE_WEBHOOK_URL }}
-          SIGNATURE: ${{ steps.payload.outputs.signature }}
+          SLACK_BOT_TOKEN: ${{ secrets.FDLANE_SLACK_BOT_TOKEN }}
         run: |
           curl --fail --show-error --silent \
-            --request POST "$HERMES_WEBHOOK_URL" \
+            --request POST "https://slack.com/api/chat.postMessage" \
+            --header "Authorization: Bearer $SLACK_BOT_TOKEN" \
             --header "Content-Type: application/json" \
-            --header "X-GitHub-Event: pull_request" \
-            --header "X-Hub-Signature-256: $SIGNATURE" \
-            --data-binary @payload.json
+            --data-binary @slack-payload.json \
+            --output slack-response.json
+
+          python - <<'PY'
+          import json
+          import sys
+
+          with open("slack-response.json", encoding="utf-8") as response_file:
+              response = json.load(response_file)
+
+          if not response.get("ok"):
+              print(f"::error::Slack API returned error: {response.get('error', 'unknown_error')}")
+              sys.exit(1)
+          PY
