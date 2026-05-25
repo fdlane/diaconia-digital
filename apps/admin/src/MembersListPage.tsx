@@ -115,7 +115,7 @@ export function MembersListPage() {
               {members.map((m) => (
                 <tr
                   className="row-link"
-                  key={m.id}
+                  key={`${m.id}:${m.groupId ?? "unassigned"}`}
                   onClick={() => router.push(`/members/${m.id}`)}
                 >
                   <td>

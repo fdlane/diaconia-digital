@@ -18,6 +18,72 @@ jobs:
             exit 1
           fi
 
+      - name: Resolve Slack destination
+        env:
+          DEFAULT_FDLANE_SLACK_CHANNEL_ID: C0B6U1J2124
+          FDLANE_SLACK_CHANNEL_ID: ${{ vars.FDLANE_SLACK_CHANNEL_ID }}
+          FDLANE_SLACK_CHANNEL_ID_SECRET: ${{ secrets.FDLANE_SLACK_CHANNEL_ID }}
+          HERMES_SLACK_BOT_USER_ID: ${{ secrets.HERMES_SLACK_BOT_USER_ID }}
+          SLACK_BOT_TOKEN: ${{ secrets.FDLANE_SLACK_BOT_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import sys
+          import urllib.error
+          import urllib.request
+
+          default_channel_id = os.environ.get("DEFAULT_FDLANE_SLACK_CHANNEL_ID", "").strip()
+          configured_channel_id = os.environ.get("FDLANE_SLACK_CHANNEL_ID", "").strip()
+          configured_channel_id_secret = os.environ.get("FDLANE_SLACK_CHANNEL_ID_SECRET", "").strip()
+          configured_channel_id = configured_channel_id or configured_channel_id_secret or default_channel_id
+          hermes_bot_user_id = os.environ.get("HERMES_SLACK_BOT_USER_ID", "").strip()
+          slack_bot_token = os.environ["SLACK_BOT_TOKEN"]
+
+          if configured_channel_id:
+              slack_channel_id = configured_channel_id
+          elif hermes_bot_user_id:
+              request = urllib.request.Request(
+                  "https://slack.com/api/conversations.open",
+                  data=json.dumps({"users": hermes_bot_user_id}).encode("utf-8"),
+                  headers={
+                      "Authorization": f"Bearer {slack_bot_token}",
+                      "Content-Type": "application/json",
+                  },
+                  method="POST",
+              )
+
+              try:
+                  with urllib.request.urlopen(request) as response:
+                      slack_response = json.load(response)
+              except urllib.error.URLError as error:
+                  print(f"::error::Unable to open Slack conversation: {error}")
+                  sys.exit(1)
+
+              if not slack_response.get("ok"):
+                  error = slack_response.get("error", "unknown_error")
+                  print(
+                      "::error::Slack conversations.open returned error: "
+                      f"{error}. Set FDLANE_SLACK_CHANNEL_ID to a channel ID "
+                      "visible to FDLANE_SLACK_BOT_TOKEN, or verify "
+                      "HERMES_SLACK_BOT_USER_ID belongs to the same Slack workspace."
+                  )
+                  sys.exit(1)
+
+              slack_channel_id = slack_response["channel"]["id"]
+          else:
+              print(
+                  "::error::Missing Slack destination. Set the "
+                  "FDLANE_SLACK_CHANNEL_ID repository or organization variable "
+                  "or secret to a Slack channel ID, or set HERMES_SLACK_BOT_USER_ID so "
+                  "the workflow can open a DM."
+              )
+              sys.exit(1)
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as github_env:
+              github_env.write(f"SLACK_CHANNEL_ID={slack_channel_id}\n")
+          PY
+
       - name: Build Slack message payload
         env:
           AUTHOR: ${{ github.event.pull_request.user.login }}
@@ -29,7 +95,6 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_URL: ${{ github.event.pull_request.html_url }}
           REPOSITORY: ${{ github.repository }}
-          SLACK_CHANNEL_ID: D0B3KUUAUGZ
         run: |
           python - <<'PY'
           import json
@@ -112,6 +177,14 @@ jobs:
               response = json.load(response_file)
 
           if not response.get("ok"):
-              print(f"::error::Slack API returned error: {response.get('error', 'unknown_error')}")
+              error = response.get("error", "unknown_error")
+              hint = ""
+              if error == "channel_not_found":
+                  hint = (
+                      " Verify FDLANE_SLACK_CHANNEL_ID is visible to "
+                      "FDLANE_SLACK_BOT_TOKEN and invite the Slack app to "
+                      "private channels."
+                  )
+              print(f"::error::Slack API returned error: {error}.{hint}")
               sys.exit(1)
           PY
