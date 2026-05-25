@@ -108,7 +108,7 @@ The ecosystem is composed of four major functional blocks, all of them covered b
 •	Education engine (LMS) compatible with SCORM and xAPI, with progressive download and offline visualization.
 •	Talent Mining: software oracle that validates educational progress and triggers DIACOIN minting.
 •	In-app AI counseling: a proprietary AI assistant available 24/7 that offers conversational financial, educational and well-being guidance to clients, with safe-fallback rules and human-handoff triggers.
-•	Online scheduling and video counseling: when the AI determines that human attention is needed — or when the client requests it — the app allows booking an appointment online and holds the session with a human counselor via video (WebRTC) directly inside the app.
+•	Online scheduling and video counseling: when the AI determines that human attention is needed — or when the client requests it — the app allows booking an appointment online and holds the consultation with a human counselor via video (WebRTC) directly inside the app.
 •	Virtual counseling through WebRTC with codecs optimized for low bandwidth (AV1 / H.265), with audio-only fallback on weak networks.
 •	Self-Sovereign Identity (SSI) with verifiable credentials registered on the blockchain.
 •	Gamification based on levels, badges and redeemable “Talents”.
@@ -165,7 +165,7 @@ RF-M-05	Self-Sovereign Identity: issuance, presentation and revocation of verifi
 RF-M-06	Gamification: levels, badges, group ranking and seasonal challenges.	High
 RF-M-07	B2B2C Marketplace: partner merchants and DIACOIN redemption.	High
 RF-M-08	In-app AI counseling: proprietary conversational assistant for financial, educational and well-being guidance, with safe-fallback rules, content guardrails and automatic human-handoff triggers.	Critical
-RF-M-09	Online appointment scheduling with human counselors and in-app video session (WebRTC), including reminders, calendar synchronization and rescheduling/cancellation flow.	Critical
+RF-M-09	Online appointment scheduling with human counselors and in-app video consultation (WebRTC), including reminders, calendar synchronization and rescheduling/cancellation flow.	Critical
 RF-M-10	Diaconía Legacy: tokenized referral program that rewards clients with DIACOIN, credit-history boost, preferential rates or special loans for bringing children, family members or friends into the ecosystem, with on-chain verification of the referral’s onboarding and activity, plus a configurable rules engine.	High
 5.3. Non-functional requirements (cross-cutting)
 Attribute	Objective	Metric
@@ -187,7 +187,7 @@ Accessibility	Real inclusion.	WCAG 2.1 AA verified · 100% Spanish/English suppo
 •	BLE/Wi-Fi Direct mesh synchronization with cryptographic verification between devices to validate payments without cellular coverage.
 6.2. Tokenomics and Smart Contracts
 •	DIACOIN is a non-speculative utility token. It is not offered, traded or transferred outside the authorized ecosystem.
-•	Mint: triggered by oracles when the client completes modules in Moirũ or attends counseling sessions.
+•	Mint: triggered by oracles when the client completes modules in Moirũ or attends counseling appointments.
 •	Burn: triggered when the client redeems DIACOIN for benefits (e.g. a 1% monthly interest-rate reduction).
 •	Group guarantee contracts: Smart Contracts block disbursement until 100% of the digital signatures are recorded on the blockchain.
 •	On-chain audit: every status change of the loan and of the SSI credentials is recorded immutably.
@@ -249,7 +249,7 @@ F6 — Stabilization and support	M13–M18	Operational warranty, improvements, o
 Every provider must submit its quotation following the structure described below. The objective is to ensure real comparability between proposals and traceability of every cost component. Prices must be presented in Guaranis (PYG) and, optionally, in USD at a reference exchange rate.
 10.1. Implementation costs (CAPEX)
 Component	Expected description	Unit
-Discovery and architecture	Inception sessions, detailed architecture, prioritized backlog, master plan.	Lump sum
+Discovery and architecture	Inception workshops, detailed architecture, prioritized backlog, master plan.	Lump sum
 Diaconía App development	Mobile front-end, financial integrations, offline module.	Per milestone
 Moirũ App development	LMS, counseling, gamification, SSI.	Per milestone
 Backend microservices	Wallet, Credit, Sync, Notifications, BI, Risk, Audit.	Per milestone
@@ -318,7 +318,7 @@ Sev 4 — Low	Minor improvements and documentation.	≤ 1 business day	Scheduled
 12.5. Knowledge transfer
 •	Formal training to Diaconía’s internal IT team throughout the project life and at closing.
 •	Living documentation (in repository) and complete operational manuals as a condition of final acceptance.
-•	Pair-programming sessions and architectural reviews with the Client’s engineers.
+•	Pair-programming workshops and architectural reviews with the Client’s engineers.
 12.6. Compliance, audit and security
 •	Right of the Client to audit the provider’s security practices, code and processes with reasonable prior notice.
 •	Mandatory reporting of security incidents within 24 hours of detection.

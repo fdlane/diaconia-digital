@@ -3,17 +3,22 @@ import { z } from "zod";
 export const supportedLocales = ["es", "en"] as const;
 export type SupportedLocale = (typeof supportedLocales)[number];
 
-export const roleSchema = z.enum(["facilitator", "admin", "chaplain"]);
+export const roleSchema = z.enum(["admin", "facilitator", "chaplain", "member"]);
 export type Role = z.infer<typeof roleSchema>;
+
+export const userStatusSchema = z.enum(["invited", "active", "disabled"]);
+export type UserStatus = z.infer<typeof userStatusSchema>;
+
+export const invitationStatusSchema = z.enum(["pending", "accepted", "revoked", "expired"]);
+export type InvitationStatus = z.infer<typeof invitationStatusSchema>;
 
 export const groupPositionSchema = z.enum(["president", "secretary", "treasurer"]);
 export type GroupPosition = z.infer<typeof groupPositionSchema>;
 
-export const mediaAssetTypeSchema = z.enum([
-  "user_profile_photo",
-  "attendee_profile_photo",
-  "meeting_photo",
-]);
+export const meetingStatusSchema = z.enum(["scheduled", "completed", "cancelled"]);
+export type MeetingStatus = z.infer<typeof meetingStatusSchema>;
+
+export const mediaAssetTypeSchema = z.enum(["user_profile_photo", "group_profile_photo", "meeting_photo"]);
 export type MediaAssetType = z.infer<typeof mediaAssetTypeSchema>;
 
 export const attendanceStatusSchema = z.enum(["present", "absent", "excused"]);
@@ -32,66 +37,95 @@ export const followUpCategorySchema = z.enum([
 ]);
 export type FollowUpCategory = z.infer<typeof followUpCategorySchema>;
 
+export const locationSourceSchema = z.enum(["manual", "device", "imported"]);
+export type LocationSource = z.infer<typeof locationSourceSchema>;
+
+const nullableDateTime = z.string().datetime().nullable();
+
 export const userSchema = z.object({
   id: z.string().uuid(),
-  cognitoSub: z.string().min(1),
+  authProvider: z.string().min(1).default("clerk"),
+  authSubject: z.string().min(1).nullable(),
   displayName: z.string().min(1),
-  email: z.string().email().nullable(),
+  email: z.string().email(),
   phone: z.string().min(4).nullable(),
   role: roleSchema,
+  status: userStatusSchema,
   profilePhotoMediaId: z.string().uuid().nullable(),
+  invitedAt: nullableDateTime,
+  activatedAt: nullableDateTime,
 });
 export type User = z.infer<typeof userSchema>;
+
+export const invitationSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  email: z.string().email(),
+  status: invitationStatusSchema,
+  expiresAt: z.string().datetime(),
+  acceptedAt: nullableDateTime,
+  invitedByUserId: z.string().uuid().nullable(),
+});
+export type Invitation = z.infer<typeof invitationSchema>;
 
 export const groupSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1),
   community: z.string().min(1),
   facilitatorId: z.string().uuid(),
-  chaplainId: z.string().uuid().nullable(),
+  chaplainUserId: z.string().uuid().nullable(),
+  profilePhotoMediaId: z.string().uuid().nullable(),
   active: z.boolean(),
 });
 export type Group = z.infer<typeof groupSchema>;
 
-export const attendeeSchema = z.object({
+export const groupMembershipSchema = z.object({
   id: z.string().uuid(),
   groupId: z.string().uuid(),
-  displayName: z.string().min(1),
-  phone: z.string().min(4).nullable(),
+  userId: z.string().uuid(),
   position: groupPositionSchema.nullable(),
-  profilePhotoMediaId: z.string().uuid().nullable(),
   active: z.boolean(),
+  joinedAt: z.string().datetime(),
+  leftAt: nullableDateTime,
 });
-export type Attendee = z.infer<typeof attendeeSchema>;
+export type GroupMembership = z.infer<typeof groupMembershipSchema>;
 
-export const sessionSchema = z.object({
+export const meetingSchema = z.object({
   id: z.string().uuid(),
   groupId: z.string().uuid(),
   facilitatorId: z.string().uuid(),
-  chaplainId: z.string().uuid().nullable(),
-  heldAt: z.string().datetime(),
+  chaplainUserId: z.string().uuid().nullable(),
+  scheduledStartAt: z.string().datetime(),
+  scheduledEndAt: nullableDateTime,
+  occurredAt: nullableDateTime,
+  status: meetingStatusSchema,
   latitude: z.number().nullable(),
   longitude: z.number().nullable(),
+  locationName: z.string().nullable(),
+  address: z.string().nullable(),
+  locationCapturedAt: nullableDateTime,
+  locationSource: locationSourceSchema.nullable(),
   notes: z.string().max(4000).default(""),
   followUpCategory: followUpCategorySchema.default("none"),
   followUpNotes: z.string().max(2000).default(""),
-  submittedAt: z.string().datetime().nullable(),
+  submittedAt: nullableDateTime,
+  completedAt: nullableDateTime,
+  cancelledAt: nullableDateTime,
 });
-export type Session = z.infer<typeof sessionSchema>;
+export type Meeting = z.infer<typeof meetingSchema>;
 
 export const attendanceSchema = z.object({
   id: z.string().uuid(),
-  sessionId: z.string().uuid(),
-  attendeeId: z.string().uuid(),
+  meetingId: z.string().uuid(),
+  userId: z.string().uuid(),
   status: attendanceStatusSchema,
+  note: z.string(),
 });
 export type Attendance = z.infer<typeof attendanceSchema>;
 
 export const prayerRequestSchema = z.object({
   id: z.string().uuid(),
-  sessionId: z.string().uuid(),
-  attendeeId: z.string().uuid().nullable(),
-  requesterName: z.string().min(1),
+  meetingId: z.string().uuid(),
   request: z.string().min(1).max(2000),
   status: prayerRequestStatusSchema,
 });
@@ -101,8 +135,8 @@ export const mediaAssetSchema = z.object({
   id: z.string().uuid(),
   type: mediaAssetTypeSchema,
   ownerUserId: z.string().uuid().nullable(),
-  attendeeId: z.string().uuid().nullable(),
-  sessionId: z.string().uuid().nullable(),
+  groupId: z.string().uuid().nullable(),
+  meetingId: z.string().uuid().nullable(),
   objectKey: z.string().min(1),
   contentType: z.string().min(1),
   byteSize: z.number().int().nonnegative(),
@@ -111,32 +145,40 @@ export const mediaAssetSchema = z.object({
 });
 export type MediaAsset = z.infer<typeof mediaAssetSchema>;
 
-export const createSessionInputSchema = z.object({
+export const createMeetingInputSchema = z.object({
   id: z.string().uuid(),
   groupId: z.string().uuid(),
-  heldAt: z.string().datetime(),
+  scheduledStartAt: z.string().datetime(),
+  scheduledEndAt: z.string().datetime().nullable().optional(),
+  occurredAt: z.string().datetime().nullable().optional(),
+  status: meetingStatusSchema.default("completed"),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional(),
+  locationName: z.string().max(200).nullable().optional(),
+  address: z.string().max(500).nullable().optional(),
+  locationCapturedAt: z.string().datetime().nullable().optional(),
+  locationSource: locationSourceSchema.nullable().optional(),
   notes: z.string().max(4000).default(""),
   followUpCategory: followUpCategorySchema.default("none"),
   followUpNotes: z.string().max(2000).default(""),
   attendance: z.array(
     z.object({
-      attendeeId: z.string().uuid(),
+      userId: z.string().uuid(),
       status: attendanceStatusSchema,
+      note: z.string().max(500).default(""),
     }),
   ),
   prayerRequests: z
     .array(
       z.object({
         id: z.string().uuid(),
-        attendeeId: z.string().uuid().nullable().optional(),
-        requesterName: z.string().min(1),
         request: z.string().min(1).max(2000),
       }),
     )
     .default([]),
   meetingPhotoMediaIds: z.array(z.string().uuid()).default([]),
 });
-export type CreateSessionInput = z.infer<typeof createSessionInputSchema>;
+export type CreateMeetingInput = z.infer<typeof createMeetingInputSchema>;
 
 export const createMediaUploadInputSchema = z
   .object({
@@ -144,31 +186,31 @@ export const createMediaUploadInputSchema = z
     contentType: z.string().regex(/^image\/(jpeg|png|webp)$/),
     byteSize: z.number().int().positive().max(10 * 1024 * 1024),
     ownerUserId: z.string().uuid().optional(),
-    attendeeId: z.string().uuid().optional(),
-    sessionId: z.string().uuid().optional(),
+    groupId: z.string().uuid().optional(),
+    meetingId: z.string().uuid().optional(),
   })
   .superRefine((value, context) => {
-    if (value.type === "user_profile_photo" && value.attendeeId) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["attendeeId"],
-        message: "user_profile_photo cannot be attached to an attendee",
-      });
-    }
-
-    if (value.type === "attendee_profile_photo" && value.ownerUserId) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["ownerUserId"],
-        message: "attendee_profile_photo cannot be attached to a user",
-      });
-    }
-
-    if (value.type === "meeting_photo" && (value.ownerUserId || value.attendeeId)) {
+    if (value.type === "user_profile_photo" && (value.groupId || value.meetingId)) {
       context.addIssue({
         code: z.ZodIssueCode.custom,
         path: ["type"],
-        message: "meeting_photo cannot be attached as a profile photo",
+        message: "user_profile_photo must only be attached to a user",
+      });
+    }
+
+    if (value.type === "group_profile_photo" && (value.ownerUserId || value.meetingId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["type"],
+        message: "group_profile_photo must only be attached to a group",
+      });
+    }
+
+    if (value.type === "meeting_photo" && (value.ownerUserId || value.groupId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["type"],
+        message: "meeting_photo must only be attached to a meeting",
       });
     }
   });
@@ -185,14 +227,17 @@ export type CreateMediaUploadResponse = z.infer<typeof createMediaUploadResponse
 export const labels = {
   es: {
     adminName: "Diaconia Admin",
-    adminSubtitle: "Sesiones de campo y asistencia",
+    adminSubtitle: "Reuniones de campo y asistencia",
     add: "Agregar",
     appName: "Diaconia Mobile",
     signIn: "Ingresar",
     signInHelp:
-      "Ingreso de facilitadores con Cognito. En desarrollo local se usa un usuario demo para validar el flujo de campo.",
+      "Ingreso para usuarios invitados. En desarrollo local se usa un usuario demo para validar el flujo de campo.",
     groups: "Grupos",
     group: "Grupo",
+    members: "Miembros",
+    meetings: "Reuniones",
+    meeting: "Reunion",
     attendance: "Asistencia",
     notes: "Notas",
     meetingNotesPlaceholder: "Notas de la reunion",
@@ -205,11 +250,10 @@ export const labels = {
     localQueue: "Cola local",
     retry: "Reintentar",
     ready: "Listo",
-    loadingSessions: "Cargando sesiones",
-    sessions: "sesiones",
+    loadingMeetings: "Cargando reuniones",
     exportCsv: "Exportar CSV",
     filters: "Filtros",
-    cognitoToken: "Token Cognito",
+    accessToken: "Token de acceso",
     tokenPlaceholder: "Bearer token para ambiente real",
     from: "Desde",
     to: "Hasta",
@@ -217,28 +261,31 @@ export const labels = {
     date: "Fecha",
     facilitator: "Facilitador",
     noNotes: "Sin notas",
-    noSessions: "No hay sesiones para mostrar.",
+    noMeetings: "No hay reuniones para mostrar.",
     meetingPhotoAlt: "Foto de reunion",
     profilePhoto: "Foto",
-    sessionQueued: "Sesion guardada para sincronizar",
+    meetingQueued: "Reunion guardada para sincronizar",
     draftSaved: "Borrador guardado",
     syncing: "Sincronizando",
     syncError: "Hay errores",
     profilePhotoPending: "Foto de perfil pendiente",
-    attendeePhotoPending: "Foto de asistente pendiente",
+    memberPhotoPending: "Foto de miembro pendiente",
     syncPending: "Pendiente de sincronizacion",
     syncComplete: "Sincronizado",
   },
   en: {
     adminName: "Diaconia Admin",
-    adminSubtitle: "Field sessions and attendance",
+    adminSubtitle: "Field meetings and attendance",
     add: "Add",
     appName: "Diaconia Mobile",
     signIn: "Sign in",
     signInHelp:
-      "Facilitator sign-in with Cognito. Local development uses a demo user to validate the field workflow.",
+      "Sign-in for invited users. Local development uses a demo user to validate the field workflow.",
     groups: "Groups",
     group: "Group",
+    members: "Members",
+    meetings: "Meetings",
+    meeting: "Meeting",
     attendance: "Attendance",
     notes: "Notes",
     meetingNotesPlaceholder: "Meeting notes",
@@ -251,11 +298,10 @@ export const labels = {
     localQueue: "Local queue",
     retry: "Retry",
     ready: "Ready",
-    loadingSessions: "Loading sessions",
-    sessions: "sessions",
+    loadingMeetings: "Loading meetings",
     exportCsv: "Export CSV",
     filters: "Filters",
-    cognitoToken: "Cognito token",
+    accessToken: "Access token",
     tokenPlaceholder: "Bearer token for real environments",
     from: "From",
     to: "To",
@@ -263,15 +309,15 @@ export const labels = {
     date: "Date",
     facilitator: "Facilitator",
     noNotes: "No notes",
-    noSessions: "No sessions to show.",
+    noMeetings: "No meetings to show.",
     meetingPhotoAlt: "Meeting photo",
     profilePhoto: "Photo",
-    sessionQueued: "Session saved for sync",
+    meetingQueued: "Meeting saved for sync",
     draftSaved: "Draft saved",
     syncing: "Syncing",
     syncError: "There are errors",
     profilePhotoPending: "Profile photo pending",
-    attendeePhotoPending: "Attendee photo pending",
+    memberPhotoPending: "Member photo pending",
     syncPending: "Pending sync",
     syncComplete: "Synced",
   },

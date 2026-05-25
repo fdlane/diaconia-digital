@@ -24,7 +24,7 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-const TOKEN_KEY = "diaconia:admin:cognitoToken";
+const TOKEN_KEY = "diaconia:admin:accessToken";
 const PROFILE_KEY = "diaconia:admin:profile";
 const LOCALE_KEY = "diaconia:admin:locale";
 

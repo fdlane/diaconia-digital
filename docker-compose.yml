@@ -7,6 +7,7 @@ services:
       POSTGRES_DB: diaconia
     ports:
       - "5432:5432"
+    command: postgres -c wal_level=logical
     volumes:
       - db_data_pg18:/var/lib/postgresql
     healthcheck:
@@ -15,5 +16,31 @@ services:
       timeout: 3s
       retries: 10
 
+  zero-cache:
+    image: rocicorp/zero:0.23.3000000000
+    restart: unless-stopped
+    ports:
+      - "4848:4848"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      ZERO_UPSTREAM_DB: postgres://postgres:postgres@db:5432/diaconia
+      ZERO_APP_ID: diaconia_digital
+      ZERO_CVR_DB: postgres://postgres:postgres@db:5432/diaconia
+      ZERO_CHANGE_DB: postgres://postgres:postgres@db:5432/diaconia
+      ZERO_REPLICA_FILE: /data/zero.db
+      ZERO_ADMIN_PASSWORD: dev-admin
+      ZERO_QUERY_URL: http://host.docker.internal:4000/zero/query
+      ZERO_MUTATE_URL: http://host.docker.internal:4000/zero/mutate
+      ZERO_AUTH_JWKS_URL: ${CLERK_JWKS_URL:-}
+      ZERO_AUTH_ISSUER: ${CLERK_ISSUER:-}
+      ZERO_AUTH_AUDIENCE: ${CLERK_AUDIENCE:-}
+    volumes:
+      - zero_cache_data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   db_data_pg18:
+  zero_cache_data:

@@ -36,7 +36,7 @@ export function GroupsListPage() {
     setStatus("loading");
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(`${apiUrl}/admin/groups`, { headers });
+      const res = await fetch(`${apiUrl}/groups`, { headers });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
         setErrorMsg(payload?.error ?? `Error ${res.status}`);

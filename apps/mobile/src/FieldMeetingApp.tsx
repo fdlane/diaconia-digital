@@ -23,20 +23,20 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import diaconiaLogo from "../assets/logo.png";
 import { pickImage } from "./media";
-import { adminUserId, defaultGroupId, facilitatorUserId, seedAttendees, seedGroups } from "./seed";
-import { replaySessionWrite, uploadPhotoAsset } from "./sync/zero";
+import { adminUserId, defaultGroupId, facilitatorUserId, seedGroups, seedMembers } from "./seed";
+import { replayMeetingWrite, uploadPhotoAsset } from "./sync/zero";
 import {
-  loadAttendees,
+  loadMeetings,
   loadLocale,
-  loadSessions,
+  loadMembers,
   loadUser,
   removeUser,
-  saveAttendees,
+  saveMeetings,
   saveLocale,
-  saveSessions,
+  saveMembers,
   saveUser,
 } from "./storage";
-import type { LocalAttendee, LocalGroup, LocalPrayerRequest, LocalSession, LocalUser } from "./types";
+import type { LocalGroup, LocalMeeting, LocalMember, LocalPrayerRequest, LocalUser } from "./types";
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
 const brand = {
@@ -85,10 +85,10 @@ const ui = {
     displayName: "Nombre",
     email: "Correo",
     phone: "Teléfono",
-    cognitoToken: "Token Cognito",
-    cognitoTokenHelp: "Pega un ID token de Cognito cuando el pool esté configurado; demo local sigue disponible.",
+    accessToken: "Token de acceso",
+    accessTokenHelp: "Pega un token de acceso cuando esté configurado; demo local sigue disponible.",
     saveProfile: "Guardar perfil",
-    signOut: "Cerrar sesión",
+    signOut: "Salir",
     cancel: "Cancelar",
   },
   en: {
@@ -121,8 +121,8 @@ const ui = {
     displayName: "Name",
     email: "Email",
     phone: "Phone",
-    cognitoToken: "Cognito token",
-    cognitoTokenHelp: "Paste a Cognito ID token once the user pool is configured; local demo stays available.",
+    accessToken: "Access token",
+    accessTokenHelp: "Paste an access token once it is configured; local demo stays available.",
     saveProfile: "Save profile",
     signOut: "Sign out",
     cancel: "Cancel",
@@ -133,20 +133,19 @@ function statusLabel(status: AttendanceStatus, locale: SupportedLocale) {
   return ui[locale][status];
 }
 
-export function FieldSessionApp() {
+export function FieldMeetingApp() {
   const [locale, setLocale] = useState<SupportedLocale>("es");
   const [user, setUser] = useState<LocalUser | null>(null);
   const [groups] = useState<LocalGroup[]>(seedGroups);
-  const [attendees, setAttendees] = useState<LocalAttendee[]>(seedAttendees);
-  const [sessions, setSessions] = useState<LocalSession[]>([]);
+  const [members, setMembers] = useState<LocalMember[]>(seedMembers);
+  const [meetings, setMeetings] = useState<LocalMeeting[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState(defaultGroupId);
   const [notes, setNotes] = useState("");
   const [followUpCategory, setFollowUpCategory] = useState<FollowUpCategory>("none");
   const [followUpNotes, setFollowUpNotes] = useState("");
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
-  const [meetingPhotos, setMeetingPhotos] = useState<LocalSession["meetingPhotos"]>([]);
+  const [meetingPhotos, setMeetingPhotos] = useState<LocalMeeting["meetingPhotos"]>([]);
   const [prayerRequests, setPrayerRequests] = useState<LocalPrayerRequest[]>([]);
-  const [selectedPrayerAttendeeId, setSelectedPrayerAttendeeId] = useState<string | null>(null);
   const [newPrayer, setNewPrayer] = useState("");
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonPhone, setNewPersonPhone] = useState("");
@@ -155,7 +154,7 @@ export function FieldSessionApp() {
   const [profileName, setProfileName] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
   const [profilePhone, setProfilePhone] = useState("");
-  const [cognitoToken, setCognitoToken] = useState("");
+  const [accessToken, setAccessToken] = useState("");
   const copy = labels[locale];
   const text = ui[locale];
   const [status, setStatus] = useState(copy.ready);
@@ -170,10 +169,10 @@ export function FieldSessionApp() {
         setProfileName(storedUser.displayName);
         setProfileEmail(storedUser.email ?? "");
         setProfilePhone(storedUser.phone ?? "");
-        setCognitoToken(storedUser.token === "local-dev-token" ? "" : storedUser.token);
+        setAccessToken(storedUser.token === "local-dev-token" ? "" : storedUser.token);
       }
-      setAttendees(await loadAttendees(seedAttendees));
-      setSessions(await loadSessions());
+      setMembers(await loadMembers(seedMembers));
+      setMeetings(await loadMeetings());
     }
 
     void hydrate();
@@ -185,11 +184,11 @@ export function FieldSessionApp() {
       name: "Grupo demo",
       community: "Paraguay",
     };
-  const groupAttendees = useMemo(
-    () => attendees.filter((attendee) => attendee.groupId === selectedGroup.id),
-    [attendees, selectedGroup.id],
+  const groupMembers = useMemo(
+    () => members.filter((member) => member.groupId === selectedGroup.id),
+    [members, selectedGroup.id],
   );
-  const presentCount = groupAttendees.filter((attendee) => (attendance[attendee.id] ?? "present") === "present").length;
+  const presentCount = groupMembers.filter((member) => (attendance[member.id] ?? "present") === "present").length;
   const canAdmin = user?.role === "admin";
 
   async function updateLocale(nextLocale: SupportedLocale) {
@@ -212,7 +211,7 @@ export function FieldSessionApp() {
     setProfileName(nextUser.displayName);
     setProfileEmail(nextUser.email ?? "");
     setProfilePhone(nextUser.phone ?? "");
-    setCognitoToken(nextUser.token === "local-dev-token" ? "" : nextUser.token);
+    setAccessToken(nextUser.token === "local-dev-token" ? "" : nextUser.token);
     await saveUser(nextUser);
   }
 
@@ -223,7 +222,7 @@ export function FieldSessionApp() {
       displayName: profileName.trim() || user.displayName,
       email: profileEmail.trim() || null,
       phone: profilePhone.trim() || null,
-      token: cognitoToken.trim() || user.token,
+      token: accessToken.trim() || user.token,
     };
     setUser(nextUser);
     await saveUser(nextUser);
@@ -235,7 +234,7 @@ export function FieldSessionApp() {
     setUser(null);
     setProfileMenuOpen(false);
     setProfileEditorOpen(false);
-    setCognitoToken("");
+    setAccessToken("");
     await removeUser();
   }
 
@@ -261,29 +260,24 @@ export function FieldSessionApp() {
     await saveUser(nextUser);
   }
 
-  async function updateAttendeePhoto(attendeeId: string) {
-    const photo = await pickImage("attendee_profile_photo");
+  async function updateMemberPhoto(memberId: string) {
+    const photo = await pickImage("user_profile_photo");
     if (!photo) return;
     let remoteMediaId: string | undefined;
     try {
-      remoteMediaId = await uploadPhotoAsset({ apiUrl, token: user?.token ?? "", photo, attendeeId });
-      await fetch(`${apiUrl}/attendees/${attendeeId}/profile-photo`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${user?.token ?? ""}`, "content-type": "application/json" },
-        body: JSON.stringify({ mediaId: remoteMediaId }),
-      });
+      remoteMediaId = await uploadPhotoAsset({ apiUrl, token: user?.token ?? "", photo, ownerUserId: memberId });
     } catch {
-      setStatus(copy.attendeePhotoPending);
+      setStatus(copy.memberPhotoPending);
     }
-    const nextAttendees = attendees.map((attendee) =>
-      attendee.id === attendeeId
+    const nextMembers = members.map((member) =>
+      member.id === memberId
         ? remoteMediaId
-          ? { ...attendee, profilePhotoUri: photo.uri, profilePhotoRemoteMediaId: remoteMediaId }
-          : { ...attendee, profilePhotoUri: photo.uri }
-        : attendee,
+          ? { ...member, profilePhotoUri: photo.uri, profilePhotoRemoteMediaId: remoteMediaId }
+          : { ...member, profilePhotoUri: photo.uri }
+        : member,
     );
-    setAttendees(nextAttendees);
-    await saveAttendees(nextAttendees);
+    setMembers(nextMembers);
+    await saveMembers(nextMembers);
   }
 
   async function addMeetingPhoto() {
@@ -294,36 +288,36 @@ export function FieldSessionApp() {
   async function addPerson() {
     if (!newPersonName.trim()) return;
     const phone = newPersonPhone.trim();
-    const nextPerson: LocalAttendee = {
+    const nextPerson: LocalMember = {
       id: Crypto.randomUUID(),
       groupId: selectedGroup.id,
       displayName: newPersonName.trim(),
+      role: "member",
       ...(phone ? { phone } : {}),
     };
-    const nextAttendees = [...attendees, nextPerson];
-    setAttendees(nextAttendees);
-    await saveAttendees(nextAttendees);
+    const nextMembers = [...members, nextPerson];
+    setMembers(nextMembers);
+    await saveMembers(nextMembers);
     setNewPersonName("");
     setNewPersonPhone("");
   }
 
-  async function toggleFacilitator(attendeeId: string) {
-    const nextAttendees = attendees.map((attendee) =>
-      attendee.id === attendeeId ? { ...attendee, isFacilitator: !attendee.isFacilitator } : attendee,
-    );
-    setAttendees(nextAttendees);
-    await saveAttendees(nextAttendees);
+  async function toggleFacilitator(memberId: string) {
+    const nextMembers: LocalMember[] = members.map((member) => {
+      if (member.id !== memberId) return member;
+      const role: Role = member.role === "facilitator" ? "member" : "facilitator";
+      return { ...member, role };
+    });
+    setMembers(nextMembers);
+    await saveMembers(nextMembers);
   }
 
   function addPrayerRequest() {
     if (!newPrayer.trim()) return;
-    const attendee = groupAttendees.find((person) => person.id === selectedPrayerAttendeeId);
     setPrayerRequests((value) => [
       ...value,
       {
         id: Crypto.randomUUID(),
-        attendeeId: attendee?.id ?? null,
-        requesterName: attendee?.displayName ?? "Grupo",
         request: newPrayer.trim(),
       },
     ]);
@@ -332,70 +326,87 @@ export function FieldSessionApp() {
 
   async function saveDraft(syncNow: boolean) {
     if (!user) return;
-    const session: LocalSession = {
+    const meeting: LocalMeeting = {
       id: Crypto.randomUUID(),
       groupId: selectedGroup.id,
-      heldAt: new Date().toISOString(),
+      scheduledStartAt: new Date().toISOString(),
+      occurredAt: new Date().toISOString(),
+      status: "completed",
+      latitude: selectedGroup.id === defaultGroupId ? -25.4646 : -27.3306,
+      longitude: selectedGroup.id === defaultGroupId ? -56.0139 : -55.8667,
+      locationName: selectedGroup.name,
+      address: selectedGroup.community,
+      locationCapturedAt: new Date().toISOString(),
+      locationSource: "manual",
       notes,
       followUpCategory,
       followUpNotes,
-      attendance: Object.fromEntries(groupAttendees.map((attendee) => [attendee.id, attendance[attendee.id] ?? "present"])),
+      attendance: Object.fromEntries(groupMembers.map((member) => [member.id, attendance[member.id] ?? "present"])),
       prayerRequests,
       meetingPhotos,
       syncStatus: syncNow ? "pending" : "draft",
     };
-    const nextSessions = [session, ...sessions];
-    setSessions(nextSessions);
-    await saveSessions(nextSessions);
+    const nextMeetings = [meeting, ...meetings];
+    setMeetings(nextMeetings);
+    await saveMeetings(nextMeetings);
     setNotes("");
     setFollowUpCategory("none");
     setFollowUpNotes("");
     setPrayerRequests([]);
     setMeetingPhotos([]);
-    setStatus(syncNow ? copy.sessionQueued : copy.draftSaved);
-    if (syncNow) await syncPending(nextSessions);
+    setStatus(syncNow ? copy.meetingQueued : copy.draftSaved);
+    if (syncNow) await syncPending(nextMeetings);
   }
 
-  async function syncPending(source = sessions) {
+  async function syncPending(source = meetings) {
     if (!user) return;
     setStatus(copy.syncing);
-    const nextSessions: LocalSession[] = [];
-    for (const session of source) {
-      if (session.syncStatus !== "pending" && session.syncStatus !== "failed") {
-        nextSessions.push(session);
+    const nextMeetings: LocalMeeting[] = [];
+    for (const meeting of source) {
+      if (meeting.syncStatus !== "pending" && meeting.syncStatus !== "failed") {
+        nextMeetings.push(meeting);
         continue;
       }
-      let uploadedMeetingPhotos = session.meetingPhotos;
+      let uploadedMeetingPhotos = meeting.meetingPhotos;
       try {
-        for (const photo of session.meetingPhotos) {
-          const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token: user.token, photo }));
+        for (const photo of meeting.meetingPhotos) {
+          const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token: user.token, photo, meetingId: meeting.id }));
           uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) =>
             candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate,
           );
         }
-        await replaySessionWrite({
+        await replayMeetingWrite({
           apiUrl,
           token: user.token,
           payload: {
-            id: session.id,
-            groupId: session.groupId,
-            heldAt: session.heldAt,
-            notes: session.notes,
-            followUpCategory: session.followUpCategory,
-            followUpNotes: session.followUpNotes,
-            attendance: Object.entries(session.attendance).map(([attendeeId, value]) => ({ attendeeId, status: value })),
-            prayerRequests: session.prayerRequests,
+            id: meeting.id,
+            groupId: meeting.groupId,
+            scheduledStartAt: meeting.scheduledStartAt,
+            scheduledEndAt: meeting.scheduledEndAt,
+            occurredAt: meeting.occurredAt,
+            status: meeting.status,
+            latitude: meeting.latitude,
+            longitude: meeting.longitude,
+            locationName: meeting.locationName,
+            address: meeting.address,
+            locationCapturedAt: meeting.locationCapturedAt,
+            locationSource: meeting.locationSource,
+            notes: meeting.notes,
+            followUpCategory: meeting.followUpCategory,
+            followUpNotes: meeting.followUpNotes,
+            attendance: Object.entries(meeting.attendance).map(([userId, value]) => ({ userId, status: value, note: "" })),
+            prayerRequests: meeting.prayerRequests,
             meetingPhotoMediaIds: uploadedMeetingPhotos.map((photo) => photo.remoteMediaId).filter((id): id is string => Boolean(id)),
           },
         });
-        nextSessions.push({ ...session, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" });
+        nextMeetings.push({ ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" });
       } catch {
-        nextSessions.push({ ...session, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" });
+        nextMeetings.push({ ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" });
       }
     }
-    setSessions(nextSessions);
-    await saveSessions(nextSessions);
-    setStatus(nextSessions.some((session) => session.syncStatus === "failed") ? copy.syncError : copy.syncComplete);
+    setMeetings(nextMeetings);
+    await saveMeetings(nextMeetings);
+    setStatus(nextMeetings.some((meeting) => meeting.syncStatus === "failed") ? copy.syncError : copy.syncComplete);
   }
 
   const languageSwitch = (
@@ -418,16 +429,16 @@ export function FieldSessionApp() {
           <Text style={styles.heroSubtitle}>{text.heroSubtitle}</Text>
           <View style={styles.signInButtons}>
             <TextInput
-              onChangeText={setCognitoToken}
-              placeholder={text.cognitoToken}
+              onChangeText={setAccessToken}
+              placeholder={text.accessToken}
               style={styles.input}
-              value={cognitoToken}
+              value={accessToken}
             />
-            <Text style={styles.microcopy}>{text.cognitoTokenHelp}</Text>
-            <Pressable onPress={() => signIn("facilitator", cognitoToken)} style={styles.primaryButton}>
+            <Text style={styles.microcopy}>{text.accessTokenHelp}</Text>
+            <Pressable onPress={() => signIn("facilitator", accessToken)} style={styles.primaryButton}>
               <Text style={styles.primaryButtonText}>{text.facilitatorMode}</Text>
             </Pressable>
-            <Pressable onPress={() => signIn("admin", cognitoToken)} style={styles.secondaryButton}>
+            <Pressable onPress={() => signIn("admin", accessToken)} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>{text.adminMode}</Text>
             </Pressable>
           </View>
@@ -495,7 +506,7 @@ export function FieldSessionApp() {
         </ScrollView>
 
         <View style={styles.metricRow}>
-          <Metric label={text.metricsAttendance} value={`${presentCount}/${groupAttendees.length}`} />
+          <Metric label={text.metricsAttendance} value={`${presentCount}/${groupMembers.length}`} />
           <Metric label={text.metricsPrayers} value={`${prayerRequests.length}`} />
           <Metric label={text.metricsPhotos} value={`${meetingPhotos.length}`} />
         </View>
@@ -518,27 +529,28 @@ export function FieldSessionApp() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{copy.attendance}</Text>
-          {groupAttendees.map((attendee) => (
-            <View key={attendee.id} style={styles.attendeeCard}>
-              <Pressable onPress={() => updateAttendeePhoto(attendee.id)} style={styles.smallAvatar}>
-                {attendee.profilePhotoUri ? <Image source={{ uri: attendee.profilePhotoUri }} style={styles.smallAvatarImage} /> : <Text style={styles.smallAvatarText}>+</Text>}
+          {groupMembers.map((member) => (
+            <View key={member.id} style={styles.memberCard}>
+              <Pressable onPress={() => updateMemberPhoto(member.id)} style={styles.smallAvatar}>
+                {member.profilePhotoUri ? <Image source={{ uri: member.profilePhotoUri }} style={styles.smallAvatarImage} /> : <Text style={styles.smallAvatarText}>+</Text>}
               </Pressable>
-              <View style={styles.attendeeInfo}>
+              <View style={styles.memberInfo}>
                 <View style={styles.nameLine}>
-                  <Text style={styles.rowTitle}>{attendee.displayName}</Text>
-                  {attendee.isFacilitator ? <Text style={styles.facilitatorPill}>{text.facilitatorBadge}</Text> : null}
+                  <Text style={styles.rowTitle}>{member.displayName}</Text>
+                  {member.role === "facilitator" ? <Text style={styles.facilitatorPill}>{text.facilitatorBadge}</Text> : null}
+                  {member.position ? <Text style={styles.facilitatorPill}>{member.position}</Text> : null}
                 </View>
-                <Text style={styles.body}>{attendee.phone}</Text>
+                <Text style={styles.body}>{member.phone}</Text>
                 <View style={styles.statusRow}>
                   {(["present", "absent", "excused"] as const).map((value) => (
-                    <Pressable key={value} onPress={() => setAttendance((state) => ({ ...state, [attendee.id]: value }))} style={[styles.statusPill, (attendance[attendee.id] ?? "present") === value && styles.statusPillActive]}>
-                      <Text style={[styles.statusPillText, (attendance[attendee.id] ?? "present") === value && styles.statusPillTextActive]}>{statusLabel(value, locale)}</Text>
+                    <Pressable key={value} onPress={() => setAttendance((state) => ({ ...state, [member.id]: value }))} style={[styles.statusPill, (attendance[member.id] ?? "present") === value && styles.statusPillActive]}>
+                      <Text style={[styles.statusPillText, (attendance[member.id] ?? "present") === value && styles.statusPillTextActive]}>{statusLabel(value, locale)}</Text>
                     </Pressable>
                   ))}
                 </View>
                 {canAdmin ? (
-                  <Pressable onPress={() => toggleFacilitator(attendee.id)} style={styles.linkButton}>
-                    <Text style={styles.linkText}>{attendee.isFacilitator ? text.removeFacilitator : text.makeFacilitator}</Text>
+                  <Pressable onPress={() => toggleFacilitator(member.id)} style={styles.linkButton}>
+                    <Text style={styles.linkText}>{member.role === "facilitator" ? text.removeFacilitator : text.makeFacilitator}</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -548,16 +560,10 @@ export function FieldSessionApp() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{text.prayerRequests}</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.prayerPeopleRail}>
-            <Pressable onPress={() => setSelectedPrayerAttendeeId(null)} style={[styles.personChip, selectedPrayerAttendeeId === null && styles.personChipActive]}><Text style={styles.personChipText}>Grupo</Text></Pressable>
-            {groupAttendees.map((attendee) => (
-              <Pressable key={attendee.id} onPress={() => setSelectedPrayerAttendeeId(attendee.id)} style={[styles.personChip, selectedPrayerAttendeeId === attendee.id && styles.personChipActive]}><Text style={styles.personChipText}>{attendee.displayName}</Text></Pressable>
-            ))}
-          </ScrollView>
           <TextInput multiline onChangeText={setNewPrayer} placeholder={text.prayerPlaceholder} style={styles.textAreaSmall} value={newPrayer} />
           <Pressable onPress={addPrayerRequest} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.addPrayer}</Text></Pressable>
           {prayerRequests.length ? prayerRequests.map((request) => (
-            <View key={request.id} style={styles.prayerCard}><Text style={styles.rowTitle}>{request.requesterName}</Text><Text style={styles.body}>{request.request}</Text></View>
+            <View key={request.id} style={styles.prayerCard}><Text style={styles.body}>{request.request}</Text></View>
           )) : <Text style={styles.body}>{text.noPrayers}</Text>}
         </View>
 
@@ -597,10 +603,10 @@ export function FieldSessionApp() {
             <Pressable onPress={() => syncPending()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{copy.retry}</Text></Pressable>
           </View>
           <Text style={styles.body}>{status}</Text>
-          {sessions.slice(0, 5).map((session) => (
-            <View key={session.id} style={styles.queueRow}>
-              <Text style={styles.rowTitle}>{formatDisplayDate(session.heldAt, locale)}</Text>
-              <Text style={styles.body}>{session.syncStatus} · {Object.values(session.attendance).filter((value) => value === "present").length} / {Object.keys(session.attendance).length}</Text>
+          {meetings.slice(0, 5).map((meeting) => (
+            <View key={meeting.id} style={styles.queueRow}>
+              <Text style={styles.rowTitle}>{formatDisplayDate(meeting.occurredAt ?? meeting.scheduledStartAt, locale)}</Text>
+              <Text style={styles.body}>{meeting.syncStatus} · {Object.values(meeting.attendance).filter((value) => value === "present").length} / {Object.keys(meeting.attendance).length}</Text>
             </View>
           ))}
         </View>
@@ -612,7 +618,7 @@ export function FieldSessionApp() {
             <TextInput onChangeText={setProfileName} placeholder={text.displayName} style={styles.input} value={profileName} />
             <TextInput autoCapitalize="none" keyboardType="email-address" onChangeText={setProfileEmail} placeholder={text.email} style={styles.input} value={profileEmail} />
             <TextInput keyboardType="phone-pad" onChangeText={setProfilePhone} placeholder={text.phone} style={styles.input} value={profilePhone} />
-            <TextInput autoCapitalize="none" multiline onChangeText={setCognitoToken} placeholder={text.cognitoToken} style={styles.textAreaSmall} value={cognitoToken} />
+            <TextInput autoCapitalize="none" multiline onChangeText={setAccessToken} placeholder={text.accessToken} style={styles.textAreaSmall} value={accessToken} />
             <View style={styles.actions}>
               <Pressable onPress={() => setProfileEditorOpen(false)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.cancel}</Text></Pressable>
               <Pressable onPress={saveProfile} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{text.saveProfile}</Text></Pressable>
@@ -689,11 +695,11 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: "white", fontWeight: "900" },
   secondaryButton: { alignItems: "center", justifyContent: "center", minHeight: 44, borderRadius: 16, backgroundColor: brand.surfaceAlt, paddingHorizontal: 16 },
   secondaryButtonText: { color: brand.primaryStrong, fontWeight: "900" },
-  attendeeCard: { flexDirection: "row", gap: 12, borderWidth: 1, borderColor: brand.line, borderRadius: 20, padding: 12, backgroundColor: "#fbfcff" },
+  memberCard: { flexDirection: "row", gap: 12, borderWidth: 1, borderColor: brand.line, borderRadius: 20, padding: 12, backgroundColor: "#fbfcff" },
   smallAvatar: { width: 54, height: 54, alignItems: "center", justifyContent: "center", overflow: "hidden", borderRadius: 18, backgroundColor: brand.surfaceAlt },
   smallAvatarImage: { width: 54, height: 54 },
   smallAvatarText: { color: brand.primary, fontSize: 24, fontWeight: "900" },
-  attendeeInfo: { flex: 1, gap: 8 },
+  memberInfo: { flex: 1, gap: 8 },
   nameLine: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
   facilitatorPill: { overflow: "hidden", borderRadius: 999, backgroundColor: "#e8fbf7", color: "#047a67", fontSize: 11, fontWeight: "900", paddingHorizontal: 8, paddingVertical: 4 },
   statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },

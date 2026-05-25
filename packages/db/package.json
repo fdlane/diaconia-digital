@@ -13,9 +13,10 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "node --env-file=../../.env --import tsx src/seed.ts",
-    "zero:generate": "drizzle-zero generate --schema ./src/schema.ts --out ./src/zero/schema.ts"
+    "zero:generate": "zero-deploy-permissions --schema-path ./src/zero/schema.ts --output-file ./src/zero/permissions.sql --output-format sql --app-id diaconia_digital"
   },
   "dependencies": {
+    "@rocicorp/zero": "^0.23.2025090100",
     "drizzle-orm": "^0.38.4",
     "pg": "^8.13.1"
   },

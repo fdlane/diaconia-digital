@@ -7,7 +7,7 @@ import { CalendarIcon, MeetingReportIcon, PrayerIcon, UsersIcon } from "./icons"
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-type AdminSession = {
+type AdminMeeting = {
   id: string;
   heldAt: string;
   submittedAt: string | null;
@@ -50,20 +50,20 @@ export function Dashboard() {
     const headers = token ? { authorization: `Bearer ${token}` } : {};
 
     try {
-      const res = await fetch(`${apiUrl}/admin/sessions`, { headers });
+      const res = await fetch(`${apiUrl}/meetings`, { headers });
       if (!res.ok) return;
 
-      const data = (await res.json()) as { sessions: AdminSession[] };
-      const sessions = data.sessions;
+      const data = (await res.json()) as { meetings: AdminMeeting[] };
+      const meetings = data.meetings;
 
-      setPlannedCount(sessions.filter((s) => !s.submittedAt).length);
-      setReportsCount(sessions.filter((s) => s.submittedAt).length);
+      setPlannedCount(meetings.filter((s) => !s.submittedAt).length);
+      setReportsCount(meetings.filter((s) => s.submittedAt).length);
 
-      const submitted = sessions.filter((s) => s.submittedAt);
+      const submitted = meetings.filter((s) => s.submittedAt);
       const counts = await Promise.all(
         submitted.map(async (s) => {
           try {
-            const r = await fetch(`${apiUrl}/admin/sessions/${s.id}/prayer-requests`, {
+            const r = await fetch(`${apiUrl}/meetings/${s.id}/prayer-requests`, {
               headers,
             });
             if (!r.ok) return 0;

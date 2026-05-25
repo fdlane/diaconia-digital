@@ -19,7 +19,7 @@ export function SignInPage() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-      const res = await fetch(`${apiUrl}/admin/sessions?limit=1`, {
+      const res = await fetch(`${apiUrl}/meetings?limit=1`, {
         headers: token ? { authorization: `Bearer ${token}` } : {},
       });
 
@@ -50,7 +50,7 @@ export function SignInPage() {
         <div className="signin-form">
           {error ? <div className="alert alert-danger">{error}</div> : null}
           <div className="form-field">
-            <label htmlFor="token">{l.cognitoTokenLabel}</label>
+            <label htmlFor="token">{l.accessTokenLabel}</label>
             <input
               autoComplete="off"
               id="token"
@@ -58,7 +58,7 @@ export function SignInPage() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") void handleSignIn();
               }}
-              placeholder={l.cognitoTokenPlaceholder}
+              placeholder={l.accessTokenPlaceholder}
               type="password"
               value={token}
             />

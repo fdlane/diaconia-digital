@@ -10,7 +10,7 @@ import { ArrowLeftIcon, EditIcon, TrashIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-type SessionDetail = {
+type MeetingDetail = {
   id: string;
   groupId: string;
   facilitatorId: string;
@@ -31,21 +31,19 @@ type SessionDetail = {
 
 type AttendanceRecord = {
   id: string;
-  attendeeId: string;
-  attendeeName: string;
+  userId: string;
+  userName: string;
   status: "present" | "absent" | "excused";
 };
 
 type PrayerRequest = {
   id: string;
-  attendeeId: string | null;
-  requesterName: string;
   request: string;
   status: string;
   createdAt: string;
 };
 
-type SessionMedia = { id: string; type: string; url: string };
+type MeetingMedia = { id: string; type: string; url: string };
 
 function followUpColor(cat: string) {
   const map: Record<string, string> = {
@@ -75,10 +73,10 @@ export function MeetingDetailPage({ id }: { id: string }) {
   const l = t(locale);
   const router = useRouter();
 
-  const [session, setSession] = useState<SessionDetail | null>(null);
+  const [meeting, setMeeting] = useState<MeetingDetail | null>(null);
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [prayers, setPrayers] = useState<PrayerRequest[]>([]);
-  const [media, setMedia] = useState<SessionMedia[]>([]);
+  const [media, setMedia] = useState<MeetingMedia[]>([]);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [deleteState, setDeleteState] = useState<"idle" | "confirming" | "deleting">("idle");
@@ -92,8 +90,8 @@ export function MeetingDetailPage({ id }: { id: string }) {
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
       const [detailRes, mediaRes] = await Promise.all([
-        fetch(`${apiUrl}/admin/sessions/${id}`, { headers }),
-        fetch(`${apiUrl}/admin/sessions/${id}/media`, { headers }),
+        fetch(`${apiUrl}/meetings/${id}`, { headers }),
+        fetch(`${apiUrl}/meetings/${id}/media`, { headers }),
       ]);
 
       if (!detailRes.ok) {
@@ -104,17 +102,17 @@ export function MeetingDetailPage({ id }: { id: string }) {
       }
 
       const data = (await detailRes.json()) as {
-        session: SessionDetail;
+        meeting: MeetingDetail;
         attendance: AttendanceRecord[];
         prayerRequests: PrayerRequest[];
       };
 
-      setSession(data.session);
+      setMeeting(data.meeting);
       setAttendance(data.attendance);
       setPrayers(data.prayerRequests);
 
       if (mediaRes.ok) {
-        const mediaData = (await mediaRes.json()) as { media: SessionMedia[] };
+        const mediaData = (await mediaRes.json()) as { media: MeetingMedia[] };
         setMedia(mediaData.media);
       }
 
@@ -129,7 +127,7 @@ export function MeetingDetailPage({ id }: { id: string }) {
     setDeleteState("deleting");
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(`${apiUrl}/admin/sessions/${id}`, { method: "DELETE", headers });
+      const res = await fetch(`${apiUrl}/meetings/${id}`, { method: "DELETE", headers });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
         setErrorMsg(payload?.error ?? `Error ${res.status}`);
@@ -159,7 +157,7 @@ export function MeetingDetailPage({ id }: { id: string }) {
     );
   }
 
-  if (status === "error" || !session) {
+  if (status === "error" || !meeting) {
     return (
       <div>
         <nav className="breadcrumb">
@@ -176,7 +174,7 @@ export function MeetingDetailPage({ id }: { id: string }) {
     );
   }
 
-  const title = `${session.groupName} · ${formatDisplayDate(session.heldAt, locale)}`;
+  const title = `${meeting.groupName} · ${formatDisplayDate(meeting.heldAt, locale)}`;
 
   return (
     <div>
@@ -188,8 +186,8 @@ export function MeetingDetailPage({ id }: { id: string }) {
 
       <div className="page-header-row">
         <div className="page-header">
-          <h1 className="page-title">{session.groupName}</h1>
-          <p className="page-subtitle">{formatDisplayDate(session.heldAt, locale)}</p>
+          <h1 className="page-title">{meeting.groupName}</h1>
+          <p className="page-subtitle">{formatDisplayDate(meeting.heldAt, locale)}</p>
         </div>
         <div className="page-header-actions">
           {deleteState === "confirming" ? (
@@ -238,38 +236,38 @@ export function MeetingDetailPage({ id }: { id: string }) {
             <div className="detail-grid">
               <div className="detail-field">
                 <span className="detail-label">{l.colGroup}</span>
-                <span className="detail-value">{session.groupName}</span>
+                <span className="detail-value">{meeting.groupName}</span>
               </div>
               <div className="detail-field">
                 <span className="detail-label">{l.colCommunity}</span>
-                <span className="detail-value">{session.community}</span>
+                <span className="detail-value">{meeting.community}</span>
               </div>
               <div className="detail-field">
                 <span className="detail-label">{l.colFacilitator}</span>
-                <span className="detail-value">{session.facilitatorName}</span>
+                <span className="detail-value">{meeting.facilitatorName}</span>
               </div>
               <div className="detail-field">
                 <span className="detail-label">{l.colDate}</span>
-                <span className="detail-value">{formatDisplayDate(session.heldAt, locale)}</span>
+                <span className="detail-value">{formatDisplayDate(meeting.heldAt, locale)}</span>
               </div>
               <div className="detail-field">
                 <span className="detail-label">{l.chaplainAttended}</span>
                 <span className="detail-value">
-                  {session.chaplainName ? session.chaplainName : (
+                  {meeting.chaplainName ? meeting.chaplainName : (
                     <span className="text-muted">{l.noChaplainAttended}</span>
                   )}
                 </span>
               </div>
-              {session.latitude != null && session.longitude != null ? (
+              {meeting.latitude != null && meeting.longitude != null ? (
                 <div className="detail-field">
                   <span className="detail-label">{l.locationPin}</span>
                   <span className="detail-value">
                     <span style={{ fontVariantNumeric: "tabular-nums" }}>
-                      {session.latitude.toFixed(6)}, {session.longitude.toFixed(6)}
+                      {meeting.latitude.toFixed(6)}, {meeting.longitude.toFixed(6)}
                     </span>
                     <br />
                     <a
-                      href={`https://www.openstreetmap.org/?mlat=${session.latitude}&mlon=${session.longitude}&zoom=16`}
+                      href={`https://www.openstreetmap.org/?mlat=${meeting.latitude}&mlon=${meeting.longitude}&zoom=16`}
                       rel="noreferrer"
                       style={{ color: "var(--brand)", fontSize: "0.875rem" }}
                       target="_blank"
@@ -279,18 +277,18 @@ export function MeetingDetailPage({ id }: { id: string }) {
                   </span>
                 </div>
               ) : null}
-              {session.submittedAt ? (
+              {meeting.submittedAt ? (
                 <div className="detail-field">
                   <span className="detail-label">{l.submittedAt}</span>
-                  <span className="detail-value">{formatDisplayDate(session.submittedAt, locale)}</span>
+                  <span className="detail-value">{formatDisplayDate(meeting.submittedAt, locale)}</span>
                 </div>
               ) : null}
-              {session.notes ? (
+              {meeting.notes ? (
                 <div className="detail-field" style={{ gridColumn: "1 / -1" }}>
                   <span className="detail-label">{l.colNotes}</span>
                   <span className="detail-value"
                     style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
-                    {session.notes}
+                    {meeting.notes}
                   </span>
                 </div>
               ) : null}
@@ -299,18 +297,18 @@ export function MeetingDetailPage({ id }: { id: string }) {
         </div>
 
         {/* Follow-up */}
-        {session.followUpCategory && session.followUpCategory !== "none" ? (
+        {meeting.followUpCategory && meeting.followUpCategory !== "none" ? (
           <div className="card">
             <div className="card-header">
               <span className="card-title">{l.colFollowUp}</span>
-              <span className={`badge ${followUpColor(session.followUpCategory)}`}>
-                {session.followUpCategory}
+              <span className={`badge ${followUpColor(meeting.followUpCategory)}`}>
+                {meeting.followUpCategory}
               </span>
             </div>
-            {session.followUpNotes ? (
+            {meeting.followUpNotes ? (
               <div className="card-body">
                 <p style={{ fontSize: "0.9375rem", lineHeight: 1.6, color: "var(--ink-2)" }}>
-                  {session.followUpNotes}
+                  {meeting.followUpNotes}
                 </p>
               </div>
             ) : null}
@@ -322,7 +320,7 @@ export function MeetingDetailPage({ id }: { id: string }) {
           <div className="card-header">
             <span className="card-title">{l.attendance}</span>
             {attendance.length > 0 ? (
-              <span className="text-sm text-muted">{attendance.length} attendees</span>
+              <span className="text-sm text-muted">{attendance.length} {locale === "es" ? "miembros" : "members"}</span>
             ) : null}
           </div>
           <div className="table-wrapper">
@@ -336,7 +334,7 @@ export function MeetingDetailPage({ id }: { id: string }) {
               <tbody>
                 {attendance.map((a) => (
                   <tr key={a.id}>
-                    <td>{a.attendeeName}</td>
+                    <td>{a.userName}</td>
                     <td>{statusBadge(a.status, l)}</td>
                   </tr>
                 ))}
@@ -363,15 +361,13 @@ export function MeetingDetailPage({ id }: { id: string }) {
               <table>
                 <thead>
                   <tr>
-                    <th>{l.colName}</th>
-                    <th>Request</th>
-                    <th>Status</th>
+                    <th>{locale === "es" ? "Petición" : "Request"}</th>
+                    <th>{l.colStatus}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {prayers.map((pr) => (
                     <tr key={pr.id}>
-                      <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{pr.requesterName}</td>
                       <td style={{ lineHeight: 1.5 }}>{pr.request}</td>
                       <td>{prayerStatusBadge(pr.status)}</td>
                     </tr>

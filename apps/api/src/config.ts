@@ -12,8 +12,9 @@ export type ApiConfig = {
   databaseUrl: string;
   awsRegion: string;
   mediaBucketName: string;
-  cognitoUserPoolId: string;
-  cognitoAppClientId: string;
+  clerkIssuer: string;
+  clerkJwksUrl: string;
+  clerkAudience: string;
   allowedOrigins: string[];
 };
 
@@ -23,8 +24,9 @@ export function loadConfig(env = process.env): ApiConfig {
     databaseUrl: env.DATABASE_URL ?? defaultLocalDatabaseUrl,
     awsRegion: env.AWS_REGION ?? "sa-east-1",
     mediaBucketName: env.MEDIA_BUCKET_NAME ?? "diaconia-foundation-media-dev",
-    cognitoUserPoolId: env.COGNITO_USER_POOL_ID ?? "",
-    cognitoAppClientId: env.COGNITO_APP_CLIENT_ID ?? "",
+    clerkIssuer: env.CLERK_ISSUER ?? "",
+    clerkJwksUrl: env.CLERK_JWKS_URL ?? "",
+    clerkAudience: env.CLERK_AUDIENCE ?? "",
     allowedOrigins: (
       env.ALLOWED_ORIGINS ?? "http://localhost:3000,http://localhost:8081,http://localhost:19006"
     ).split(","),

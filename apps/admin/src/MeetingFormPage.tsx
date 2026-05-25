@@ -18,13 +18,18 @@ type Group = {
 
 type ChaplainOption = { id: string; displayName: string };
 
-type SessionDetail = {
+type MeetingDetail = {
   id: string;
   groupId: string;
   chaplainId: string | null;
   heldAt: string;
+  scheduledStartAt: string;
+  occurredAt: string | null;
+  status: string;
   latitude: number | null;
   longitude: number | null;
+  locationName: string | null;
+  address: string | null;
   notes: string;
   followUpCategory: string;
   followUpNotes: string;
@@ -81,10 +86,10 @@ export function MeetingFormPage({ id }: { id?: string }) {
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
 
     try {
-      const [groupsRes, chaplainsRes, sessionRes] = await Promise.all([
-        fetch(`${apiUrl}/admin/groups`, { headers }),
-        fetch(`${apiUrl}/admin/chaplains`, { headers }),
-        isEdit && id ? fetch(`${apiUrl}/admin/sessions/${id}`, { headers }) : Promise.resolve(null),
+      const [groupsRes, chaplainsRes, meetingRes] = await Promise.all([
+        fetch(`${apiUrl}/groups`, { headers }),
+        fetch(`${apiUrl}/chaplains`, { headers }),
+        isEdit && id ? fetch(`${apiUrl}/meetings/${id}`, { headers }) : Promise.resolve(null),
       ]);
 
       if (!groupsRes.ok) {
@@ -101,14 +106,14 @@ export function MeetingFormPage({ id }: { id?: string }) {
         setChaplains(chaplainsData.chaplains);
       }
 
-      if (sessionRes) {
-        if (!sessionRes.ok) {
-          setErrorMsg(`Failed to load session: ${sessionRes.status}`);
+      if (meetingRes) {
+        if (!meetingRes.ok) {
+          setErrorMsg(`Failed to load meeting: ${meetingRes.status}`);
           setLoadStatus("error");
           return;
         }
-        const sessionData = (await sessionRes.json()) as { session: SessionDetail };
-        const s = sessionData.session;
+        const meetingData = (await meetingRes.json()) as { meeting: MeetingDetail };
+        const s = meetingData.meeting;
         setForm({
           groupId: s.groupId,
           chaplainId: s.chaplainId ?? "",
@@ -150,16 +155,23 @@ export function MeetingFormPage({ id }: { id?: string }) {
     const body = JSON.stringify({
       groupId: form.groupId,
       chaplainId: form.chaplainId || null,
-      heldAt: heldAtIso,
+      scheduledStartAt: heldAtIso,
+      occurredAt: heldAtIso,
+      status: "completed",
       latitude: form.latitude ? parseFloat(form.latitude) : null,
       longitude: form.longitude ? parseFloat(form.longitude) : null,
+      locationName: null,
+      address: null,
+      locationSource: form.latitude && form.longitude ? "manual" : null,
       notes: form.notes,
       followUpCategory: form.followUpCategory,
       followUpNotes: form.followUpNotes,
+      attendance: [],
+      prayerRequests: [],
     });
 
     try {
-      const url = isEdit ? `${apiUrl}/admin/sessions/${id}` : `${apiUrl}/admin/sessions`;
+      const url = isEdit ? `${apiUrl}/meetings/${id}` : `${apiUrl}/meetings`;
       const method = isEdit ? "PUT" : "POST";
       const res = await fetch(url, { method, headers, body });
 

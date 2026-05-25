@@ -1,4 +1,4 @@
-import type { AttendanceStatus, FollowUpCategory, Role } from "@diaconia/shared";
+import type { AttendanceStatus, FollowUpCategory, LocationSource, MeetingStatus, Role } from "@diaconia/shared";
 
 export type LocalUser = {
   id: string;
@@ -7,6 +7,7 @@ export type LocalUser = {
   phone?: string | null;
   token: string;
   role: Role;
+  status?: "invited" | "active" | "disabled";
   profilePhotoUri?: string;
   profilePhotoRemoteMediaId?: string;
 };
@@ -16,39 +17,49 @@ export type LocalGroup = {
   name: string;
   community: string;
   facilitatorId?: string;
+  chaplainUserId?: string | null;
 };
 
-export type LocalAttendee = {
+export type LocalMember = {
   id: string;
   groupId: string;
   displayName: string;
+  email?: string | null;
   phone?: string;
-  isFacilitator?: boolean;
+  role?: Role;
+  position?: "president" | "secretary" | "treasurer" | null;
   profilePhotoUri?: string;
   profilePhotoRemoteMediaId?: string;
 };
 
 export type LocalPrayerRequest = {
   id: string;
-  attendeeId?: string | null;
-  requesterName: string;
   request: string;
 };
 
 export type LocalPhoto = {
   id: string;
   uri: string;
-  type: "user_profile_photo" | "attendee_profile_photo" | "meeting_photo";
+  type: "user_profile_photo" | "group_profile_photo" | "meeting_photo";
   contentType: string;
   byteSize: number;
   uploaded: boolean;
   remoteMediaId?: string;
 };
 
-export type LocalSession = {
+export type LocalMeeting = {
   id: string;
   groupId: string;
-  heldAt: string;
+  scheduledStartAt: string;
+  scheduledEndAt?: string | null;
+  occurredAt?: string | null;
+  status: MeetingStatus;
+  latitude?: number | null;
+  longitude?: number | null;
+  locationName?: string | null;
+  address?: string | null;
+  locationCapturedAt?: string | null;
+  locationSource?: LocationSource | null;
   notes: string;
   followUpCategory: FollowUpCategory;
   followUpNotes: string;

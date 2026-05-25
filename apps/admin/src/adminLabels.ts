@@ -3,12 +3,12 @@ import type { SupportedLocale } from "@diaconia/shared";
 const adminLabels = {
   es: {
     // Sign in
-    signInSubtitle: "Pegá tu token de Cognito, o continuá sin token en desarrollo local.",
-    cognitoTokenLabel: "Token de Cognito",
-    cognitoTokenPlaceholder: "Pegá el token (opcional en desarrollo local)",
+    signInSubtitle: "Pegá tu token de acceso, o continuá sin token en desarrollo local.",
+    accessTokenLabel: "Token de acceso",
+    accessTokenPlaceholder: "Pegá el token (opcional en desarrollo local)",
     signingIn: "Ingresando…",
     signIn: "Ingresar",
-    invalidToken: "Token inválido. Verificá tu token de Cognito e intentá de nuevo.",
+    invalidToken: "Token inválido. Verificá tu token de acceso e intentá de nuevo.",
 
     // Nav
     dashboard: "Inicio",
@@ -20,7 +20,7 @@ const adminLabels = {
     // App bar / user menu
     userMenu: "Menú de usuario",
     profile: "Perfil",
-    signOut: "Cerrar sesión",
+    signOut: "Salir",
 
     // Profile editor
     editProfile: "Editar perfil",
@@ -45,13 +45,13 @@ const adminLabels = {
     viewMembers: "Ver miembros",
 
     // Meetings list
-    meetingsSubtitle: "Todas las sesiones de grupos de confianza e informes de campo",
+    meetingsSubtitle: "Todas las reuniones de grupos de confianza e informes de campo",
     exportCsv: "Exportar CSV",
     from: "Desde",
     to: "Hasta",
     groupId: "ID de grupo",
     filter: "Filtrar",
-    loadingSessions: "Cargando sesiones…",
+    loadingMeetings: "Cargando reuniones…",
     loading: "Cargando…",
     colDate: "Fecha",
     colGroup: "Grupo",
@@ -62,7 +62,7 @@ const adminLabels = {
     colNotes: "Notas",
     noRequests: "Sin pedidos",
     noNotes: "Sin notas",
-    noSessions: "No hay sesiones para mostrar.",
+    noMeetings: "No hay reuniones para mostrar.",
     meetingPhoto: "Foto de reunión",
 
     // Members
@@ -71,12 +71,12 @@ const adminLabels = {
     found: (n: number) => `${n} encontrado${n !== 1 ? "s" : ""}`,
     colName: "Nombre",
     colCommunity: "Comunidad",
-    colSessions: "Sesiones",
+    colMeetings: "Reuniones",
     noFacilitators: "No se encontraron facilitadores.",
-    groupAttendees: "Asistentes del grupo",
-    attendeesComing: "Gestión de asistentes próximamente",
-    attendeesComingDesc:
-      "Las listas de asistentes por grupo estarán disponibles aquí cuando la API esté lista.",
+    groupMembers: "Miembros del grupo",
+    membersComing: "Gestión de miembros próximamente",
+    membersComingDesc:
+      "Las listas de miembros por grupo estarán disponibles aquí cuando la API esté lista.",
 
     // Settings
     settingsSubtitle: "Preferencias y configuración de la aplicación",
@@ -90,7 +90,7 @@ const adminLabels = {
       "La gestión de grupos, notificaciones y roles de usuario aparecerá aquí.",
 
     // Status
-    sessions: (n: number) => `${n} sesión${n !== 1 ? "es" : ""}`,
+    meetingsCount: (n: number) => `${n} reunión${n !== 1 ? "es" : ""}`,
     groups: "Grupos",
     colStatus: "Estado",
     save: "Guardar",
@@ -111,7 +111,7 @@ const adminLabels = {
     groupDeleted: "Grupo desactivado",
     groupsFound: (n: number) => `${n} grupo${n !== 1 ? "s" : ""}`,
     noGroups: "No se encontraron grupos.",
-    noGroupAttendees: "Sin asistentes registrados.",
+    noGroupMembers: "Sin miembros registrados.",
     createGroupFirst: "Primero creá un grupo",
     noGroupsForMeeting: "No hay grupos disponibles. Creá un grupo antes de agregar una reunión.",
 
@@ -162,7 +162,7 @@ const adminLabels = {
     colCreated: "Creado",
     roleFacilitator: "Facilitador",
     roleAdmin: "Administrador",
-    cognitoSub: "Sub de Cognito",
+    authSubjectLabel: "ID del proveedor de identidad",
     noGroup: "Sin grupo",
     noEmail: "Sin correo",
     noPhone: "Sin teléfono",
@@ -208,12 +208,12 @@ const adminLabels = {
 
   en: {
     // Sign in
-    signInSubtitle: "Paste a Cognito ID token, or continue without one in local dev.",
-    cognitoTokenLabel: "Cognito ID Token",
-    cognitoTokenPlaceholder: "Paste bearer token (optional for local dev)",
+    signInSubtitle: "Paste an access token, or continue without one in local dev.",
+    accessTokenLabel: "Access token",
+    accessTokenPlaceholder: "Paste bearer token (optional for local dev)",
     signingIn: "Signing in…",
     signIn: "Sign in",
-    invalidToken: "Invalid token. Check your Cognito ID token and try again.",
+    invalidToken: "Invalid token. Check your access token and try again.",
 
     // Nav
     dashboard: "Dashboard",
@@ -250,13 +250,13 @@ const adminLabels = {
     viewMembers: "View members",
 
     // Meetings list
-    meetingsSubtitle: "All trust group sessions and field reports",
+    meetingsSubtitle: "All trust group meetings and field reports",
     exportCsv: "Export CSV",
     from: "From",
     to: "To",
     groupId: "Group ID",
     filter: "Filter",
-    loadingSessions: "Loading sessions…",
+    loadingMeetings: "Loading meetings…",
     loading: "Loading…",
     colDate: "Date",
     colGroup: "Group",
@@ -267,7 +267,7 @@ const adminLabels = {
     colNotes: "Notes",
     noRequests: "No requests",
     noNotes: "No notes",
-    noSessions: "No sessions to show.",
+    noMeetings: "No meetings to show.",
     meetingPhoto: "Meeting photo",
 
     // Members
@@ -276,12 +276,12 @@ const adminLabels = {
     found: (n: number) => `${n} found`,
     colName: "Name",
     colCommunity: "Community",
-    colSessions: "Sessions",
+    colMeetings: "Meetings",
     noFacilitators: "No facilitators found.",
-    groupAttendees: "Group Attendees",
-    attendeesComing: "Attendee management coming soon",
-    attendeesComingDesc:
-      "Group-level attendee lists will be available here once the roster API is ready.",
+    groupMembers: "Group Members",
+    membersComing: "Member management coming soon",
+    membersComingDesc:
+      "Group-level member lists will be available here once the roster API is ready.",
 
     // Settings
     settingsSubtitle: "Application preferences and configuration",
@@ -294,7 +294,7 @@ const adminLabels = {
     moreSettingsDesc: "Group management, notifications, and user roles will appear here.",
 
     // Status
-    sessions: (n: number) => `${n} session${n !== 1 ? "s" : ""}`,
+    meetingsCount: (n: number) => `${n} meeting${n !== 1 ? "s" : ""}`,
     groups: "Groups",
     colStatus: "Status",
     save: "Save",
@@ -315,7 +315,7 @@ const adminLabels = {
     groupDeleted: "Group deactivated",
     groupsFound: (n: number) => `${n} group${n !== 1 ? "s" : ""}`,
     noGroups: "No groups found.",
-    noGroupAttendees: "No members registered.",
+    noGroupMembers: "No members registered.",
     createGroupFirst: "Create a group first",
     noGroupsForMeeting: "No groups available. Create a group before adding a meeting.",
 
@@ -366,7 +366,7 @@ const adminLabels = {
     colCreated: "Created",
     roleFacilitator: "Facilitator",
     roleAdmin: "Admin",
-    cognitoSub: "Cognito Sub",
+    authSubjectLabel: "Identity provider ID",
     noGroup: "No group",
     noEmail: "No email",
     noPhone: "No phone",

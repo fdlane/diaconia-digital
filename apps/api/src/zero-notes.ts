@@ -5,9 +5,10 @@ export const zeroIntegrationNotes = {
   tables: [
     "users",
     "groups",
-    "attendees",
-    "sessions",
-    "attendance_records",
+    "group_memberships",
+    "meetings",
+    "meeting_attendance",
+    "prayer_requests",
     "media_assets",
   ],
 };

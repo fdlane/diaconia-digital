@@ -7,7 +7,7 @@ import { UsersIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-type AdminSession = {
+type AdminMeeting = {
   id: string;
   facilitatorName: string;
   groupName: string;
@@ -18,7 +18,7 @@ type FacilitatorRow = {
   name: string;
   groupName: string;
   community: string;
-  sessionCount: number;
+  meetingCount: number;
 };
 
 export function MembersPage() {
@@ -36,22 +36,22 @@ export function MembersPage() {
     const headers = token ? { authorization: `Bearer ${token}` } : {};
 
     try {
-      const res = await fetch(`${apiUrl}/admin/sessions`, { headers });
+      const res = await fetch(`${apiUrl}/meetings`, { headers });
       if (!res.ok) { setLoading(false); return; }
 
-      const data = (await res.json()) as { sessions: AdminSession[] };
+      const data = (await res.json()) as { meetings: AdminMeeting[] };
 
       const map = new Map<string, FacilitatorRow>();
-      for (const s of data.sessions) {
+      for (const s of data.meetings) {
         if (!map.has(s.facilitatorName)) {
           map.set(s.facilitatorName, {
             name: s.facilitatorName,
             groupName: s.groupName,
             community: s.community,
-            sessionCount: 0,
+            meetingCount: 0,
           });
         }
-        map.get(s.facilitatorName)!.sessionCount++;
+        map.get(s.facilitatorName)!.meetingCount++;
       }
       setFacilitators([...map.values()].sort((a, b) => a.name.localeCompare(b.name)));
     } catch {
@@ -81,7 +81,7 @@ export function MembersPage() {
                 <th>{l.colName}</th>
                 <th>{l.colGroup}</th>
                 <th>{l.colCommunity}</th>
-                <th>{l.colSessions}</th>
+                <th>{l.colMeetings}</th>
               </tr>
             </thead>
             <tbody>
@@ -91,7 +91,7 @@ export function MembersPage() {
                   <td>{f.groupName}</td>
                   <td className="text-muted">{f.community}</td>
                   <td>
-                    <span className="badge badge-default">{f.sessionCount}</span>
+                    <span className="badge badge-default">{f.meetingCount}</span>
                   </td>
                 </tr>
               ))}
@@ -116,7 +116,7 @@ export function MembersPage() {
 
       <div className="card">
         <div className="card-header">
-          <span className="card-title">{l.groupAttendees}</span>
+          <span className="card-title">{l.groupMembers}</span>
         </div>
         <div className="card-body">
           <div className="placeholder-page" style={{ minHeight: 200 }}>
@@ -125,10 +125,10 @@ export function MembersPage() {
             </div>
             <div>
               <p className="font-semibold" style={{ color: "var(--ink-2)" }}>
-                {l.attendeesComing}
+                {l.membersComing}
               </p>
               <p className="text-sm text-muted" style={{ marginTop: "0.25rem" }}>
-                {l.attendeesComingDesc}
+                {l.membersComingDesc}
               </p>
             </div>
           </div>

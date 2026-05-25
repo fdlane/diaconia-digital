@@ -49,9 +49,9 @@ export function GroupFormPage({ id }: { id?: string }) {
 
     try {
       const [usersRes, chaplainsRes, groupRes] = await Promise.all([
-        fetch(`${apiUrl}/admin/users`, { headers }),
-        fetch(`${apiUrl}/admin/chaplains`, { headers }),
-        isEdit && id ? fetch(`${apiUrl}/admin/groups/${id}`, { headers }) : Promise.resolve(null),
+        fetch(`${apiUrl}/users`, { headers }),
+        fetch(`${apiUrl}/chaplains`, { headers }),
+        isEdit && id ? fetch(`${apiUrl}/groups/${id}`, { headers }) : Promise.resolve(null),
       ]);
 
       if (!usersRes.ok) {
@@ -117,7 +117,7 @@ export function GroupFormPage({ id }: { id?: string }) {
     });
 
     try {
-      const url = isEdit ? `${apiUrl}/admin/groups/${id}` : `${apiUrl}/admin/groups`;
+      const url = isEdit ? `${apiUrl}/groups/${id}` : `${apiUrl}/groups`;
       const method = isEdit ? "PUT" : "POST";
       const res = await fetch(url, { method, headers, body });
 

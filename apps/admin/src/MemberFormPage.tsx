@@ -9,7 +9,7 @@ import { ArrowLeftIcon } from "./icons";
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
-type UserRole = "facilitator" | "admin" | "chaplain";
+type UserRole = "admin" | "facilitator" | "chaplain" | "member";
 
 type UserDetail = {
   id: string;
@@ -17,7 +17,7 @@ type UserDetail = {
   email: string | null;
   phone: string | null;
   role: UserRole;
-  cognitoSub: string;
+  authSubject: string;
 };
 
 type FormState = {
@@ -25,7 +25,7 @@ type FormState = {
   email: string;
   phone: string;
   role: UserRole;
-  cognitoSub: string;
+  authSubject: string;
 };
 
 const empty: FormState = {
@@ -33,7 +33,7 @@ const empty: FormState = {
   email: "",
   phone: "",
   role: "facilitator",
-  cognitoSub: "",
+  authSubject: "",
 };
 
 export function MemberFormPage({ id }: { id?: string }) {
@@ -57,7 +57,7 @@ export function MemberFormPage({ id }: { id?: string }) {
     setLoadStatus("loading");
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(`${apiUrl}/admin/users/${userId}`, { headers });
+      const res = await fetch(`${apiUrl}/users/${userId}`, { headers });
       if (!res.ok) {
         setLoadStatus("error");
         setErrorMsg(`Error ${res.status}`);
@@ -70,7 +70,7 @@ export function MemberFormPage({ id }: { id?: string }) {
         email: u.email ?? "",
         phone: u.phone ?? "",
         role: u.role,
-        cognitoSub: u.cognitoSub,
+        authSubject: u.authSubject,
       });
       setLoadStatus("ready");
     } catch (err) {
@@ -97,20 +97,20 @@ export function MemberFormPage({ id }: { id?: string }) {
     const body = isEdit
       ? JSON.stringify({
           displayName: form.displayName,
-          email: form.email || null,
+          email: form.email,
           phone: form.phone || null,
           role: form.role,
         })
       : JSON.stringify({
           displayName: form.displayName,
-          email: form.email || null,
+          email: form.email,
           phone: form.phone || null,
           role: form.role,
-          cognitoSub: form.cognitoSub || undefined,
+          authSubject: form.authSubject || undefined,
         });
 
     try {
-      const url = isEdit ? `${apiUrl}/admin/users/${id}` : `${apiUrl}/admin/users`;
+      const url = isEdit ? `${apiUrl}/users/${id}` : `${apiUrl}/users`;
       const method = isEdit ? "PUT" : "POST";
       const res = await fetch(url, { method, headers, body });
 
@@ -215,20 +215,21 @@ export function MemberFormPage({ id }: { id?: string }) {
                 <option value="facilitator">{l.roleFacilitator}</option>
                 <option value="admin">{l.roleAdmin}</option>
                 <option value="chaplain">{locale === "es" ? "Capellán" : "Chaplain"}</option>
+                <option value="member">{locale === "es" ? "Miembro" : "Member"}</option>
               </select>
             </div>
 
             {!isEdit ? (
               <div className="form-field">
                 <label htmlFor="f-sub">
-                  {l.cognitoSub}{" "}
-                  <span className="text-muted text-sm">(optional — auto-generated if blank)</span>
+                  {l.authSubjectLabel}{" "}
+                  <span className="text-muted text-sm">({locale === "es" ? "opcional; se vincula al aceptar la invitacion" : "optional; linked on invitation acceptance"})</span>
                 </label>
                 <input
                   id="f-sub"
-                  onChange={field("cognitoSub")}
-                  placeholder="AWS Cognito User Sub"
-                  value={form.cognitoSub}
+                  onChange={field("authSubject")}
+                  placeholder={locale === "es" ? "ID del proveedor de identidad" : "Identity provider ID"}
+                  value={form.authSubject}
                 />
               </div>
             ) : null}

@@ -1,6 +1,6 @@
 # Diaconia Foundation Infrastructure
 
-Terraform foundation for the first Diaconia field-session slice on AWS.
+Terraform foundation for the first Diaconia field-meeting slice on AWS.
 
 The first deploy target is a `dev` environment in `sa-east-1` using the AWS Application Load Balancer DNS name. A custom domain, ACM certificate, private subnet NAT egress, RDS backup retention, and remote Terraform state should be added before production.
 
@@ -12,7 +12,7 @@ The first deploy target is a `dev` environment in `sa-east-1` using the AWS Appl
 - ECS Fargate services for the API and admin app
 - RDS PostgreSQL for Drizzle data
 - S3 media bucket for profile and meeting images
-- Cognito User Pool, app client, and `admin`/`facilitator` groups
+- External OIDC identity provider integration, with invite-first access controlled by the API
 - KMS key, Secrets Manager database URL, and CloudWatch log groups
 
 Zero is intentionally not deployed yet because the repo currently has Zero integration notes and client config, but no runnable Zero service entrypoint.
@@ -131,7 +131,7 @@ The RDS instance is private. The `3b. Run db migrations` GitHub workflow builds
 task in the existing API service network.
 
 For local emergency use, run migrations only from a network location that can reach
-the private RDS instance, such as a bastion/session-manager host or an ECS one-off
+the private RDS instance, such as a bastion, AWS Systems Manager access path, or an ECS one-off
 task in the VPC.
 
 Optionally seed demo data from the same private network path with
@@ -145,6 +145,6 @@ curl "http://$ALB_DNS/health"
 curl "http://$ALB_DNS/openapi.json"
 ```
 
-Then open `http://$ALB_DNS` and verify the admin dashboard loads. API routes used by the admin app, including `/admin/*`, `/media/*`, `/sessions`, `/me/*`, and `/attendees/*`, are forwarded to the API target group.
+Then open `http://$ALB_DNS` and verify the admin dashboard loads. API routes used by the admin and mobile apps, including `/media/*`, `/meetings`, `/me/*`, `/users/*`, `/groups/*`, and `/zero/*`, are forwarded to the API target group.
 
-Create initial Cognito users manually or with the AWS CLI, then add dashboard users to the `admin` group and mobile users to the `facilitator` group.
+Create initial identity-provider users through the configured provider, then invite or activate their matching application users through the admin workflow.

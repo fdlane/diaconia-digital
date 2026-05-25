@@ -461,7 +461,7 @@ resource "aws_lb_listener_rule" "api_existing_routes" {
   }
 }
 
-resource "aws_lb_listener_rule" "api_sessions" {
+resource "aws_lb_listener_rule" "api_meetings" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 30
 
@@ -472,7 +472,7 @@ resource "aws_lb_listener_rule" "api_sessions" {
 
   condition {
     path_pattern {
-      values = ["/sessions", "/sessions/*"]
+      values = ["/meetings", "/meetings/*"]
     }
   }
 }

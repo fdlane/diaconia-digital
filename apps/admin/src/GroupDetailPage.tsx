@@ -24,8 +24,9 @@ type GroupDetail = {
   createdAt: string;
 };
 
-type Attendee = {
+type Membership = {
   id: string;
+  userId: string;
   displayName: string;
   phone: string | null;
   position: "president" | "secretary" | "treasurer" | null;
@@ -38,8 +39,8 @@ export function GroupDetailPage({ id }: { id: string }) {
   const router = useRouter();
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
-  const [attendees, setAttendees] = useState<Attendee[]>([]);
-  const [sessionCount, setSessionCount] = useState(0);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
+  const [meetingCount, setMeetingCount] = useState(0);
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [deleteState, setDeleteState] = useState<"idle" | "confirming" | "deleting">("idle");
@@ -52,7 +53,7 @@ export function GroupDetailPage({ id }: { id: string }) {
     setStatus("loading");
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(`${apiUrl}/admin/groups/${id}`, { headers });
+      const res = await fetch(`${apiUrl}/groups/${id}`, { headers });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
         setErrorMsg(payload?.error ?? `Error ${res.status}`);
@@ -61,12 +62,12 @@ export function GroupDetailPage({ id }: { id: string }) {
       }
       const data = (await res.json()) as {
         group: GroupDetail;
-        sessionCount: number;
-        attendees: Attendee[];
+        meetingCount: number;
+        memberships: Membership[];
       };
       setGroup(data.group);
-      setSessionCount(data.sessionCount);
-      setAttendees(data.attendees);
+      setMeetingCount(data.meetingCount);
+      setMemberships(data.memberships);
       setStatus("done");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error");
@@ -78,7 +79,7 @@ export function GroupDetailPage({ id }: { id: string }) {
     setDeleteState("deleting");
     const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
     try {
-      const res = await fetch(`${apiUrl}/admin/groups/${id}`, { method: "DELETE", headers });
+      const res = await fetch(`${apiUrl}/groups/${id}`, { method: "DELETE", headers });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as { error?: string } | null;
         setErrorMsg(payload?.error ?? `Error ${res.status}`);
@@ -239,8 +240,8 @@ export function GroupDetailPage({ id }: { id: string }) {
                 <line x1="3" x2="21" y1="10" y2="10" />
               </svg>
             </div>
-            <div className="stat-card-value">{sessionCount}</div>
-            <div className="stat-card-label">{l.colSessions}</div>
+            <div className="stat-card-value">{meetingCount}</div>
+            <div className="stat-card-label">{l.colMeetings}</div>
           </div>
           <div className="stat-card">
             <div className="stat-card-icon purple">
@@ -250,13 +251,13 @@ export function GroupDetailPage({ id }: { id: string }) {
                 <circle cx="9" cy="7" r="4" />
               </svg>
             </div>
-            <div className="stat-card-value">{attendees.length}</div>
-            <div className="stat-card-label">{l.groupAttendees}</div>
+            <div className="stat-card-value">{memberships.length}</div>
+            <div className="stat-card-label">{l.groupMembers}</div>
           </div>
         </div>
 
         {/* Steering Committee */}
-        {attendees.some((a) => a.position) ? (
+        {memberships.some((a) => a.position) ? (
           <div className="card">
             <div className="card-header">
               <span className="card-title">{l.steeringCommittee}</span>
@@ -264,7 +265,7 @@ export function GroupDetailPage({ id }: { id: string }) {
             <div className="card-body">
               <div className="detail-grid">
                 {(["president", "secretary", "treasurer"] as const).map((pos) => {
-                  const member = attendees.find((a) => a.position === pos);
+                  const member = memberships.find((a) => a.position === pos);
                   const label = pos === "president" ? l.positionPresident : pos === "secretary" ? l.positionSecretary : l.positionTreasurer;
                   return (
                     <div className="detail-field" key={pos}>
@@ -282,9 +283,9 @@ export function GroupDetailPage({ id }: { id: string }) {
 
         <div className="card">
           <div className="card-header">
-            <span className="card-title">{l.groupAttendees}</span>
-            {attendees.length > 0 ? (
-              <span className="text-sm text-muted">{attendees.length}</span>
+            <span className="card-title">{l.groupMembers}</span>
+            {memberships.length > 0 ? (
+              <span className="text-sm text-muted">{memberships.length}</span>
             ) : null}
           </div>
           <div className="table-wrapper">
@@ -298,7 +299,7 @@ export function GroupDetailPage({ id }: { id: string }) {
                 </tr>
               </thead>
               <tbody>
-                {attendees.map((a) => (
+                {memberships.map((a) => (
                   <tr key={a.id}>
                     <td>{a.displayName}</td>
                     <td>
@@ -318,9 +319,9 @@ export function GroupDetailPage({ id }: { id: string }) {
                     </td>
                   </tr>
                 ))}
-                {!attendees.length ? (
+                {!memberships.length ? (
                   <tr>
-                    <td className="table-empty" colSpan={4}>{l.noGroupAttendees}</td>
+                    <td className="table-empty" colSpan={4}>{l.noGroupMembers}</td>
                   </tr>
                 ) : null}
               </tbody>
