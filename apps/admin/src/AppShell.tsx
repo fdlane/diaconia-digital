@@ -17,6 +17,7 @@ import {
   UserIcon,
   UsersIcon,
 } from "./icons";
+import { AppLoadingScreen } from "./AppLoadingScreen";
 import { SignInPage } from "./SignInPage";
 import { desktopSidebarMediaQuery, getInitialSidebarOpen } from "./sidebarState";
 
@@ -74,7 +75,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  if (!isLoaded) return null;
+  if (!isLoaded) return <AppLoadingScreen label={l.loading} />;
   if (!currentUser) return <SignInPage />;
 
   function handleSignOut() {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
@@ -94,6 +95,7 @@ export function Dashboard() {
     day: "numeric",
     year: "numeric",
   }).format(new Date());
+  const statsLoading = plannedCount === "…" || reportsCount === "…" || openPrayersCount === "…";
 
   return (
     <div>
@@ -101,6 +103,13 @@ export function Dashboard() {
         <h1 className="page-title">{greeting}</h1>
         <p className="page-subtitle">{today}</p>
       </div>
+
+      {statsLoading ? (
+        <div className="dashboard-loading" role="status" aria-live="polite">
+          <span className="loading-dot" />
+          <span>{l.loading}</span>
+        </div>
+      ) : null}
 
       <div className="stat-cards">
         <StatCard
@@ -132,14 +141,14 @@ export function Dashboard() {
         </div>
         <div className="card-body">
           <div className="quick-links">
-            <a className="quick-link" href="/meetings">
+            <Link className="quick-link" href="/meetings">
               <CalendarIcon size={18} />
               {l.viewAllMeetings}
-            </a>
-            <a className="quick-link" href="/members">
+            </Link>
+            <Link className="quick-link" href="/members">
               <UsersIcon size={18} />
               {l.viewMembers}
-            </a>
+            </Link>
           </div>
         </div>
       </div>

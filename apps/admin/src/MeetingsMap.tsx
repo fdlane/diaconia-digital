@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { formatDisplayDate, type SupportedLocale } from "@diaconia/shared";
 import type { AdminMeeting } from "./MeetingsList";
@@ -21,6 +22,7 @@ export function MeetingsMap({
   viewDetailsLabel,
   onSelect,
 }: Props) {
+  const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<import("leaflet").Map | null>(null);
   const markersRef = useRef<Record<string, import("leaflet").Marker>>({});
@@ -29,6 +31,26 @@ export function MeetingsMap({
   useEffect(() => {
     onSelectRef.current = onSelect;
   }, [onSelect]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const mapContainer = container;
+
+    function handlePopupRouteClick(event: MouseEvent) {
+      const target = event.target instanceof Element ? event.target : null;
+      const link = target?.closest<HTMLAnchorElement>("a[data-app-route]");
+      const href = link?.getAttribute("href");
+
+      if (!link || !href || !href.startsWith("/") || !mapContainer.contains(link)) return;
+
+      event.preventDefault();
+      router.push(href);
+    }
+
+    mapContainer.addEventListener("click", handlePopupRouteClick);
+    return () => mapContainer.removeEventListener("click", handlePopupRouteClick);
+  }, [router]);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -143,9 +165,9 @@ function meetingPopupHtml(
       <small>${escapeHtml(formatDisplayDate(meeting.heldAt, locale))}</small>
       <span class="map-popup-steward">
         ${escapeHtml(stewardLabel)}:
-        <a href="/members/${encodeURIComponent(meeting.facilitatorId)}">${escapeHtml(meeting.facilitatorName)}</a>
+        <a data-app-route href="/members/${encodeURIComponent(meeting.facilitatorId)}">${escapeHtml(meeting.facilitatorName)}</a>
       </span>
-      <a class="map-popup-detail-link" href="/meetings/${encodeURIComponent(meeting.id)}">${escapeHtml(viewDetailsLabel)}</a>
+      <a class="map-popup-detail-link" data-app-route href="/meetings/${encodeURIComponent(meeting.id)}">${escapeHtml(viewDetailsLabel)}</a>
     </div>
   `;
 }
