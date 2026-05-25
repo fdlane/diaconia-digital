@@ -16,7 +16,7 @@ type UserDetail = {
   displayName: string;
   email: string | null;
   phone: string | null;
-  role: "facilitator" | "admin";
+  role: "admin" | "facilitator" | "chaplain" | "member";
   createdAt: string;
   updatedAt: string;
 };
@@ -39,6 +39,13 @@ export function MemberDetailPage({ id }: { id: string }) {
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [deleteState, setDeleteState] = useState<"idle" | "confirming" | "deleting">("idle");
+
+  function roleLabel(role: UserDetail["role"]) {
+    if (role === "admin") return l.roleAdmin;
+    if (role === "chaplain") return l.chaplain;
+    if (role === "member") return l.rolePerson;
+    return l.roleFacilitator;
+  }
 
   useEffect(() => {
     void load();
@@ -79,7 +86,7 @@ export function MemberDetailPage({ id }: { id: string }) {
         setDeleteState("idle");
         return;
       }
-      router.push("/members");
+      router.push("/people");
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Error");
       setDeleteState("idle");
@@ -90,7 +97,7 @@ export function MemberDetailPage({ id }: { id: string }) {
     return (
       <div>
         <nav className="breadcrumb">
-          <Link href="/members">{l.members}</Link>
+          <Link href="/people">{l.members}</Link>
           <span className="breadcrumb-sep">›</span>
           <span>{l.loading}</span>
         </nav>
@@ -106,12 +113,12 @@ export function MemberDetailPage({ id }: { id: string }) {
     return (
       <div>
         <nav className="breadcrumb">
-          <Link href="/members">{l.members}</Link>
+          <Link href="/people">{l.members}</Link>
           <span className="breadcrumb-sep">›</span>
           <span>Error</span>
         </nav>
         <div className="banner banner-error">{errorMsg || "Not found"}</div>
-        <Link className="btn btn-ghost" href="/members">
+        <Link className="btn btn-ghost" href="/people">
           <ArrowLeftIcon size={15} />
           {l.backToMembers}
         </Link>
@@ -122,7 +129,7 @@ export function MemberDetailPage({ id }: { id: string }) {
   return (
     <div>
       <nav className="breadcrumb">
-        <Link href="/members">{l.members}</Link>
+        <Link href="/people">{l.members}</Link>
         <span className="breadcrumb-sep">›</span>
         <span>{user.displayName}</span>
       </nav>
@@ -131,7 +138,7 @@ export function MemberDetailPage({ id }: { id: string }) {
         <div className="page-header">
           <h1 className="page-title">{user.displayName}</h1>
           <p className="page-subtitle">
-            {user.role === "admin" ? l.roleAdmin : l.roleFacilitator}
+            {roleLabel(user.role)}
           </p>
         </div>
         <div className="page-header-actions">
@@ -151,7 +158,7 @@ export function MemberDetailPage({ id }: { id: string }) {
             </div>
           ) : (
             <>
-              <Link className="btn btn-secondary" href={`/members/${id}/edit`}>
+              <Link className="btn btn-secondary" href={`/people/${id}/edit`}>
                 <EditIcon size={15} />
                 {l.editMember}
               </Link>
@@ -188,6 +195,10 @@ export function MemberDetailPage({ id }: { id: string }) {
                 <span className="detail-value">
                   {user.role === "admin" ? (
                     <span className="badge badge-default">{l.roleAdmin}</span>
+                  ) : user.role === "chaplain" ? (
+                    <span className="badge badge-muted">{l.chaplain}</span>
+                  ) : user.role === "member" ? (
+                    <span className="badge badge-muted">{l.rolePerson}</span>
                   ) : (
                     <span className="badge badge-muted">{l.roleFacilitator}</span>
                   )}

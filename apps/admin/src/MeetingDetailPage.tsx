@@ -318,7 +318,7 @@ export function MeetingDetailPage({ id }: { id: string }) {
           <div className="card-header">
             <span className="card-title">{l.attendance}</span>
             {attendance.length > 0 ? (
-              <span className="text-sm text-muted">{attendance.length} {locale === "es" ? "miembros" : "members"}</span>
+              <span className="text-sm text-muted">{attendance.length} {locale === "es" ? "personas" : "people"}</span>
             ) : null}
           </div>
           <div className="table-wrapper">

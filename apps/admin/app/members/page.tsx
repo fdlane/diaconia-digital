@@ -1,5 +1,5 @@
-import { MembersListPage } from "../../src/MembersListPage";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <MembersListPage />;
+  redirect("/people");
 }

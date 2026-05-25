@@ -55,7 +55,7 @@ export function GroupFormPage({ id }: { id?: string }) {
       ]);
 
       if (!usersRes.ok) {
-        setErrorMsg(`Failed to load members: ${usersRes.status}`);
+        setErrorMsg(`Failed to load people: ${usersRes.status}`);
         setLoadStatus("error");
         return;
       }

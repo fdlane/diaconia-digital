@@ -532,6 +532,17 @@ resource "aws_secretsmanager_secret_version" "database_url" {
   )
 }
 
+resource "aws_secretsmanager_secret" "clerk_secret_key" {
+  name       = "${local.name}/clerk-secret-key"
+  kms_key_id = aws_kms_key.app.arn
+  tags       = local.common_tags
+}
+
+resource "aws_secretsmanager_secret_version" "clerk_secret_key" {
+  secret_id     = aws_secretsmanager_secret.clerk_secret_key.id
+  secret_string = var.clerk_secret_key
+}
+
 resource "aws_iam_role" "ecs_task_execution" {
   name = "${local.name}-ecs-execution"
 
@@ -568,7 +579,10 @@ resource "aws_iam_role_policy" "ecs_task_execution_secrets" {
         Action = [
           "secretsmanager:GetSecretValue"
         ]
-        Resource = aws_secretsmanager_secret.database_url.arn
+        Resource = [
+          aws_secretsmanager_secret.database_url.arn,
+          aws_secretsmanager_secret.clerk_secret_key.arn,
+        ]
       },
       {
         Effect = "Allow"
@@ -727,7 +741,11 @@ resource "aws_ecs_task_definition" "admin" {
       ]
       environment = [
         { name = "NODE_ENV", value = "production" },
-        { name = "PORT", value = tostring(var.admin_container_port) }
+        { name = "PORT", value = tostring(var.admin_container_port) },
+        { name = "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", value = var.clerk_publishable_key }
+      ]
+      secrets = [
+        { name = "CLERK_SECRET_KEY", valueFrom = aws_secretsmanager_secret.clerk_secret_key.arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
