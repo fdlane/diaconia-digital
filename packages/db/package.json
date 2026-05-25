@@ -12,7 +12,7 @@
     "test": "vitest run --passWithNoTests",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx src/seed.ts",
+    "db:seed": "node --env-file=../../.env --import tsx src/seed.ts",
     "zero:generate": "drizzle-zero generate --schema ./src/schema.ts --out ./src/zero/schema.ts"
   },
   "dependencies": {

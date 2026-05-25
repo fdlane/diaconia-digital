@@ -22,6 +22,10 @@ type FormState = {
 
 const empty: FormState = { name: "", community: "", facilitatorId: "", chaplainId: "", active: true };
 
+function uniqueById<T extends { id: string }>(items: T[]) {
+  return [...new Map(items.map((item) => [item.id, item])).values()];
+}
+
 export function GroupFormPage({ id }: { id?: string }) {
   const { token, locale } = useAuth();
   const l = t(locale);
@@ -57,7 +61,8 @@ export function GroupFormPage({ id }: { id?: string }) {
       }
 
       const usersData = (await usersRes.json()) as { users: MemberOption[] };
-      setMembers(usersData.users.filter((user) => user.role === "facilitator"));
+      const facilitatorOptions = uniqueById(usersData.users.filter((user) => user.role === "facilitator"));
+      setMembers(facilitatorOptions);
 
       if (chaplainsRes.ok) {
         const chaplainsData = (await chaplainsRes.json()) as { chaplains: ChaplainOption[] };
@@ -75,8 +80,8 @@ export function GroupFormPage({ id }: { id?: string }) {
         };
         const g = groupData.group;
         setForm({ name: g.name, community: g.community, facilitatorId: g.facilitatorId, chaplainId: g.chaplainId ?? "", active: g.active });
-      } else if (usersData.users.length > 0) {
-        setForm((prev) => ({ ...prev, facilitatorId: usersData.users[0]!.id }));
+      } else if (facilitatorOptions.length > 0) {
+        setForm((prev) => ({ ...prev, facilitatorId: facilitatorOptions[0]!.id }));
       }
 
       setLoadStatus("ready");
