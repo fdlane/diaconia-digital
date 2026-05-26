@@ -16,3 +16,4 @@ terraform.tfstate
 terraform.tfstate.*
 .terraform/
 infra/tfplan
+infra/terraform.*.generated.tfvars

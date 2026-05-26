@@ -92,7 +92,8 @@ if image_exists "${name}/admin"; then
   verify_image_platform "${admin_repo}:${image_tag}"
 else
   build_and_push admin apps/admin/Dockerfile "${admin_repo}:${image_tag}" \
-    --build-arg "NEXT_PUBLIC_API_URL=${admin_api_url}"
+    --build-arg "NEXT_PUBLIC_API_URL=${admin_api_url}" \
+    --build-arg "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY:-}"
 fi
 
 {
