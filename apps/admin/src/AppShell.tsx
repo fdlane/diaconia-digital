@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { getProfileInitials } from "@diaconia/shared";
 import { useAuth, type CurrentUserProfile } from "./AuthContext";
-import { t } from "./adminLabels";
+import { localizeAccessError, t } from "./adminLabels";
 import {
   CalendarIcon,
   DashboardIcon,
@@ -34,10 +34,17 @@ function Avatar({ user }: { user: CurrentUserProfile }) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { currentUser, isLoaded, signOut, locale, setLocale } = useAuth();
+  const { currentUser, isLoaded, accessError, refreshSession, signOut, locale, setLocale } = useAuth();
   const l = t(locale);
   const pathname = usePathname();
   const router = useRouter();
+  const accessErrorMessage = accessError ? localizeAccessError(accessError, l) : "";
+  const shellUser: CurrentUserProfile = currentUser ?? {
+    displayName: l.authSignedInAccount,
+    email: "",
+    phone: "",
+    avatarUrl: "",
+  };
 
   const navItems = [
     { href: "/", label: l.dashboard, Icon: DashboardIcon },
@@ -76,7 +83,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (!isLoaded) return <AppLoadingScreen label={l.loading} />;
-  if (!currentUser) return <SignInPage />;
+  if (!currentUser && !accessError) return <SignInPage />;
 
   function handleSignOut() {
     setDotsOpen(false);
@@ -121,7 +128,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               EN
             </button>
           </div>
-          <Avatar user={currentUser} />
+          <Avatar user={shellUser} />
           <div className="dots-anchor" ref={dotsRef}>
             <button
               aria-expanded={dotsOpen}
@@ -135,19 +142,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {dotsOpen ? (
               <div className="context-menu" role="menu">
                 <div className="context-menu-header">
-                  <strong>{currentUser.displayName}</strong>
-                  <span>{currentUser.email || currentUser.phone || "Diaconia Admin"}</span>
+                  <strong>{shellUser.displayName}</strong>
+                  <span>{shellUser.email || shellUser.phone || "Diaconia Admin"}</span>
                 </div>
                 <div className="context-menu-divider" />
-                <Link
-                  className="context-menu-item"
-                  href="/profile"
-                  onClick={() => setDotsOpen(false)}
-                  role="menuitem"
-                >
-                  <UserIcon size={16} />
-                  {l.profile}
-                </Link>
+                {currentUser ? (
+                  <Link
+                    className="context-menu-item"
+                    href="/profile"
+                    onClick={() => setDotsOpen(false)}
+                    role="menuitem"
+                  >
+                    <UserIcon size={16} />
+                    {l.profile}
+                  </Link>
+                ) : null}
                 <button
                   className="context-menu-item danger"
                   onClick={handleSignOut}
@@ -222,9 +231,66 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </nav>
 
-        <main className="main-content">{children}</main>
+        <main className="main-content">
+          {currentUser ? (
+            children
+          ) : (
+            <AppAccessIssue
+              detail={l.authAccessIssueDetail}
+              message={accessErrorMessage || l.authSessionLoadFailed}
+              onRetry={() => void refreshSession()}
+              onSignOut={handleSignOut}
+              retryLabel={l.authTryAgain}
+              signOutLabel={l.signOut}
+              title={l.authAccessIssueTitle}
+              lead={l.authAccessIssueLead}
+            />
+          )}
+        </main>
       </div>
 
     </div>
+  );
+}
+
+function AppAccessIssue({
+  detail,
+  lead,
+  message,
+  onRetry,
+  onSignOut,
+  retryLabel,
+  signOutLabel,
+  title,
+}: {
+  detail: string;
+  lead: string;
+  message: string;
+  onRetry: () => void;
+  onSignOut: () => void;
+  retryLabel: string;
+  signOutLabel: string;
+  title: string;
+}) {
+  return (
+    <section className="access-issue-panel" aria-labelledby="access-issue-title">
+      <div className="access-issue-status" aria-hidden>
+        !
+      </div>
+      <div className="access-issue-copy">
+        <h1 id="access-issue-title">{title}</h1>
+        <p className="access-issue-lead">{lead}</p>
+        <div className="alert alert-danger">{message}</div>
+        <p className="access-issue-detail">{detail}</p>
+        <div className="access-issue-actions">
+          <button className="btn btn-primary" onClick={onRetry} type="button">
+            {retryLabel}
+          </button>
+          <button className="btn btn-secondary" onClick={onSignOut} type="button">
+            {signOutLabel}
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }

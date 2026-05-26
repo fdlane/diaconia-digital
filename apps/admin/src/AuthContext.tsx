@@ -163,7 +163,13 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
     if (!response.ok) {
       const payload = (await response.json().catch(() => null)) as { error?: string; code?: string } | null;
       setCurrentUser(null);
-      setAccessError(payload?.code ?? payload?.error ?? "INVITE_REQUIRED");
+      const fallbackCode =
+        response.status === 401
+          ? "UNAUTHENTICATED"
+          : response.status === 403
+            ? "INVITE_REQUIRED"
+            : "SESSION_LOAD_FAILED";
+      setAccessError(payload?.code ?? payload?.error ?? fallbackCode);
       markLoaded();
       return;
     }
@@ -191,7 +197,7 @@ function ClerkBackedAuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshSession().catch((error) => {
-      setAccessError(error instanceof Error ? error.message : "SESSION_LOAD_FAILED");
+      setAccessError(error instanceof Error && error.message ? error.message : "SESSION_LOAD_FAILED");
       setCurrentUser(null);
       hasLoadedSessionRef.current = true;
       setIsLoaded(true);

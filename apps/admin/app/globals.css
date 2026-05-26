@@ -345,6 +345,61 @@ a {
   min-width: 0;
 }
 
+.access-issue-panel {
+  min-height: calc(100dvh - var(--appbar-height) - 4rem);
+  display: grid;
+  grid-template-columns: auto minmax(0, 38rem);
+  align-content: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.access-issue-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-md);
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.access-issue-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  min-width: 0;
+}
+
+.access-issue-copy h1 {
+  color: var(--ink);
+  font-size: 1.35rem;
+  line-height: 1.25;
+}
+
+.access-issue-lead {
+  color: var(--ink-2);
+  font-size: 0.98rem;
+  max-width: 34rem;
+}
+
+.access-issue-detail {
+  color: var(--ink-muted);
+  font-size: 0.875rem;
+  max-width: 36rem;
+}
+
+.access-issue-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
 /* ─── Page Header ────────────────────────────────────── */
 
 .page-header {
@@ -1429,6 +1484,18 @@ tbody td {
 
   .main-content {
     padding: 1.25rem;
+  }
+
+  .access-issue-panel {
+    min-height: calc(100dvh - var(--appbar-height) - 2.5rem);
+    grid-template-columns: 1fr;
+    align-content: start;
+    padding-top: 1.5rem;
+  }
+
+  .access-issue-status {
+    width: 2.5rem;
+    height: 2.5rem;
   }
 
   .stat-cards {
