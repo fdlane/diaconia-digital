@@ -59,6 +59,19 @@ Optionally set `TF_VARS_DEV` and `TF_VARS_PROD` secrets with complete `.tfvars`
 content; otherwise dev uses the committed `infra/terraform.tfvars`, and prod expects
 `infra/terraform.prod.tfvars` or `TF_VARS_PROD`.
 
+The deployed services require Clerk values when desired counts are greater than
+zero:
+
+```hcl
+clerk_publishable_key = "pk_..."
+clerk_secret_key      = "sk_..."
+```
+
+The code deploy workflows pass Clerk values from the GitHub environment secrets
+`CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY`. They can also read
+`clerk_publishable_key` from the prepared tfvars file when the publishable key
+is not set as a GitHub secret.
+
 The deployment workflows are:
 
 - `0a. Deploy branch to AWS`: manual branch/tag/SHA code deploy
@@ -105,6 +118,7 @@ docker push "$API_REPO:$GIT_SHA"
 docker build \
   -f apps/admin/Dockerfile \
   --build-arg "NEXT_PUBLIC_API_URL=http://$ALB_DNS" \
+  --build-arg "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
   -t "$ADMIN_REPO:$GIT_SHA" .
 docker push "$ADMIN_REPO:$GIT_SHA"
 ```

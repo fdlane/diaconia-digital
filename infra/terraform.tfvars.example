@@ -16,6 +16,9 @@ allowed_logout_urls = [
   "http://localhost:19006"
 ]
 
+clerk_publishable_key = "pk_test_replace_me"
+clerk_secret_key      = "sk_test_replace_me"
+
 # Set these to pushed immutable image tags before applying with desired counts of 1.
 # If you need to create ECR before images exist, temporarily set both desired counts to 0.
 api_image_tag       = "bootstrap"

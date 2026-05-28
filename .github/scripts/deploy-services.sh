@@ -11,6 +11,20 @@ shift 2
 project="${PROJECT:-diaconia-foundation}"
 name="${project}-${environment}"
 state_key="${TF_STATE_KEY:-${project}/${environment}/terraform.tfstate}"
+terraform_vars=("$@")
+
+clerk_publishable_key="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}"
+if [ -z "$clerk_publishable_key" ]; then
+  clerk_publishable_key="${CLERK_PUBLISHABLE_KEY:-}"
+fi
+
+if [ -n "$clerk_publishable_key" ]; then
+  terraform_vars+=("-var=clerk_publishable_key=${clerk_publishable_key}")
+fi
+
+if [ -n "${CLERK_SECRET_KEY:-}" ]; then
+  terraform_vars+=("-var=clerk_secret_key=${CLERK_SECRET_KEY}")
+fi
 
 terraform -chdir=infra init \
   -backend-config="bucket=${TF_STATE_BUCKET}" \
@@ -25,7 +39,7 @@ terraform -chdir=infra plan \
   -target=aws_ecs_service.admin \
   -var-file="$tfvars_file" \
   -var="environment=${environment}" \
-  "$@" \
+  "${terraform_vars[@]}" \
   -out=tfplan
 
 terraform -chdir=infra apply -auto-approve tfplan

@@ -694,10 +694,13 @@ resource "aws_ecs_task_definition" "api" {
         { name = "MEDIA_BUCKET_NAME", value = aws_s3_bucket.media.bucket },
         { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main.id },
         { name = "COGNITO_APP_CLIENT_ID", value = aws_cognito_user_pool_client.facilitator.id },
-        { name = "ALLOWED_ORIGINS", value = join(",", concat(var.allowed_callback_urls, ["http://${aws_lb.app.dns_name}"])) }
+        { name = "ALLOWED_ORIGINS", value = join(",", concat(var.allowed_callback_urls, ["http://${aws_lb.app.dns_name}"])) },
+        { name = "CLERK_JWT_AUDIENCE", value = "diaconia-api" },
+        { name = "CLERK_AUTHORIZED_PARTIES", value = join(",", concat(var.allowed_callback_urls, ["http://${aws_lb.app.dns_name}"])) }
       ]
       secrets = [
-        { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn }
+        { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
+        { name = "CLERK_SECRET_KEY", valueFrom = aws_secretsmanager_secret.clerk_secret_key.arn }
       ]
       logConfiguration = {
         logDriver = "awslogs"
@@ -709,6 +712,13 @@ resource "aws_ecs_task_definition" "api" {
       }
     }
   ])
+
+  lifecycle {
+    precondition {
+      condition     = var.api_desired_count == 0 || length(trimspace(nonsensitive(var.clerk_secret_key))) > 0
+      error_message = "clerk_secret_key must be set when api_desired_count is greater than 0."
+    }
+  }
 
   tags = local.common_tags
 }
@@ -742,7 +752,9 @@ resource "aws_ecs_task_definition" "admin" {
       environment = [
         { name = "NODE_ENV", value = "production" },
         { name = "PORT", value = tostring(var.admin_container_port) },
-        { name = "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", value = var.clerk_publishable_key }
+        { name = "NEXT_PUBLIC_API_URL", value = "http://${aws_lb.app.dns_name}" },
+        { name = "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", value = var.clerk_publishable_key },
+        { name = "NEXT_PUBLIC_CLERK_JWT_TEMPLATE", value = "diaconia-api" }
       ]
       secrets = [
         { name = "CLERK_SECRET_KEY", valueFrom = aws_secretsmanager_secret.clerk_secret_key.arn }
@@ -757,6 +769,18 @@ resource "aws_ecs_task_definition" "admin" {
       }
     }
   ])
+
+  lifecycle {
+    precondition {
+      condition     = var.admin_desired_count == 0 || length(trimspace(var.clerk_publishable_key)) > 0
+      error_message = "clerk_publishable_key must be set when admin_desired_count is greater than 0."
+    }
+
+    precondition {
+      condition     = var.admin_desired_count == 0 || length(trimspace(nonsensitive(var.clerk_secret_key))) > 0
+      error_message = "clerk_secret_key must be set when admin_desired_count is greater than 0."
+    }
+  }
 
   tags = local.common_tags
 }

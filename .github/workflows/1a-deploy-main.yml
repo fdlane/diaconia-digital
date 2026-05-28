@@ -22,6 +22,10 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION || 'sa-east-1' }}
       AWS_ROLE_TO_ASSUME: ${{ secrets.AWS_ROLE_TO_ASSUME }}
       PROJECT: ${{ vars.PROJECT || 'diaconia-foundation' }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
+      NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ vars.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || secrets.CLERK_PUBLISHABLE_KEY }}
+      NEXT_PUBLIC_CLERK_JWT_TEMPLATE: ${{ vars.NEXT_PUBLIC_CLERK_JWT_TEMPLATE || 'diaconia-api' }}
       TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
       TF_VARS_CONTENT: ${{ secrets.TF_VARS_DEV }}
@@ -55,7 +59,7 @@ jobs:
 
       - name: Build and push images
         id: images
-        run: .github/scripts/deploy-images.sh dev ""
+        run: .github/scripts/deploy-images.sh dev "" "${{ steps.tfvars.outputs.tfvars_file }}"
 
       - name: Deploy service images
         run: >
