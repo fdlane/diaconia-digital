@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
@@ -80,8 +80,11 @@ export function MeetingDetailPage({ id }: { id: string }) {
   const [status, setStatus] = useState<"loading" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [deleteState, setDeleteState] = useState<"idle" | "confirming" | "deleting">("idle");
+  const loadedIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (loadedIdRef.current === id) return;
+    loadedIdRef.current = id;
     void load();
   }, [id, token]);
 

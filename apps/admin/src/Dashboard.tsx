@@ -33,7 +33,7 @@ function StatCard({ icon, iconColor, value, label, description }: StatCardProps)
 export function Dashboard() {
   const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
-  const loadedTokenRef = useRef("");
+  const hasLoadedStatsRef = useRef(false);
 
   const [meetings, setMeetings] = useState<AdminMeeting[]>([]);
   const [plannedCount, setPlannedCount] = useState<number | "…">("…");
@@ -41,8 +41,8 @@ export function Dashboard() {
   const [openPrayersCount, setOpenPrayersCount] = useState<number | "…">("…");
 
   useEffect(() => {
-    if (!isLoaded || !token || loadedTokenRef.current === token) return;
-    loadedTokenRef.current = token;
+    if (!isLoaded || !token || hasLoadedStatsRef.current) return;
+    hasLoadedStatsRef.current = true;
     void loadStats(token);
   }, [isLoaded, token]);
 

@@ -4,7 +4,7 @@ import { useSignIn, useSignUp } from "@clerk/nextjs";
 import { normalizePhoneNumber } from "@diaconia/shared";
 import { useState, type FormEvent } from "react";
 import { defaultProfile, useAuth } from "./AuthContext";
-import { t } from "./adminLabels";
+import { localizeAccessError, t } from "./adminLabels";
 
 const devBypass = process.env.NEXT_PUBLIC_AUTH_DEV_BYPASS === "true";
 const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
@@ -302,28 +302,6 @@ function getClerkErrorCode(error: unknown) {
   if (typeof anyError?.code === "string") return anyError.code;
   const nestedCode = anyError?.errors?.find?.((item: any) => typeof item?.code === "string")?.code;
   return typeof nestedCode === "string" ? nestedCode : "";
-}
-
-function localizeAccessError(error: string, labels: ReturnType<typeof t>) {
-  if (/invited active user required/i.test(error) || /invite_required/i.test(error) || /no tiene acceso a diaconia admin/i.test(error)) {
-    return labels.authInviteRequired;
-  }
-  if (/admin role required/i.test(error) || /admin_required/i.test(error) || /rol de administrador/i.test(error)) {
-    return labels.authAdminRequired;
-  }
-  if (/clerk_config_missing/i.test(error) || /NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/i.test(error)) {
-    return labels.authMissingClerkConfig;
-  }
-  if (/jwt_template_error/i.test(error) || /plantilla JWT/i.test(error)) {
-    return labels.authTokenTemplateError;
-  }
-  if (/session_load_failed/i.test(error) || /cargar la sesi[oó]n/i.test(error)) {
-    return labels.authSessionLoadFailed;
-  }
-  if (/already signed in/i.test(error)) {
-    return labels.authAlreadySignedIn;
-  }
-  return error;
 }
 
 function LocaleToggle({

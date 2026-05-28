@@ -36,6 +36,10 @@ const adminLabels = {
     authTryAgain: "Intentar de nuevo",
     authInvalidSession: "Tu sesión expiró o no es válida. Salí e ingresá de nuevo.",
     authMissingSession: "Iniciá sesión para continuar.",
+    authAccessIssueTitle: "No se pudo cargar tu acceso",
+    authAccessIssueLead: "La aplicación está disponible, pero no pudimos confirmar tu usuario de Diaconia.",
+    authAccessIssueDetail: "Si ya tenés acceso habilitado, puede ser un problema temporal con la API o la base de datos.",
+    authSignedInAccount: "Cuenta conectada",
 
     // Nav
     dashboard: "Inicio",
@@ -274,6 +278,10 @@ const adminLabels = {
     authTryAgain: "Try again",
     authInvalidSession: "Your session expired or is not valid. Sign out and sign in again.",
     authMissingSession: "Sign in to continue.",
+    authAccessIssueTitle: "Could not load your access",
+    authAccessIssueLead: "The app is available, but Diaconia could not confirm your user record.",
+    authAccessIssueDetail: "If your access was already enabled, the API or database may be temporarily unavailable.",
+    authSignedInAccount: "Signed-in account",
 
     // Nav
     dashboard: "Dashboard",
@@ -480,6 +488,28 @@ const adminLabels = {
 export type AdminLabels = (typeof adminLabels)["es"];
 export function t(locale: SupportedLocale): AdminLabels {
   return adminLabels[locale] as AdminLabels;
+}
+
+export function localizeAccessError(error: string, labels: AdminLabels) {
+  if (/invited active user required/i.test(error) || /invite_required/i.test(error) || /no tiene acceso a diaconia admin/i.test(error)) {
+    return labels.authInviteRequired;
+  }
+  if (/admin role required/i.test(error) || /admin_required/i.test(error) || /rol de administrador/i.test(error)) {
+    return labels.authAdminRequired;
+  }
+  if (/clerk_config_missing/i.test(error) || /NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY/i.test(error)) {
+    return labels.authMissingClerkConfig;
+  }
+  if (/jwt_template_error/i.test(error) || /plantilla JWT/i.test(error)) {
+    return labels.authTokenTemplateError;
+  }
+  if (/session_load_failed/i.test(error) || /failed to fetch/i.test(error) || /load failed/i.test(error) || /cargar la sesi[oó]n/i.test(error)) {
+    return labels.authSessionLoadFailed;
+  }
+  if (/already signed in/i.test(error)) {
+    return labels.authAlreadySignedIn;
+  }
+  return error;
 }
 
 export function localizeRouteError(

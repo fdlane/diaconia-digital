@@ -3,6 +3,7 @@ set -euo pipefail
 
 environment="${1:?environment is required}"
 image_tag="${2:-}"
+tfvars_file="${3:-}"
 
 : "${AWS_REGION:?AWS_REGION is required}"
 project="${PROJECT:-diaconia-foundation}"
@@ -12,6 +13,41 @@ image_platform="${IMAGE_PLATFORM:-linux/arm64}"
 if [ -z "$image_tag" ]; then
   image_tag="$(git rev-parse --short HEAD)"
 fi
+
+tfvars_path=""
+if [ -n "$tfvars_file" ]; then
+  if [ -f "$tfvars_file" ]; then
+    tfvars_path="$tfvars_file"
+  elif [ -f "infra/$tfvars_file" ]; then
+    tfvars_path="infra/$tfvars_file"
+  else
+    echo "Terraform variable file '$tfvars_file' was not found." >&2
+    exit 1
+  fi
+fi
+
+tfvar_string() {
+  local name="$1"
+  local file="$2"
+
+  sed -nE "s/^[[:space:]]*${name}[[:space:]]*=[[:space:]]*\"([^\"]*)\"[[:space:]]*(#.*)?$/\1/p" "$file" | head -n 1
+}
+
+clerk_publishable_key="${NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY:-}"
+if [ -z "$clerk_publishable_key" ]; then
+  clerk_publishable_key="${CLERK_PUBLISHABLE_KEY:-}"
+fi
+if [ -z "$clerk_publishable_key" ] && [ -n "$tfvars_path" ]; then
+  clerk_publishable_key="$(tfvar_string clerk_publishable_key "$tfvars_path")"
+fi
+
+if [ -z "$clerk_publishable_key" ]; then
+  echo "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is required to build the admin image." >&2
+  echo "Set NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY or clerk_publishable_key in the Terraform tfvars file." >&2
+  exit 1
+fi
+
+clerk_jwt_template="${NEXT_PUBLIC_CLERK_JWT_TEMPLATE:-diaconia-api}"
 
 account_id="$(aws sts get-caller-identity --query Account --output text)"
 registry="${account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com"
@@ -93,7 +129,8 @@ if image_exists "${name}/admin"; then
 else
   build_and_push admin apps/admin/Dockerfile "${admin_repo}:${image_tag}" \
     --build-arg "NEXT_PUBLIC_API_URL=${admin_api_url}" \
-    --build-arg "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY:-}"
+    --build-arg "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${clerk_publishable_key}" \
+    --build-arg "NEXT_PUBLIC_CLERK_JWT_TEMPLATE=${clerk_jwt_template}"
 fi
 
 {

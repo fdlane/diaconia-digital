@@ -32,11 +32,11 @@ export function MembersListPage() {
   const [members, setMembers] = useState<AdminUser[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
-  const loadedTokenRef = useRef("");
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
-    if (!isLoaded || !token || loadedTokenRef.current === token) return;
-    loadedTokenRef.current = token;
+    if (!isLoaded || !token || hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     void load();
   }, [isLoaded, token]);
 

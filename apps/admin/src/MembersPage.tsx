@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
 import { UsersIcon } from "./icons";
@@ -26,8 +26,11 @@ export function MembersPage() {
   const l = t(locale);
   const [facilitators, setFacilitators] = useState<FacilitatorRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     void loadMembers();
   }, [token]);
 

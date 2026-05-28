@@ -13,6 +13,11 @@ allowed_logout_urls = [
   "http://localhost:19006"
 ]
 
+# Set these in TF_VARS_DEV or an uncommitted local tfvars file before deploying with
+# desired counts greater than 0.
+# clerk_publishable_key = "pk_test_..."
+# clerk_secret_key      = "sk_test_..."
+
 # First apply:
 #   keep desired counts at 0 so the ALB/ECR/cluster can bootstrap before images exist.
 # Second apply after pushing immutable git-SHA image tags:

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
 import { ArrowLeftIcon } from "./icons";
@@ -48,9 +48,12 @@ export function MemberFormPage({ id }: { id?: string }) {
   );
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const loadedIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (isEdit && id) void loadUser(id);
+    if (!isEdit || !id || loadedIdRef.current === id) return;
+    loadedIdRef.current = id;
+    void loadUser(id);
   }, [id, token]);
 
   async function loadUser(userId: string) {
