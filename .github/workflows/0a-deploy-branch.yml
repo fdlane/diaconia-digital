@@ -45,6 +45,8 @@ jobs:
       TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
       TF_VARS_DEV: ${{ secrets.TF_VARS_DEV }}
       TF_VARS_PROD: ${{ secrets.TF_VARS_PROD }}
+      CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+      CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
