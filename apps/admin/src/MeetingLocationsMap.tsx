@@ -25,7 +25,7 @@ export type MeetingLocationsMapProps = {
   onZoomChange?: (zoom: number) => void;
 };
 
-const defaultMapCenter: [number, number] = [-23.4, -57.4];
+const defaultMapCenter: [number, number] = [-25.2712003, -57.496089];
 
 export function MeetingLocationsMap({
   meetings,
@@ -37,7 +37,7 @@ export function MeetingLocationsMap({
   selectedMeetingId = "",
   selectedZoom = null,
   defaultCenter = defaultMapCenter,
-  defaultZoom = 6,
+  defaultZoom = 13,
   fitBoundsMaxZoom = 13,
   scrollWheelZoom = true,
   onSelect,

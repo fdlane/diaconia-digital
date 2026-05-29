@@ -88,7 +88,30 @@ async function getActor(c: ApiContext): Promise<DbUser | null> {
 
   if (bySubject) return bySubject;
 
-  if (!authUser.phone && !authUser.email) return null;
+  async function createAutoProvisionedActor() {
+    if (!config.authAutoProvisionClerkUsers) return null;
+
+    const now = new Date();
+    const [created] = await db
+      .insert(users)
+      .values({
+        id: uuidv7(),
+        authProvider: "clerk",
+        authSubject: authUser.sub,
+        displayName: authUser.email ?? authUser.phone ?? "Clerk Admin",
+        email: authUser.email,
+        phone: authUser.phone ?? `clerk:${authUser.sub}`,
+        role: "admin",
+        status: "active",
+        invitedAt: now,
+        activatedAt: now,
+      })
+      .returning();
+
+    return created ?? null;
+  }
+
+  if (!authUser.phone && !authUser.email) return createAutoProvisionedActor();
 
   const authUserPhoneDigits = authUser.phone?.replace(/\D/g, "") ?? "";
   const [invited] = await db
@@ -107,7 +130,7 @@ async function getActor(c: ApiContext): Promise<DbUser | null> {
     )
     .limit(1);
 
-  if (!invited) return null;
+  if (!invited) return createAutoProvisionedActor();
 
   await db
     .update(users)

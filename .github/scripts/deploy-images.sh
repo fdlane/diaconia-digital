@@ -48,6 +48,10 @@ if [ -z "$clerk_publishable_key" ]; then
 fi
 
 clerk_jwt_template="${NEXT_PUBLIC_CLERK_JWT_TEMPLATE:-diaconia-api}"
+clerk_sign_in_url="${NEXT_PUBLIC_CLERK_SIGN_IN_URL:-/}"
+clerk_sign_up_url="${NEXT_PUBLIC_CLERK_SIGN_UP_URL:-/sign-up}"
+clerk_sign_in_force_redirect_url="${NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL:-/}"
+clerk_sign_up_force_redirect_url="${NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL:-/}"
 
 account_id="$(aws sts get-caller-identity --query Account --output text)"
 registry="${account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com"
@@ -130,7 +134,11 @@ else
   build_and_push admin apps/admin/Dockerfile "${admin_repo}:${image_tag}" \
     --build-arg "NEXT_PUBLIC_API_URL=${admin_api_url}" \
     --build-arg "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${clerk_publishable_key}" \
-    --build-arg "NEXT_PUBLIC_CLERK_JWT_TEMPLATE=${clerk_jwt_template}"
+    --build-arg "NEXT_PUBLIC_CLERK_JWT_TEMPLATE=${clerk_jwt_template}" \
+    --build-arg "NEXT_PUBLIC_CLERK_SIGN_IN_URL=${clerk_sign_in_url}" \
+    --build-arg "NEXT_PUBLIC_CLERK_SIGN_UP_URL=${clerk_sign_up_url}" \
+    --build-arg "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=${clerk_sign_in_force_redirect_url}" \
+    --build-arg "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL=${clerk_sign_up_force_redirect_url}"
 fi
 
 {

@@ -1189,6 +1189,14 @@ tbody td {
   width: min(420px, 100%);
 }
 
+.clerk-auth-root {
+  width: min(420px, 100%);
+}
+
+.clerk-auth-card {
+  box-shadow: var(--shadow-lg);
+}
+
 .signin-access-error {
   width: min(520px, 100%);
   display: flex;

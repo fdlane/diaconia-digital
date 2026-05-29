@@ -11,6 +11,7 @@ vi.mock("@clerk/backend", () => ({
 
 function config(overrides: Partial<ApiConfig> = {}): ApiConfig {
   return {
+    environment: "test",
     port: 4000,
     databaseUrl: "postgres://example",
     awsRegion: "sa-east-1",
@@ -20,6 +21,7 @@ function config(overrides: Partial<ApiConfig> = {}): ApiConfig {
     clerkJwtAudience: "diaconia-api",
     clerkAuthorizedParties: ["http://localhost:3000"],
     authDevBypass: false,
+    authAutoProvisionClerkUsers: false,
     authDevSubject: "local-dev-user",
     authDevEmail: null,
     authDevPhone: "+595000000000",

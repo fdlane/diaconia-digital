@@ -38,6 +38,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const l = t(locale);
   const pathname = usePathname();
   const router = useRouter();
+  const isAuthRoute = pathname.startsWith("/sign-up");
   const accessErrorMessage = accessError ? localizeAccessError(accessError, l) : "";
   const shellUser: CurrentUserProfile = currentUser ?? {
     displayName: l.authSignedInAccount,
@@ -83,6 +84,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (!isLoaded) return <AppLoadingScreen label={l.loading} />;
+  if (!currentUser && !accessError && isAuthRoute) return <>{children}</>;
   if (!currentUser && !accessError) return <SignInPage />;
 
   function handleSignOut() {

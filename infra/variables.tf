@@ -112,6 +112,12 @@ variable "admin_desired_count" {
   default     = 0
 }
 
+variable "auth_auto_provision_clerk_users" {
+  description = "Allow non-production deployments to create an active admin row for any valid Clerk user that signs in. Ignored by the API when environment is prod or production."
+  type        = bool
+  default     = false
+}
+
 variable "clerk_publishable_key" {
   description = "Clerk publishable key (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) for the admin Next.js app."
   type        = string

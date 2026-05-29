@@ -135,20 +135,16 @@ export function Dashboard() {
           <span className="card-title">{l.activeMeetingsMap}</span>
         </div>
         <div className="card-body dashboard-map-body">
-          {activeMeetingsWithLocation.length > 0 ? (
-            <DeferredMeetingLocationsMap
-              fitBoundsMaxZoom={12}
-              height="var(--dashboard-map-height)"
-              locale={locale}
-              loadingLabel={l.loading}
-              meetings={activeMeetingsWithLocation}
-              stewardLabel={l.loanSteward}
-              unavailableLabel={l.mapUnavailable}
-              viewDetailsLabel={l.viewMeetingDetail}
-            />
-          ) : (
-            <p className="text-sm text-muted">{l.noActiveMeetingLocations}</p>
-          )}
+          <DeferredMeetingLocationsMap
+            fitBoundsMaxZoom={12}
+            height="var(--dashboard-map-height)"
+            locale={locale}
+            loadingLabel={l.loading}
+            meetings={activeMeetingsWithLocation}
+            stewardLabel={l.loanSteward}
+            unavailableLabel={l.mapUnavailable}
+            viewDetailsLabel={l.viewMeetingDetail}
+          />
         </div>
       </div>
     </div>

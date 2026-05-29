@@ -8,6 +8,7 @@ loadEnvFile(resolve(process.cwd(), ".env"));
 const defaultLocalDatabaseUrl = "postgres://postgres:postgres@localhost:5432/diaconia";
 
 export type ApiConfig = {
+  environment: string;
   port: number;
   databaseUrl: string;
   awsRegion: string;
@@ -17,6 +18,7 @@ export type ApiConfig = {
   clerkJwtAudience: string;
   clerkAuthorizedParties: string[];
   authDevBypass: boolean;
+  authAutoProvisionClerkUsers: boolean;
   authDevSubject: string;
   authDevEmail: string | null;
   authDevPhone: string;
@@ -24,7 +26,11 @@ export type ApiConfig = {
 };
 
 export function loadConfig(env = process.env): ApiConfig {
+  const environment = env.ENVIRONMENT ?? env.APP_ENV ?? env.NODE_ENV ?? "development";
+  const isProductionLike = environment === "prod" || environment === "production";
+
   return {
+    environment,
     port: Number(env.PORT ?? 4000),
     databaseUrl: env.DATABASE_URL ?? defaultLocalDatabaseUrl,
     awsRegion: env.AWS_REGION ?? "sa-east-1",
@@ -36,7 +42,8 @@ export function loadConfig(env = process.env): ApiConfig {
       .split(",")
       .map((origin) => origin.trim())
       .filter(Boolean),
-    authDevBypass: env.AUTH_DEV_BYPASS === "true" && env.NODE_ENV !== "production",
+    authDevBypass: env.AUTH_DEV_BYPASS === "true" && !isProductionLike,
+    authAutoProvisionClerkUsers: env.AUTH_AUTO_PROVISION_CLERK_USERS === "true" && !isProductionLike,
     authDevSubject: env.AUTH_DEV_SUBJECT ?? "local-dev-user",
     authDevEmail: env.AUTH_DEV_EMAIL?.trim().toLowerCase() || null,
     authDevPhone: env.AUTH_DEV_PHONE ?? "+595000000000",
