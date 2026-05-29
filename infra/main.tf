@@ -445,7 +445,7 @@ resource "aws_lb_listener_rule" "api_health" {
   }
 }
 
-resource "aws_lb_listener_rule" "api_routes" {
+resource "aws_lb_listener_rule" "api_routes_1" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 20
 
@@ -456,22 +456,39 @@ resource "aws_lb_listener_rule" "api_routes" {
 
   condition {
     path_pattern {
-      values = [
-        "/me",
-        "/me/*",
-        "/admin/*",
-        "/attendees/*",
-        "/media/*",
-        "/meetings",
-        "/meetings/*",
-        "/groups",
-        "/groups/*",
-        "/users",
-        "/users/*",
-        "/chaplains",
-        "/chaplains/*",
-        "/api/*",
-      ]
+      values = ["/me", "/me/*", "/admin/*", "/attendees/*", "/media/*"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "api_routes_2" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 30
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/meetings", "/meetings/*", "/groups", "/groups/*", "/users"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "api_routes_3" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 40
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/users/*", "/chaplains", "/chaplains/*", "/api/*"]
     }
   }
 }
