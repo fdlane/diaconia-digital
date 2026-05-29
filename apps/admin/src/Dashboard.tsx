@@ -82,6 +82,7 @@ export function Dashboard() {
         <StatCard
           className="dashboard-stat-card"
           description={l.plannedMeetingsDesc}
+          href="/meetings"
           icon={<CalendarIcon size={20} />}
           iconColor="blue"
           label={l.plannedMeetings}
@@ -90,6 +91,7 @@ export function Dashboard() {
         <StatCard
           className="dashboard-stat-card"
           description={l.openPrayerRequestsDesc}
+          href="/meetings"
           icon={<PrayerIcon size={20} />}
           iconColor="purple"
           label={l.openPrayerRequests}
@@ -98,6 +100,7 @@ export function Dashboard() {
         <StatCard
           className="dashboard-stat-card"
           description={l.meetingReportsDesc}
+          href="/meetings"
           icon={<MeetingReportIcon size={20} />}
           iconColor="green"
           label={l.meetingReports}
