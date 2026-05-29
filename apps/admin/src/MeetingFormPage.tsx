@@ -65,7 +65,7 @@ function toDatetimeLocal(iso: string) {
 }
 
 export function MeetingFormPage({ id }: { id?: string }) {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
   const isEdit = Boolean(id);
@@ -79,15 +79,17 @@ export function MeetingFormPage({ id }: { id?: string }) {
   const loadedKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!isLoaded || !token) return;
     const loadKey = id ?? "new";
     if (loadedKeyRef.current === loadKey) return;
     loadedKeyRef.current = loadKey;
     void loadData();
-  }, [id, token]);
+  }, [id, isLoaded, token]);
 
   async function loadData() {
+    if (!token) return;
     setLoadStatus("loading");
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
 
     try {
       const [groupsRes, chaplainsRes, meetingRes] = await Promise.all([
@@ -146,12 +148,17 @@ export function MeetingFormPage({ id }: { id?: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!token) {
+      setErrorMsg(l.authMissingSession);
+      setSaveStatus("error");
+      return;
+    }
     setSaveStatus("saving");
     setErrorMsg("");
 
     const headers: Record<string, string> = {
       "content-type": "application/json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      authorization: `Bearer ${token}`,
     };
 
     const heldAtIso = form.heldAt ? new Date(form.heldAt).toISOString() : "";

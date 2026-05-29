@@ -22,21 +22,23 @@ type FacilitatorRow = {
 };
 
 export function MembersPage() {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const [facilitators, setFacilitators] = useState<FacilitatorRow[]>([]);
   const [loading, setLoading] = useState(true);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (!isLoaded || !token) return;
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
     void loadMembers();
-  }, [token]);
+  }, [isLoaded, token]);
 
   async function loadMembers() {
+    if (!token) return;
     setLoading(true);
-    const headers = token ? { authorization: `Bearer ${token}` } : {};
+    const headers = { authorization: `Bearer ${token}` };
 
     try {
       const res = await fetch(`${apiUrl}/meetings`, { headers });

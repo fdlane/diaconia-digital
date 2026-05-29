@@ -37,7 +37,7 @@ const empty: FormState = {
 };
 
 export function MemberFormPage({ id }: { id?: string }) {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
   const isEdit = Boolean(id);
@@ -51,14 +51,16 @@ export function MemberFormPage({ id }: { id?: string }) {
   const loadedIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!isLoaded || !token) return;
     if (!isEdit || !id || loadedIdRef.current === id) return;
     loadedIdRef.current = id;
     void loadUser(id);
-  }, [id, token]);
+  }, [id, isEdit, isLoaded, token]);
 
   async function loadUser(userId: string) {
+    if (!token) return;
     setLoadStatus("loading");
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     try {
       const res = await fetch(`${apiUrl}/users/${userId}`, { headers });
       if (!res.ok) {
@@ -89,12 +91,17 @@ export function MemberFormPage({ id }: { id?: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!token) {
+      setErrorMsg(l.authMissingSession);
+      setSaveStatus("error");
+      return;
+    }
     setSaveStatus("saving");
     setErrorMsg("");
 
     const headers: Record<string, string> = {
       "content-type": "application/json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
+      authorization: `Bearer ${token}`,
     };
 
     const body = isEdit

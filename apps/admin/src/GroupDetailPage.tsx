@@ -34,7 +34,7 @@ type Membership = {
 };
 
 export function GroupDetailPage({ id }: { id: string }) {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
 
@@ -47,14 +47,16 @@ export function GroupDetailPage({ id }: { id: string }) {
   const loadedIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!isLoaded || !token) return;
     if (loadedIdRef.current === id) return;
     loadedIdRef.current = id;
     void load();
-  }, [id, token]);
+  }, [id, isLoaded, token]);
 
   async function load() {
+    if (!token) return;
     setStatus("loading");
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     try {
       const res = await fetch(`${apiUrl}/groups/${id}`, { headers });
       if (!res.ok) {
@@ -79,8 +81,12 @@ export function GroupDetailPage({ id }: { id: string }) {
   }
 
   async function handleDelete() {
+    if (!token) {
+      setErrorMsg(l.authMissingSession);
+      return;
+    }
     setDeleteState("deleting");
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
+    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
     try {
       const res = await fetch(`${apiUrl}/groups/${id}`, { method: "DELETE", headers });
       if (!res.ok) {
