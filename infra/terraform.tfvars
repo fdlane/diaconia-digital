@@ -29,5 +29,6 @@ api_image_tag       = "0abad7e"
 admin_image_tag     = "0abad7e"
 api_desired_count   = 1
 admin_desired_count = 1
+auth_auto_provision_clerk_users = true
 
 database_engine_version = "18.4"

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { getProfileInitials } from "@diaconia/shared";
 import { useAuth, type CurrentUserProfile } from "./AuthContext";
 import { localizeAccessError, t } from "./adminLabels";
+import { AvatarCircle } from "./AvatarCircle";
 import {
   CalendarIcon,
   DashboardIcon,
@@ -21,23 +21,12 @@ import { AppLoadingScreen } from "./AppLoadingScreen";
 import { SignInPage } from "./SignInPage";
 import { desktopSidebarMediaQuery, getInitialSidebarOpen } from "./sidebarState";
 
-function Avatar({ user }: { user: CurrentUserProfile }) {
-  return (
-    <div className="avatar-circle" aria-hidden>
-      {user.avatarUrl ? (
-        <img alt="" src={user.avatarUrl} />
-      ) : (
-        <span>{getProfileInitials(user.displayName, user.email)}</span>
-      )}
-    </div>
-  );
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { currentUser, isLoaded, accessError, refreshSession, signOut, locale, setLocale } = useAuth();
   const l = t(locale);
   const pathname = usePathname();
   const router = useRouter();
+  const isAuthRoute = pathname.startsWith("/sign-up");
   const accessErrorMessage = accessError ? localizeAccessError(accessError, l) : "";
   const shellUser: CurrentUserProfile = currentUser ?? {
     displayName: l.authSignedInAccount,
@@ -83,6 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   if (!isLoaded) return <AppLoadingScreen label={l.loading} />;
+  if (!currentUser && !accessError && isAuthRoute) return <>{children}</>;
   if (!currentUser && !accessError) return <SignInPage />;
 
   function handleSignOut() {
@@ -128,7 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               EN
             </button>
           </div>
-          <Avatar user={shellUser} />
+          <AvatarCircle name={shellUser.displayName} email={shellUser.email} avatarUrl={shellUser.avatarUrl} size={32} />
           <div className="dots-anchor" ref={dotsRef}>
             <button
               aria-expanded={dotsOpen}

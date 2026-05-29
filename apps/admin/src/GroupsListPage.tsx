@@ -3,11 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { localizeRouteError, t } from "./adminLabels";
 import { ChevronRightIcon, GroupsIcon, PlusIcon } from "./icons";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type GroupRow = {
   id: string;
@@ -36,29 +35,16 @@ export function GroupsListPage() {
   }, [isLoaded, token]);
 
   async function load() {
-    if (!token) {
-      setErrorMsg(l.authMissingSession);
+    if (!token) { setErrorMsg(l.authMissingSession); setStatus("error"); return; }
+    setStatus("loading");
+    const result = await apiFetch<{ groups: GroupRow[]; warning?: string }>("/groups", token);
+    if (!result.ok) {
+      setErrorMsg(localizeRouteError({ error: result.error }, l));
       setStatus("error");
       return;
     }
-
-    setStatus("loading");
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
-    try {
-      const res = await fetch(`${apiUrl}/groups`, { headers });
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
-        setErrorMsg(localizeRouteError(payload, l, res.status));
-        setStatus("error");
-        return;
-      }
-      const data = (await res.json()) as { groups: GroupRow[]; warning?: string };
-      setGroups(data.groups);
-      setStatus("done");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
-      setStatus("error");
-    }
+    setGroups(result.data.groups);
+    setStatus("done");
   }
 
   return (
@@ -66,11 +52,7 @@ export function GroupsListPage() {
       <div className="page-header-row">
         <div className="page-header">
           <h1 className="page-title">{l.groups}</h1>
-          <p className="page-subtitle">
-            {locale === "es"
-              ? "Grupos de confianza y sus custodios de préstamos"
-              : "Trust groups and their loan stewards"}
-          </p>
+          <p className="page-subtitle">{l.groupsSubtitle}</p>
         </div>
         <div className="page-header-actions">
           <Link className="btn btn-primary" href="/groups/new">

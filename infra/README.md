@@ -119,6 +119,10 @@ docker build \
   -f apps/admin/Dockerfile \
   --build-arg "NEXT_PUBLIC_API_URL=http://$ALB_DNS" \
   --build-arg "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
+  --build-arg "NEXT_PUBLIC_CLERK_SIGN_IN_URL=/" \
+  --build-arg "NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up" \
+  --build-arg "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL=/" \
+  --build-arg "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL=/" \
   -t "$ADMIN_REPO:$GIT_SHA" .
 docker push "$ADMIN_REPO:$GIT_SHA"
 ```
@@ -131,6 +135,8 @@ admin_image_tag     = "<git-sha>"
 api_desired_count   = 1
 admin_desired_count = 1
 ```
+
+For non-production auth testing, set `auth_auto_provision_clerk_users = true` to allow any valid Clerk user to become an active admin in that deployed environment. The API ignores that flag when `environment` is `prod` or `production`.
 
 Apply to start or update the services:
 

@@ -214,6 +214,17 @@ export function AlertIcon(props: IconProps) {
   );
 }
 
+export function GridIcon(props: IconProps) {
+  return (
+    <Icon {...props} strokeWidth={1.5}>
+      <rect height="7" rx="1" width="7" x="3" y="3" />
+      <rect height="7" rx="1" width="7" x="14" y="3" />
+      <rect height="7" rx="1" width="7" x="3" y="14" />
+      <rect height="7" rx="1" width="7" x="14" y="14" />
+    </Icon>
+  );
+}
+
 export function CameraIcon(props: IconProps) {
   return (
     <Icon {...props}>

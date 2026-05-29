@@ -445,7 +445,7 @@ resource "aws_lb_listener_rule" "api_health" {
   }
 }
 
-resource "aws_lb_listener_rule" "api_existing_routes" {
+resource "aws_lb_listener_rule" "api_routes" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 20
 
@@ -456,41 +456,25 @@ resource "aws_lb_listener_rule" "api_existing_routes" {
 
   condition {
     path_pattern {
-      values = ["/admin/*", "/attendees/*", "/media/*", "/me/*"]
+      values = [
+        "/me",
+        "/me/*",
+        "/admin/*",
+        "/attendees/*",
+        "/media/*",
+        "/meetings",
+        "/meetings/*",
+        "/groups",
+        "/groups/*",
+        "/users",
+        "/users/*",
+        "/chaplains",
+        "/chaplains/*",
+        "/api/*",
+      ]
     }
   }
 }
-
-resource "aws_lb_listener_rule" "api_meetings" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 30
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/meetings", "/meetings/*"]
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "api_prefix" {
-  listener_arn = aws_lb_listener.http.arn
-  priority     = 40
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.api.arn
-  }
-
-  condition {
-    path_pattern {
-      values = ["/api/*"]
-    }
-  }
 }
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -689,12 +673,14 @@ resource "aws_ecs_task_definition" "api" {
       ]
       environment = [
         { name = "NODE_ENV", value = "production" },
+        { name = "ENVIRONMENT", value = var.environment },
         { name = "PORT", value = tostring(var.api_container_port) },
         { name = "AWS_REGION", value = var.aws_region },
         { name = "MEDIA_BUCKET_NAME", value = aws_s3_bucket.media.bucket },
         { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main.id },
         { name = "COGNITO_APP_CLIENT_ID", value = aws_cognito_user_pool_client.facilitator.id },
         { name = "ALLOWED_ORIGINS", value = join(",", concat(var.allowed_callback_urls, ["http://${aws_lb.app.dns_name}"])) },
+        { name = "AUTH_AUTO_PROVISION_CLERK_USERS", value = tostring(var.auth_auto_provision_clerk_users) },
         { name = "CLERK_JWT_AUDIENCE", value = "diaconia-api" },
         { name = "CLERK_AUTHORIZED_PARTIES", value = join(",", concat(var.allowed_callback_urls, ["http://${aws_lb.app.dns_name}"])) }
       ]
@@ -751,10 +737,15 @@ resource "aws_ecs_task_definition" "admin" {
       ]
       environment = [
         { name = "NODE_ENV", value = "production" },
+        { name = "ENVIRONMENT", value = var.environment },
         { name = "PORT", value = tostring(var.admin_container_port) },
         { name = "NEXT_PUBLIC_API_URL", value = "http://${aws_lb.app.dns_name}" },
         { name = "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY", value = var.clerk_publishable_key },
-        { name = "NEXT_PUBLIC_CLERK_JWT_TEMPLATE", value = "diaconia-api" }
+        { name = "NEXT_PUBLIC_CLERK_JWT_TEMPLATE", value = "diaconia-api" },
+        { name = "NEXT_PUBLIC_CLERK_SIGN_IN_URL", value = "/" },
+        { name = "NEXT_PUBLIC_CLERK_SIGN_UP_URL", value = "/sign-up" },
+        { name = "NEXT_PUBLIC_CLERK_SIGN_IN_FORCE_REDIRECT_URL", value = "/" },
+        { name = "NEXT_PUBLIC_CLERK_SIGN_UP_FORCE_REDIRECT_URL", value = "/" }
       ]
       secrets = [
         { name = "CLERK_SECRET_KEY", valueFrom = aws_secretsmanager_secret.clerk_secret_key.arn }

@@ -5,9 +5,10 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { localizeRouteError, t } from "./adminLabels";
-import { ChevronRightIcon, DownloadIcon, FilterIcon, PlusIcon } from "./icons";
+import { CalendarIcon, ChevronRightIcon, DownloadIcon, FilterIcon, PlusIcon } from "./icons";
 import { defaultSelectedMapZoom, parseMapZoom } from "./mapUrlState";
 import type { AdminMeeting } from "./meetingTypes";
 
@@ -16,16 +17,7 @@ const MeetingsMap = dynamic(() => import("./MeetingsMap").then((m) => ({ default
   loading: () => <div style={{ height: 480, display: "flex", alignItems: "center", justifyContent: "center" }}>Loading map…</div>,
 });
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
 type Group = { id: string; name: string; community: string };
-
-type MeetingMedia = { id: string; type: string; url: string };
-type PrayerRequest = {
-  id: string;
-  request: string;
-  status: string;
-};
 
 export function MeetingsList() {
   const { token, isLoaded, locale } = useAuth();
@@ -69,57 +61,31 @@ export function MeetingsList() {
 
   async function loadGroups() {
     if (!token) return;
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
-    try {
-      const res = await fetch(`${apiUrl}/groups`, { headers });
-      if (!res.ok) return;
-      const data = (await res.json()) as { groups: Group[] };
-      setGroups(data.groups.filter((g) => g.name));
-    } catch { /* non-critical */ }
+    const result = await apiFetch<{ groups: Group[] }>("/groups", token);
+    if (result.ok) {
+      setGroups(result.data.groups.filter((g) => g.name));
+    }
   }
 
   async function loadMeetings() {
-    if (!token) {
-      setStatus("error");
-      setStatusMsg(l.authMissingSession);
-      return;
-    }
-
+    if (!token) { setStatus("error"); setStatusMsg(l.authMissingSession); return; }
     setStatus("loading");
     setStatusMsg(l.loadingMeetings);
 
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
+    const result = await apiFetch<{ meetings: AdminMeeting[]; warning?: string }>(
+      `/meetings${query ? `?${query}` : ""}`,
+      token,
+    );
 
-    try {
-      const res = await fetch(
-        `${apiUrl}/meetings${query ? `?${query}` : ""}`,
-        { headers },
-      );
-
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as {
-          code?: string;
-          error?: string;
-          detail?: string;
-        } | null;
-        setStatus("error");
-        setStatusMsg(payload?.detail ?? localizeRouteError(payload, l, res.status));
-        return;
-      }
-
-      const data = (await res.json()) as {
-        meetings: AdminMeeting[];
-        warning?: string;
-      };
-      setMeetings(data.meetings);
-
-      const base = data.warning ?? l.meetingsCount(data.meetings.length);
-      setStatus("done");
-      setStatusMsg(base);
-    } catch (err) {
+    if (!result.ok) {
       setStatus("error");
-      setStatusMsg(err instanceof Error ? err.message : "Error");
+      setStatusMsg(localizeRouteError({ error: result.error }, l));
+      return;
     }
+
+    setMeetings(result.data.meetings);
+    setStatus("done");
+    setStatusMsg(result.data.warning ?? l.meetingsCount(result.data.meetings.length));
   }
 
   function exportCsv() {
@@ -287,7 +253,7 @@ export function MeetingsList() {
               onChange={(e) => setFilters((v) => ({ ...v, groupId: e.target.value }))}
               value={filters.groupId}
             >
-              <option value="">{locale === "es" ? "Todos los grupos" : "All groups"}</option>
+              <option value="">{l.allGroups}</option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}{g.community ? ` — ${g.community}` : ""}
@@ -328,7 +294,7 @@ export function MeetingsList() {
             />
             {meetings.filter((s) => s.latitude != null).length === 0 && status === "done" ? (
               <p className="text-sm text-muted" style={{ marginTop: "0.75rem", textAlign: "center" }}>
-                {locale === "es" ? "Ninguna reunión tiene ubicación registrada." : "No meetings have a location recorded."}
+                {l.noActiveMeetingLocations}
               </p>
             ) : null}
           </div>
@@ -401,21 +367,11 @@ export function MeetingsList() {
                   <td colSpan={8}>
                     <div className="empty-state">
                       <div className="empty-state-icon">
-                        <svg fill="none" height={40} stroke="currentColor" strokeLinecap="round"
-                          strokeLinejoin="round" strokeWidth={1.5} viewBox="0 0 24 24" width={40}>
-                          <rect height="18" rx="2" width="18" x="3" y="4" />
-                          <line x1="16" x2="16" y1="2" y2="6" />
-                          <line x1="8" x2="8" y1="2" y2="6" />
-                          <line x1="3" x2="21" y1="10" y2="10" />
-                        </svg>
+                        <CalendarIcon size={40} />
                       </div>
                       <p className="empty-state-title">{l.noMeetings}</p>
                       <Link className="btn btn-primary" href="/meetings/new">
-                        <svg fill="none" height={14} stroke="currentColor" strokeLinecap="round"
-                          strokeLinejoin="round" strokeWidth={2} viewBox="0 0 24 24" width={14}>
-                          <line x1="12" x2="12" y1="5" y2="19" />
-                          <line x1="5" x2="19" y1="12" y2="12" />
-                        </svg>
+                        <PlusIcon size={14} />
                         {l.newMeeting}
                       </Link>
                     </div>

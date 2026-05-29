@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(sed -i '' 's/if \\(result\\\\.error\\) {/if \\(!result.ok\\) {/g' GroupDetailPage.tsx MeetingDetailPage.tsx MemberDetailPage.tsx GroupFormPage.tsx MeetingFormPage.tsx MemberFormPage.tsx GroupsListPage.tsx MembersListPage.tsx MeetingsList.tsx Dashboard.tsx)",
+      "Bash(sed -i '' 's/if \\(usersResult\\\\.error\\) {/if \\(!usersResult.ok\\) {/g' GroupFormPage.tsx)",
+      "Bash(sed -i '' 's/if \\(groupResult\\\\.error\\) {/if \\(!groupResult.ok\\) {/g' GroupFormPage.tsx)",
+      "Bash(sed -i '' 's/if \\(groupsResult\\\\.error\\) {/if \\(!groupsResult.ok\\) {/g' MeetingFormPage.tsx)",
+      "Bash(sed -i '' 's/if \\(meetingResult\\\\.error\\) {/if \\(!meetingResult.ok\\) {/g' MeetingFormPage.tsx)"
+    ]
+  }
+}

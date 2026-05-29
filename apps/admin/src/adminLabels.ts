@@ -77,6 +77,10 @@ const adminLabels = {
     viewAllMeetings: "Ver todas las reuniones",
     viewMembers: "Ver personas",
 
+    // Groups list
+    groupsSubtitle: "Grupos de confianza y sus custodios de préstamos",
+    allGroups: "Todos los grupos",
+
     // Meetings list
     meetingsSubtitle: "Todas las reuniones de grupos de confianza e informes de campo",
     exportCsv: "Exportar CSV",
@@ -169,6 +173,15 @@ const adminLabels = {
     selectChaplain: "Seleccionar capellán…",
     noChaplainAttended: "Sin capellán presente",
 
+    // Form placeholders
+    placeholderGroupName: "Nombre del grupo",
+    placeholderCommunity: "Comunidad",
+    placeholderSelectSteward: "Seleccionar custodio…",
+    placeholderFullName: "Nombre completo",
+    placeholderMeetingNotes: "Notas de la reunión",
+    gpsInstructions: "Ingresá las coordenadas del pin de ubicación de la reunión",
+    authSubjectOptionalHint: "opcional; se vincula al aceptar la invitacion",
+
     // Location
     meetingLocation: "Ubicación",
     locationPin: "Pin de ubicación",
@@ -221,7 +234,10 @@ const adminLabels = {
     meetingSaved: "Reunión guardada",
     meetingDeleted: "Reunión eliminada",
     attendance: "Asistencia",
+    attendanceCount: (n: number) => `${n} ${n === 1 ? "persona" : "personas"}`,
     prayerRequests: "Pedidos de oración",
+    prayerRequestsCount: (n: number) => `${n} ${n === 1 ? "pedido" : "pedidos"}`,
+    colRequest: "Petición",
     present: "Presente",
     absent: "Ausente",
     excused: "Justificado",
@@ -319,6 +335,10 @@ const adminLabels = {
     viewAllMeetings: "View all meetings",
     viewMembers: "View people",
 
+    // Groups list
+    groupsSubtitle: "Trust groups and their loan stewards",
+    allGroups: "All groups",
+
     // Meetings list
     meetingsSubtitle: "All trust group meetings and field reports",
     exportCsv: "Export CSV",
@@ -410,6 +430,15 @@ const adminLabels = {
     selectChaplain: "Select chaplain…",
     noChaplainAttended: "No chaplain attended",
 
+    // Form placeholders
+    placeholderGroupName: "Group name",
+    placeholderCommunity: "Community",
+    placeholderSelectSteward: "Select loan steward…",
+    placeholderFullName: "Full name",
+    placeholderMeetingNotes: "Meeting notes",
+    gpsInstructions: "Enter the GPS coordinates for the meeting location pin",
+    authSubjectOptionalHint: "optional; linked on invitation acceptance",
+
     // Location
     meetingLocation: "Location",
     locationPin: "Location Pin",
@@ -462,7 +491,10 @@ const adminLabels = {
     meetingSaved: "Meeting saved",
     meetingDeleted: "Meeting deleted",
     attendance: "Attendance",
+    attendanceCount: (n: number) => `${n} ${n === 1 ? "person" : "people"}`,
     prayerRequests: "Prayer Requests",
+    prayerRequestsCount: (n: number) => `${n} ${n === 1 ? "request" : "requests"}`,
+    colRequest: "Request",
     present: "Present",
     absent: "Absent",
     excused: "Excused",

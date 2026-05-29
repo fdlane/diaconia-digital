@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
 import { ArrowLeftIcon } from "./icons";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+import { PageLoadingState } from "./PageLoadingState";
 
 type UserRole = "admin" | "facilitator" | "chaplain" | "member";
 
@@ -37,7 +37,7 @@ const empty: FormState = {
 };
 
 export function MemberFormPage({ id }: { id?: string }) {
-  const { token, locale } = useAuth();
+  const { token, isLoaded, locale } = useAuth();
   const l = t(locale);
   const router = useRouter();
   const isEdit = Boolean(id);
@@ -51,35 +51,30 @@ export function MemberFormPage({ id }: { id?: string }) {
   const loadedIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (!isLoaded || !token) return;
     if (!isEdit || !id || loadedIdRef.current === id) return;
     loadedIdRef.current = id;
     void loadUser(id);
-  }, [id, token]);
+  }, [id, isEdit, isLoaded, token]);
 
   async function loadUser(userId: string) {
+    if (!token) return;
     setLoadStatus("loading");
-    const headers: Record<string, string> = token ? { authorization: `Bearer ${token}` } : {};
-    try {
-      const res = await fetch(`${apiUrl}/users/${userId}`, { headers });
-      if (!res.ok) {
-        setLoadStatus("error");
-        setErrorMsg(`Error ${res.status}`);
-        return;
-      }
-      const data = (await res.json()) as { user: UserDetail };
-      const u = data.user;
-      setForm({
-        displayName: u.displayName,
-        email: u.email ?? "",
-        phone: u.phone ?? "",
-        role: u.role,
-        authSubject: u.authSubject,
-      });
-      setLoadStatus("ready");
-    } catch (err) {
+    const result = await apiFetch<{ user: UserDetail }>(`/users/${userId}`, token);
+    if (!result.ok) {
       setLoadStatus("error");
-      setErrorMsg(err instanceof Error ? err.message : "Error");
+      setErrorMsg(result.error);
+      return;
     }
+    const u = result.data.user;
+    setForm({
+      displayName: u.displayName,
+      email: u.email ?? "",
+      phone: u.phone ?? "",
+      role: u.role,
+      authSubject: u.authSubject,
+    });
+    setLoadStatus("ready");
   }
 
   function field(key: keyof FormState) {
@@ -89,63 +84,37 @@ export function MemberFormPage({ id }: { id?: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!token) { setErrorMsg(l.authMissingSession); setSaveStatus("error"); return; }
     setSaveStatus("saving");
     setErrorMsg("");
 
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      ...(token ? { authorization: `Bearer ${token}` } : {}),
-    };
-
     const body = isEdit
-      ? JSON.stringify({
-          displayName: form.displayName,
-          email: form.email || null,
-          phone: form.phone,
-          role: form.role,
-        })
-      : JSON.stringify({
-          displayName: form.displayName,
-          email: form.email || null,
-          phone: form.phone,
-          role: form.role,
-          authSubject: form.authSubject || undefined,
-        });
+      ? JSON.stringify({ displayName: form.displayName, email: form.email || null, phone: form.phone, role: form.role })
+      : JSON.stringify({ displayName: form.displayName, email: form.email || null, phone: form.phone, role: form.role, authSubject: form.authSubject || undefined });
 
-    try {
-      const url = isEdit ? `${apiUrl}/users/${id}` : `${apiUrl}/users`;
-      const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers, body });
+    const result = await apiFetch<{ id: string }>(
+      isEdit ? `/users/${id}` : "/users",
+      token,
+      { method: isEdit ? "PUT" : "POST", body },
+    );
 
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${res.status}`);
-        setSaveStatus("error");
-        return;
-      }
-
-      const data = isEdit ? null : ((await res.json()) as { id: string });
-      router.push(isEdit ? `/people/${id}` : `/people/${data!.id}`);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
+    if (!result.ok) {
+      setErrorMsg(result.error);
       setSaveStatus("error");
+      return;
     }
+
+    router.push(isEdit ? `/people/${id}` : `/people/${result.data.id}`);
   }
 
+  const breadcrumbs = [
+    { label: l.members, href: "/people" },
+    ...(isEdit ? [{ label: form.displayName || id!, href: `/people/${id}` }] : []),
+    { label: isEdit ? l.editMember : l.newMember },
+  ];
+
   if (loadStatus === "loading") {
-    return (
-      <div>
-        <nav className="breadcrumb">
-          <Link href="/people">{l.members}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>{l.loading}</span>
-        </nav>
-        <div className="status-bar">
-          <span className="loading-dot" />
-          <span>{l.loading}</span>
-        </div>
-      </div>
-    );
+    return <PageLoadingState breadcrumbs={breadcrumbs} loadingLabel={l.loading} />;
   }
 
   return (
@@ -185,7 +154,7 @@ export function MemberFormPage({ id }: { id?: string }) {
               <input
                 id="f-name"
                 onChange={field("displayName")}
-                placeholder="Full name"
+                placeholder={l.placeholderFullName}
                 required
                 value={form.displayName}
               />
@@ -218,7 +187,7 @@ export function MemberFormPage({ id }: { id?: string }) {
               <select id="f-role" onChange={field("role")} value={form.role}>
                 <option value="facilitator">{l.roleFacilitator}</option>
                 <option value="admin">{l.roleAdmin}</option>
-                <option value="chaplain">{locale === "es" ? "Capellán" : "Chaplain"}</option>
+                <option value="chaplain">{l.chaplain}</option>
                 <option value="member">{l.rolePerson}</option>
               </select>
             </div>
@@ -227,12 +196,12 @@ export function MemberFormPage({ id }: { id?: string }) {
               <div className="form-field">
                 <label htmlFor="f-sub">
                   {l.authSubjectLabel}{" "}
-                  <span className="text-muted text-sm">({locale === "es" ? "opcional; se vincula al aceptar la invitacion" : "optional; linked on invitation acceptance"})</span>
+                  <span className="text-muted text-sm">({l.authSubjectOptionalHint})</span>
                 </label>
                 <input
                   id="f-sub"
                   onChange={field("authSubject")}
-                  placeholder={locale === "es" ? "ID del proveedor de identidad" : "Identity provider ID"}
+                  placeholder={l.authSubjectLabel}
                   value={form.authSubject}
                 />
               </div>
