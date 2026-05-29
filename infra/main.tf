@@ -445,7 +445,11 @@ resource "aws_lb_listener_rule" "api_health" {
   }
 }
 
-resource "aws_lb_listener_rule" "api_routes_1" {
+# Rules 20–50: require Authorization header so browser page navigation
+# (no token) falls through to the admin app even on shared paths like
+# /meetings and /groups.
+
+resource "aws_lb_listener_rule" "api_auth_1" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 20
 
@@ -456,12 +460,19 @@ resource "aws_lb_listener_rule" "api_routes_1" {
 
   condition {
     path_pattern {
-      values = ["/me", "/me/*", "/admin/*", "/attendees/*", "/media/*"]
+      values = ["/me", "/me/*", "/admin/*", "/attendees/*"]
+    }
+  }
+
+  condition {
+    http_header {
+      http_header_name = "Authorization"
+      values           = ["Bearer *"]
     }
   }
 }
 
-resource "aws_lb_listener_rule" "api_routes_2" {
+resource "aws_lb_listener_rule" "api_auth_2" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 30
 
@@ -472,12 +483,19 @@ resource "aws_lb_listener_rule" "api_routes_2" {
 
   condition {
     path_pattern {
-      values = ["/meetings", "/meetings/*", "/groups", "/groups/*", "/users"]
+      values = ["/meetings", "/meetings/*", "/groups", "/groups/*"]
+    }
+  }
+
+  condition {
+    http_header {
+      http_header_name = "Authorization"
+      values           = ["Bearer *"]
     }
   }
 }
 
-resource "aws_lb_listener_rule" "api_routes_3" {
+resource "aws_lb_listener_rule" "api_auth_3" {
   listener_arn = aws_lb_listener.http.arn
   priority     = 40
 
@@ -488,7 +506,37 @@ resource "aws_lb_listener_rule" "api_routes_3" {
 
   condition {
     path_pattern {
-      values = ["/users/*", "/chaplains", "/chaplains/*", "/api/*"]
+      values = ["/users", "/users/*", "/chaplains", "/chaplains/*"]
+    }
+  }
+
+  condition {
+    http_header {
+      http_header_name = "Authorization"
+      values           = ["Bearer *"]
+    }
+  }
+}
+
+resource "aws_lb_listener_rule" "api_auth_4" {
+  listener_arn = aws_lb_listener.http.arn
+  priority     = 50
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.api.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/media/*", "/api/*"]
+    }
+  }
+
+  condition {
+    http_header {
+      http_header_name = "Authorization"
+      values           = ["Bearer *"]
     }
   }
 }
