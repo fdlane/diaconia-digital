@@ -475,7 +475,6 @@ resource "aws_lb_listener_rule" "api_routes" {
     }
   }
 }
-}
 
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/aws/ecs/${local.name}/api"
