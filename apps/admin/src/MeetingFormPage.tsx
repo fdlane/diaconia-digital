@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
-import { ArrowLeftIcon } from "./icons";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+import { ArrowLeftIcon, GridIcon } from "./icons";
+import { PageLoadingState } from "./PageLoadingState";
+import type { UserOption } from "./types";
 
 type Group = {
   id: string;
@@ -15,8 +16,6 @@ type Group = {
   community: string;
   active: boolean;
 };
-
-type ChaplainOption = { id: string; displayName: string };
 
 type MeetingDetail = {
   id: string;
@@ -72,7 +71,7 @@ export function MeetingFormPage({ id }: { id?: string }) {
 
   const [form, setForm] = useState<FormState>(empty);
   const [groups, setGroups] = useState<Group[]>([]);
-  const [chaplains, setChaplains] = useState<ChaplainOption[]>([]);
+  const [chaplains, setChaplains] = useState<UserOption[]>([]);
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -89,56 +88,48 @@ export function MeetingFormPage({ id }: { id?: string }) {
   async function loadData() {
     if (!token) return;
     setLoadStatus("loading");
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
 
-    try {
-      const [groupsRes, chaplainsRes, meetingRes] = await Promise.all([
-        fetch(`${apiUrl}/groups`, { headers }),
-        fetch(`${apiUrl}/chaplains`, { headers }),
-        isEdit && id ? fetch(`${apiUrl}/meetings/${id}`, { headers }) : Promise.resolve(null),
-      ]);
+    const [groupsResult, chaplainsResult, meetingResult] = await Promise.all([
+      apiFetch<{ groups: Group[] }>("/groups", token),
+      apiFetch<{ chaplains: UserOption[] }>("/chaplains", token),
+      isEdit && id ? apiFetch<{ meeting: MeetingDetail }>(`/meetings/${id}`, token) : null,
+    ]);
 
-      if (!groupsRes.ok) {
-        setErrorMsg(`Failed to load groups: ${groupsRes.status}`);
+    if (!groupsResult.ok) {
+      setErrorMsg(`Failed to load groups: ${groupsResult.error}`);
+      setLoadStatus("error");
+      return;
+    }
+
+    const activeGroups = groupsResult.data.groups.filter((g) => g.active);
+    setGroups(activeGroups);
+
+    if (chaplainsResult?.ok) {
+      setChaplains(chaplainsResult.data.chaplains);
+    }
+
+    if (meetingResult) {
+      if (!meetingResult.ok) {
+        setErrorMsg(`Failed to load meeting: ${meetingResult.error}`);
         setLoadStatus("error");
         return;
       }
-
-      const groupsData = (await groupsRes.json()) as { groups: Group[] };
-      setGroups(groupsData.groups.filter((g) => g.active));
-
-      if (chaplainsRes.ok) {
-        const chaplainsData = (await chaplainsRes.json()) as { chaplains: ChaplainOption[] };
-        setChaplains(chaplainsData.chaplains);
-      }
-
-      if (meetingRes) {
-        if (!meetingRes.ok) {
-          setErrorMsg(`Failed to load meeting: ${meetingRes.status}`);
-          setLoadStatus("error");
-          return;
-        }
-        const meetingData = (await meetingRes.json()) as { meeting: MeetingDetail };
-        const s = meetingData.meeting;
-        setForm({
-          groupId: s.groupId,
-          chaplainId: s.chaplainId ?? "",
-          heldAt: toDatetimeLocal(s.heldAt),
-          latitude: s.latitude != null ? String(s.latitude) : "",
-          longitude: s.longitude != null ? String(s.longitude) : "",
-          notes: s.notes,
-          followUpCategory: s.followUpCategory,
-          followUpNotes: s.followUpNotes,
-        });
-      } else if (groupsData.groups.length > 0) {
-        setForm((prev) => ({ ...prev, groupId: groupsData.groups[0]!.id }));
-      }
-
-      setLoadStatus("ready");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
-      setLoadStatus("error");
+      const s = meetingResult.data.meeting;
+      setForm({
+        groupId: s.groupId,
+        chaplainId: s.chaplainId ?? "",
+        heldAt: toDatetimeLocal(s.heldAt),
+        latitude: s.latitude != null ? String(s.latitude) : "",
+        longitude: s.longitude != null ? String(s.longitude) : "",
+        notes: s.notes,
+        followUpCategory: s.followUpCategory,
+        followUpNotes: s.followUpNotes,
+      });
+    } else if (activeGroups.length > 0) {
+      setForm((prev) => ({ ...prev, groupId: activeGroups[0]!.id }));
     }
+
+    setLoadStatus("ready");
   }
 
   function field(key: keyof FormState) {
@@ -148,18 +139,9 @@ export function MeetingFormPage({ id }: { id?: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token) {
-      setErrorMsg(l.authMissingSession);
-      setSaveStatus("error");
-      return;
-    }
+    if (!token) { setErrorMsg(l.authMissingSession); setSaveStatus("error"); return; }
     setSaveStatus("saving");
     setErrorMsg("");
-
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      authorization: `Bearer ${token}`,
-    };
 
     const heldAtIso = form.heldAt ? new Date(form.heldAt).toISOString() : "";
 
@@ -181,40 +163,29 @@ export function MeetingFormPage({ id }: { id?: string }) {
       prayerRequests: [],
     });
 
-    try {
-      const url = isEdit ? `${apiUrl}/meetings/${id}` : `${apiUrl}/meetings`;
-      const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers, body });
+    const result = await apiFetch<{ id: string }>(
+      isEdit ? `/meetings/${id}` : "/meetings",
+      token,
+      { method: isEdit ? "PUT" : "POST", body },
+    );
 
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${res.status}`);
-        setSaveStatus("error");
-        return;
-      }
-
-      const data = isEdit ? null : ((await res.json()) as { id: string });
-      router.push(isEdit ? `/meetings/${id}` : `/meetings/${data!.id}`);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
+    if (!result.ok) {
+      setErrorMsg(result.error);
       setSaveStatus("error");
+      return;
     }
+
+    router.push(isEdit ? `/meetings/${id}` : `/meetings/${result.data.id}`);
   }
 
+  const breadcrumbs = [
+    { label: l.meetings, href: "/meetings" },
+    ...(isEdit ? [{ label: id!, href: `/meetings/${id}` }] : []),
+    { label: isEdit ? l.editMeeting : l.newMeeting },
+  ];
+
   if (loadStatus === "loading") {
-    return (
-      <div>
-        <nav className="breadcrumb">
-          <Link href="/meetings">{l.meetings}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>{l.loading}</span>
-        </nav>
-        <div className="status-bar">
-          <span className="loading-dot" />
-          <span>{l.loading}</span>
-        </div>
-      </div>
-    );
+    return <PageLoadingState breadcrumbs={breadcrumbs} loadingLabel={l.loading} />;
   }
 
   const followUpOptions = [
@@ -257,13 +228,7 @@ export function MeetingFormPage({ id }: { id?: string }) {
         <div className="card">
           <div className="empty-state">
             <div className="empty-state-icon">
-              <svg fill="none" height={40} stroke="currentColor" strokeLinecap="round"
-                strokeLinejoin="round" strokeWidth={1.5} viewBox="0 0 24 24" width={40}>
-                <rect height="7" rx="1" width="7" x="3" y="3" />
-                <rect height="7" rx="1" width="7" x="14" y="3" />
-                <rect height="7" rx="1" width="7" x="3" y="14" />
-                <rect height="7" rx="1" width="7" x="14" y="14" />
-              </svg>
+              <GridIcon size={40} />
             </div>
             <p className="empty-state-title">{l.noGroupsForMeeting}</p>
             <Link className="btn btn-primary" href="/groups/new">
@@ -274,141 +239,141 @@ export function MeetingFormPage({ id }: { id?: string }) {
       ) : null}
 
       {groups.length > 0 ? (
-      <form onSubmit={handleSubmit}>
-        <div className="card">
-          {/* Basic Info */}
-          <div className="form-section">
-            <p className="form-section-title">{l.overview}</p>
+        <form onSubmit={handleSubmit}>
+          <div className="card">
+            <div className="form-section">
+              <p className="form-section-title">{l.overview}</p>
 
-            <div className="form-field">
-              <label htmlFor="f-group">{l.colGroup}</label>
-              <select
-                id="f-group"
-                onChange={field("groupId")}
-                required
-                value={form.groupId}
-              >
-                <option disabled value="">{l.selectGroup}</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>
-                    {g.name} — {g.community}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-field" style={{ maxWidth: 280 }}>
-              <label htmlFor="f-date">{l.dateTime}</label>
-              <input
-                id="f-date"
-                onChange={field("heldAt")}
-                required
-                type="datetime-local"
-                value={form.heldAt}
-              />
-            </div>
-
-            <div className="form-field" style={{ maxWidth: 320 }}>
-              <label htmlFor="f-chaplain">{l.chaplainAttended}</label>
-              <select
-                id="f-chaplain"
-                onChange={field("chaplainId")}
-                value={form.chaplainId}
-              >
-                <option value="">{l.selectChaplain}</option>
-                {chaplains.map((ch) => (
-                  <option key={ch.id} value={ch.id}>{ch.displayName}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-field">
-              <label>{l.locationPin}</label>
-              <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                <div style={{ flex: 1, minWidth: 140 }}>
-                  <label className="text-sm text-muted" htmlFor="f-lat" style={{ marginBottom: "0.25rem", display: "block" }}>{l.latitude}</label>
-                  <input
-                    id="f-lat"
-                    onChange={field("latitude")}
-                    placeholder="-25.2867"
-                    step="any"
-                    type="number"
-                    value={form.latitude}
-                  />
-                </div>
-                <div style={{ flex: 1, minWidth: 140 }}>
-                  <label className="text-sm text-muted" htmlFor="f-lng" style={{ marginBottom: "0.25rem", display: "block" }}>{l.longitude}</label>
-                  <input
-                    id="f-lng"
-                    onChange={field("longitude")}
-                    placeholder="-57.6478"
-                    step="any"
-                    type="number"
-                    value={form.longitude}
-                  />
-                </div>
-              </div>
-              <p className="text-sm text-muted" style={{ marginTop: "0.375rem" }}>
-                {locale === "es"
-                  ? "Ingresá las coordenadas del pin de ubicación de la reunión"
-                  : "Enter the GPS coordinates for the meeting location pin"}
-              </p>
-            </div>
-
-            <div className="form-field">
-              <label htmlFor="f-notes">{l.colNotes}</label>
-              <textarea
-                id="f-notes"
-                maxLength={4000}
-                onChange={field("notes")}
-                placeholder={locale === "es" ? "Notas de la reunión" : "Meeting notes"}
-                style={{ minHeight: "6rem" }}
-                value={form.notes}
-              />
-            </div>
-          </div>
-
-          {/* Follow-up */}
-          <div className="form-section">
-            <p className="form-section-title">{l.followUpLabel}</p>
-
-            <div className="form-field" style={{ maxWidth: 280 }}>
-              <label htmlFor="f-followup">{l.colFollowUp}</label>
-              <select
-                id="f-followup"
-                onChange={field("followUpCategory")}
-                value={form.followUpCategory}
-              >
-                {followUpOptions.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </select>
-            </div>
-
-            {form.followUpCategory !== "none" ? (
               <div className="form-field">
-                <label htmlFor="f-followup-notes">{l.colNotes}</label>
-                <textarea
-                  id="f-followup-notes"
-                  maxLength={2000}
-                  onChange={field("followUpNotes")}
-                  style={{ minHeight: "4rem" }}
-                  value={form.followUpNotes}
+                <label htmlFor="f-group">{l.colGroup}</label>
+                <select
+                  id="f-group"
+                  onChange={field("groupId")}
+                  required
+                  value={form.groupId}
+                >
+                  <option disabled value="">{l.selectGroup}</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name} — {g.community}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field" style={{ maxWidth: 280 }}>
+                <label htmlFor="f-date">{l.dateTime}</label>
+                <input
+                  id="f-date"
+                  onChange={field("heldAt")}
+                  required
+                  type="datetime-local"
+                  value={form.heldAt}
                 />
               </div>
-            ) : null}
-          </div>
 
-          <div className="modal-footer">
-            <Link className="btn-link" href={isEdit ? `/meetings/${id}` : "/meetings"}>
-              {l.cancel}
-            </Link>
-            <button className="btn btn-primary" disabled={saveStatus === "saving"} type="submit">
-              {saveStatus === "saving" ? l.saving : l.save}
-            </button>
+              <div className="form-field" style={{ maxWidth: 320 }}>
+                <label htmlFor="f-chaplain">{l.chaplainAttended}</label>
+                <select
+                  id="f-chaplain"
+                  onChange={field("chaplainId")}
+                  value={form.chaplainId}
+                >
+                  <option value="">{l.selectChaplain}</option>
+                  {chaplains.map((ch) => (
+                    <option key={ch.id} value={ch.id}>{ch.displayName}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-field">
+                <label>{l.locationPin}</label>
+                <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
+                  <div style={{ flex: 1, minWidth: 140 }}>
+                    <label className="text-sm text-muted" htmlFor="f-lat" style={{ marginBottom: "0.25rem", display: "block" }}>
+                      {l.latitude}
+                    </label>
+                    <input
+                      id="f-lat"
+                      onChange={field("latitude")}
+                      placeholder="-25.2867"
+                      step="any"
+                      type="number"
+                      value={form.latitude}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 140 }}>
+                    <label className="text-sm text-muted" htmlFor="f-lng" style={{ marginBottom: "0.25rem", display: "block" }}>
+                      {l.longitude}
+                    </label>
+                    <input
+                      id="f-lng"
+                      onChange={field("longitude")}
+                      placeholder="-57.6478"
+                      step="any"
+                      type="number"
+                      value={form.longitude}
+                    />
+                  </div>
+                </div>
+                <p className="text-sm text-muted" style={{ marginTop: "0.375rem" }}>
+                  {l.gpsInstructions}
+                </p>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="f-notes">{l.colNotes}</label>
+                <textarea
+                  id="f-notes"
+                  maxLength={4000}
+                  onChange={field("notes")}
+                  placeholder={l.placeholderMeetingNotes}
+                  style={{ minHeight: "6rem" }}
+                  value={form.notes}
+                />
+              </div>
+            </div>
+
+            <div className="form-section">
+              <p className="form-section-title">{l.followUpLabel}</p>
+
+              <div className="form-field" style={{ maxWidth: 280 }}>
+                <label htmlFor="f-followup">{l.colFollowUp}</label>
+                <select
+                  id="f-followup"
+                  onChange={field("followUpCategory")}
+                  value={form.followUpCategory}
+                >
+                  {followUpOptions.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {form.followUpCategory !== "none" ? (
+                <div className="form-field">
+                  <label htmlFor="f-followup-notes">{l.colNotes}</label>
+                  <textarea
+                    id="f-followup-notes"
+                    maxLength={2000}
+                    onChange={field("followUpNotes")}
+                    style={{ minHeight: "4rem" }}
+                    value={form.followUpNotes}
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <div className="modal-footer">
+              <Link className="btn-link" href={isEdit ? `/meetings/${id}` : "/meetings"}>
+                {l.cancel}
+              </Link>
+              <button className="btn btn-primary" disabled={saveStatus === "saving"} type="submit">
+                {saveStatus === "saving" ? l.saving : l.save}
+              </button>
+            </div>
           </div>
-        </div>
-      </form>
+        </form>
       ) : null}
     </div>
   );

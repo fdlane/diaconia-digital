@@ -3,14 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
 import { ArrowLeftIcon } from "./icons";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
-
-type MemberOption = { id: string; displayName: string; email: string | null; role: string };
-type ChaplainOption = { id: string; displayName: string; email: string | null; role: string };
+import { PageLoadingState } from "./PageLoadingState";
+import type { UserOption } from "./types";
 
 type FormState = {
   name: string;
@@ -33,8 +31,8 @@ export function GroupFormPage({ id }: { id?: string }) {
   const isEdit = Boolean(id);
 
   const [form, setForm] = useState<FormState>(empty);
-  const [members, setMembers] = useState<MemberOption[]>([]);
-  const [chaplains, setChaplains] = useState<ChaplainOption[]>([]);
+  const [facilitators, setFacilitators] = useState<UserOption[]>([]);
+  const [chaplains, setChaplains] = useState<UserOption[]>([]);
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
@@ -51,50 +49,39 @@ export function GroupFormPage({ id }: { id?: string }) {
   async function loadData() {
     if (!token) return;
     setLoadStatus("loading");
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
 
-    try {
-      const [usersRes, chaplainsRes, groupRes] = await Promise.all([
-        fetch(`${apiUrl}/users`, { headers }),
-        fetch(`${apiUrl}/chaplains`, { headers }),
-        isEdit && id ? fetch(`${apiUrl}/groups/${id}`, { headers }) : Promise.resolve(null),
-      ]);
+    const [usersResult, chaplainsResult, groupResult] = await Promise.all([
+      apiFetch<{ users: UserOption[] }>("/users", token),
+      apiFetch<{ chaplains: UserOption[] }>("/chaplains", token),
+      isEdit && id ? apiFetch<{ group: { name: string; community: string; facilitatorId: string; chaplainId: string | null; active: boolean } }>(`/groups/${id}`, token) : null,
+    ]);
 
-      if (!usersRes.ok) {
-        setErrorMsg(`Failed to load people: ${usersRes.status}`);
+    if (!usersResult.ok) {
+      setErrorMsg(`Failed to load people: ${usersResult.error}`);
+      setLoadStatus("error");
+      return;
+    }
+
+    const facilitatorOptions = uniqueById(usersResult.data.users.filter((u) => u.role === "facilitator"));
+    setFacilitators(facilitatorOptions);
+
+    if (chaplainsResult?.ok) {
+      setChaplains(chaplainsResult.data.chaplains.filter((u) => u.role === "chaplain"));
+    }
+
+    if (groupResult) {
+      if (!groupResult.ok) {
+        setErrorMsg(`Failed to load group: ${groupResult.error}`);
         setLoadStatus("error");
         return;
       }
-
-      const usersData = (await usersRes.json()) as { users: MemberOption[] };
-      const facilitatorOptions = uniqueById(usersData.users.filter((user) => user.role === "facilitator"));
-      setMembers(facilitatorOptions);
-
-      if (chaplainsRes.ok) {
-        const chaplainsData = (await chaplainsRes.json()) as { chaplains: ChaplainOption[] };
-        setChaplains(chaplainsData.chaplains.filter((user) => user.role === "chaplain"));
-      }
-
-      if (groupRes) {
-        if (!groupRes.ok) {
-          setErrorMsg(`Failed to load group: ${groupRes.status}`);
-          setLoadStatus("error");
-          return;
-        }
-        const groupData = (await groupRes.json()) as {
-          group: { name: string; community: string; facilitatorId: string; chaplainId: string | null; active: boolean };
-        };
-        const g = groupData.group;
-        setForm({ name: g.name, community: g.community, facilitatorId: g.facilitatorId, chaplainId: g.chaplainId ?? "", active: g.active });
-      } else if (facilitatorOptions.length > 0) {
-        setForm((prev) => ({ ...prev, facilitatorId: facilitatorOptions[0]!.id }));
-      }
-
-      setLoadStatus("ready");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
-      setLoadStatus("error");
+      const g = groupResult.data.group;
+      setForm({ name: g.name, community: g.community, facilitatorId: g.facilitatorId, chaplainId: g.chaplainId ?? "", active: g.active });
+    } else if (facilitatorOptions.length > 0) {
+      setForm((prev) => ({ ...prev, facilitatorId: facilitatorOptions[0]!.id }));
     }
+
+    setLoadStatus("ready");
   }
 
   function field(key: keyof FormState) {
@@ -106,18 +93,9 @@ export function GroupFormPage({ id }: { id?: string }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token) {
-      setErrorMsg(l.authMissingSession);
-      setSaveStatus("error");
-      return;
-    }
+    if (!token) { setErrorMsg(l.authMissingSession); setSaveStatus("error"); return; }
     setSaveStatus("saving");
     setErrorMsg("");
-
-    const headers: Record<string, string> = {
-      "content-type": "application/json",
-      authorization: `Bearer ${token}`,
-    };
 
     const body = JSON.stringify({
       name: form.name,
@@ -127,37 +105,29 @@ export function GroupFormPage({ id }: { id?: string }) {
       active: form.active,
     });
 
-    try {
-      const url = isEdit ? `${apiUrl}/groups/${id}` : `${apiUrl}/groups`;
-      const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, { method, headers, body });
+    const result = await apiFetch<{ id: string }>(
+      isEdit ? `/groups/${id}` : "/groups",
+      token,
+      { method: isEdit ? "PUT" : "POST", body },
+    );
 
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${res.status}`);
-        setSaveStatus("error");
-        return;
-      }
-
-      const data = isEdit ? null : ((await res.json()) as { id: string });
-      router.push(isEdit ? `/groups/${id}` : `/groups/${data!.id}`);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
+    if (!result.ok) {
+      setErrorMsg(result.error);
       setSaveStatus("error");
+      return;
     }
+
+    router.push(isEdit ? `/groups/${id}` : `/groups/${result.data.id}`);
   }
 
+  const breadcrumbs = [
+    { label: l.groups, href: "/groups" },
+    ...(isEdit ? [{ label: form.name || id!, href: `/groups/${id}` }] : []),
+    { label: isEdit ? l.editGroup : l.newGroup },
+  ];
+
   if (loadStatus === "loading") {
-    return (
-      <div>
-        <nav className="breadcrumb">
-          <Link href="/groups">{l.groups}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>{l.loading}</span>
-        </nav>
-        <div className="status-bar"><span className="loading-dot" /><span>{l.loading}</span></div>
-      </div>
-    );
+    return <PageLoadingState breadcrumbs={breadcrumbs} loadingLabel={l.loading} />;
   }
 
   return (
@@ -197,7 +167,7 @@ export function GroupFormPage({ id }: { id?: string }) {
               <input
                 id="f-name"
                 onChange={field("name")}
-                placeholder={locale === "es" ? "Nombre del grupo" : "Group name"}
+                placeholder={l.placeholderGroupName}
                 required
                 value={form.name}
               />
@@ -208,7 +178,7 @@ export function GroupFormPage({ id }: { id?: string }) {
               <input
                 id="f-community"
                 onChange={field("community")}
-                placeholder={locale === "es" ? "Comunidad" : "Community"}
+                placeholder={l.placeholderCommunity}
                 required
                 value={form.community}
               />
@@ -222,10 +192,8 @@ export function GroupFormPage({ id }: { id?: string }) {
                 required
                 value={form.facilitatorId}
               >
-                <option disabled value="">
-                  {locale === "es" ? "Seleccionar custodio…" : "Select loan steward…"}
-                </option>
-                {members.map((m) => (
+                <option disabled value="">{l.placeholderSelectSteward}</option>
+                {facilitators.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.displayName}{m.email ? ` — ${m.email}` : ""}
                   </option>
@@ -258,7 +226,10 @@ export function GroupFormPage({ id }: { id?: string }) {
                   style={{ width: "auto", height: "auto" }}
                   type="checkbox"
                 />
-                <label htmlFor="f-active" style={{ textTransform: "none", letterSpacing: 0, fontSize: "0.9375rem", color: "var(--ink-2)", fontWeight: 500 }}>
+                <label
+                  htmlFor="f-active"
+                  style={{ textTransform: "none", letterSpacing: 0, fontSize: "0.9375rem", color: "var(--ink-2)", fontWeight: 500 }}
+                >
                   {l.groupActive}
                 </label>
               </div>

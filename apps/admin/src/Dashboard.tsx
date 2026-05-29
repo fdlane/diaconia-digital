@@ -1,34 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
 import { DeferredMeetingLocationsMap } from "./DeferredMeetingLocationsMap";
 import { CalendarIcon, MeetingReportIcon, PrayerIcon } from "./icons";
 import type { AdminMeeting } from "./meetingTypes";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+import { StatCard } from "./StatCard";
 
 type PrayerRequest = { id: string; status: string };
-
-type StatCardProps = {
-  icon: React.ReactNode;
-  iconColor: "blue" | "purple" | "green";
-  value: number | string;
-  label: string;
-  description: string;
-};
-
-function StatCard({ icon, iconColor, value, label, description }: StatCardProps) {
-  return (
-    <div className="stat-card dashboard-stat-card">
-      <div className={`stat-card-icon ${iconColor}`}>{icon}</div>
-      <div className="stat-card-value">{value}</div>
-      <div className="stat-card-label">{label}</div>
-      <div className="stat-card-desc">{description}</div>
-    </div>
-  );
-}
 
 export function Dashboard() {
   const { token, isLoaded, locale } = useAuth();
@@ -47,41 +28,32 @@ export function Dashboard() {
   }, [isLoaded, token]);
 
   async function loadStats(activeToken: string) {
-    const headers = { authorization: `Bearer ${activeToken}` };
-
-    try {
-      const res = await fetch(`${apiUrl}/meetings`, { headers });
-      if (!res.ok) return;
-
-      const data = (await res.json()) as { meetings: AdminMeeting[] };
-      const meetings = data.meetings;
-      setMeetings(meetings);
-
-      setPlannedCount(meetings.filter((s) => !s.submittedAt).length);
-      setReportsCount(meetings.filter((s) => s.submittedAt).length);
-
-      const submitted = meetings.filter((s) => s.submittedAt);
-      const counts = await Promise.all(
-        submitted.map(async (s) => {
-          try {
-            const r = await fetch(`${apiUrl}/meetings/${s.id}/prayer-requests`, {
-              headers,
-            });
-            if (!r.ok) return 0;
-            const p = (await r.json()) as { prayerRequests: PrayerRequest[] };
-            return p.prayerRequests.filter((pr) => pr.status === "open").length;
-          } catch {
-            return 0;
-          }
-        }),
-      );
-      setOpenPrayersCount(counts.reduce((sum, n) => sum + n, 0));
-    } catch {
+    const result = await apiFetch<{ meetings: AdminMeeting[] }>("/meetings", activeToken);
+    if (!result.ok) {
       setMeetings([]);
       setPlannedCount(0);
       setReportsCount(0);
       setOpenPrayersCount(0);
+      return;
     }
+
+    const meetings = result.data.meetings;
+    setMeetings(meetings);
+    setPlannedCount(meetings.filter((s) => !s.submittedAt).length);
+    setReportsCount(meetings.filter((s) => s.submittedAt).length);
+
+    const submitted = meetings.filter((s) => s.submittedAt);
+    const counts = await Promise.all(
+      submitted.map(async (s) => {
+        const r = await apiFetch<{ prayerRequests: PrayerRequest[] }>(
+          `/meetings/${s.id}/prayer-requests`,
+          activeToken,
+        );
+        if (!r.ok) return 0;
+        return r.data.prayerRequests.filter((pr) => pr.status === "open").length;
+      }),
+    );
+    setOpenPrayersCount(counts.reduce((sum, n) => sum + n, 0));
   }
 
   const statsLoading = plannedCount === "…" || reportsCount === "…" || openPrayersCount === "…";
@@ -108,6 +80,7 @@ export function Dashboard() {
 
       <div className="stat-cards dashboard-stat-cards">
         <StatCard
+          className="dashboard-stat-card"
           description={l.plannedMeetingsDesc}
           icon={<CalendarIcon size={20} />}
           iconColor="blue"
@@ -115,6 +88,7 @@ export function Dashboard() {
           value={plannedCount}
         />
         <StatCard
+          className="dashboard-stat-card"
           description={l.openPrayerRequestsDesc}
           icon={<PrayerIcon size={20} />}
           iconColor="purple"
@@ -122,6 +96,7 @@ export function Dashboard() {
           value={openPrayersCount}
         />
         <StatCard
+          className="dashboard-stat-card"
           description={l.meetingReportsDesc}
           icon={<MeetingReportIcon size={20} />}
           iconColor="green"

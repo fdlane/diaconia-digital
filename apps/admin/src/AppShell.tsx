@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { getProfileInitials } from "@diaconia/shared";
 import { useAuth, type CurrentUserProfile } from "./AuthContext";
 import { localizeAccessError, t } from "./adminLabels";
+import { AvatarCircle } from "./AvatarCircle";
 import {
   CalendarIcon,
   DashboardIcon,
@@ -20,18 +20,6 @@ import {
 import { AppLoadingScreen } from "./AppLoadingScreen";
 import { SignInPage } from "./SignInPage";
 import { desktopSidebarMediaQuery, getInitialSidebarOpen } from "./sidebarState";
-
-function Avatar({ user }: { user: CurrentUserProfile }) {
-  return (
-    <div className="avatar-circle" aria-hidden>
-      {user.avatarUrl ? (
-        <img alt="" src={user.avatarUrl} />
-      ) : (
-        <span>{getProfileInitials(user.displayName, user.email)}</span>
-      )}
-    </div>
-  );
-}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { currentUser, isLoaded, accessError, refreshSession, signOut, locale, setLocale } = useAuth();
@@ -130,7 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               EN
             </button>
           </div>
-          <Avatar user={shellUser} />
+          <AvatarCircle name={shellUser.displayName} email={shellUser.email} avatarUrl={shellUser.avatarUrl} size={32} />
           <div className="dots-anchor" ref={dotsRef}>
             <button
               aria-expanded={dotsOpen}

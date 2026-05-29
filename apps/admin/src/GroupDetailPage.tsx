@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
-import { ArrowLeftIcon, EditIcon, TrashIcon } from "./icons";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+import { CalendarIcon, UsersIcon } from "./icons";
+import { DeleteConfirmActions } from "./DeleteConfirmActions";
+import { PageErrorState } from "./PageErrorState";
+import { PageLoadingState } from "./PageLoadingState";
+import { StatCard } from "./StatCard";
 
 type GroupDetail = {
   id: string;
@@ -31,6 +34,12 @@ type Membership = {
   phone: string | null;
   position: "president" | "secretary" | "treasurer" | null;
   active: boolean;
+};
+
+type GroupDetailResponse = {
+  group: GroupDetail;
+  meetingCount: number;
+  memberships: Membership[];
 };
 
 export function GroupDetailPage({ id }: { id: string }) {
@@ -56,78 +65,53 @@ export function GroupDetailPage({ id }: { id: string }) {
   async function load() {
     if (!token) return;
     setStatus("loading");
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
-    try {
-      const res = await fetch(`${apiUrl}/groups/${id}`, { headers });
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${res.status}`);
-        setStatus("error");
-        return;
-      }
-      const data = (await res.json()) as {
-        group: GroupDetail;
-        meetingCount: number;
-        memberships: Membership[];
-      };
-      setGroup(data.group);
-      setMeetingCount(data.meetingCount);
-      setMemberships(data.memberships);
-      setStatus("done");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
+    const result = await apiFetch<GroupDetailResponse>(`/groups/${id}`, token);
+    if (!result.ok) {
+      setErrorMsg(result.error);
       setStatus("error");
+      return;
     }
+    setGroup(result.data.group);
+    setMeetingCount(result.data.meetingCount);
+    setMemberships(result.data.memberships);
+    setStatus("done");
   }
 
   async function handleDelete() {
-    if (!token) {
-      setErrorMsg(l.authMissingSession);
+    if (!token) { setErrorMsg(l.authMissingSession); return; }
+    setDeleteState("deleting");
+    const result = await apiFetch(`/groups/${id}`, token, { method: "DELETE" });
+    if (!result.ok) {
+      setErrorMsg(result.error);
+      setDeleteState("idle");
       return;
     }
-    setDeleteState("deleting");
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
-    try {
-      const res = await fetch(`${apiUrl}/groups/${id}`, { method: "DELETE", headers });
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${res.status}`);
-        setDeleteState("idle");
-        return;
-      }
-      router.push("/groups");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
-      setDeleteState("idle");
-    }
+    router.push("/groups");
   }
 
+  function positionLabel(pos: Membership["position"]) {
+    if (pos === "president") return l.positionPresident;
+    if (pos === "secretary") return l.positionSecretary;
+    return l.positionTreasurer;
+  }
+
+  const breadcrumbs = [
+    { label: l.groups, href: "/groups" },
+    { label: status === "loading" ? l.loading : (group?.name ?? "Error") },
+  ];
+
   if (status === "loading") {
-    return (
-      <div>
-        <nav className="breadcrumb">
-          <Link href="/groups">{l.groups}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>{l.loading}</span>
-        </nav>
-        <div className="status-bar"><span className="loading-dot" /><span>{l.loading}</span></div>
-      </div>
-    );
+    return <PageLoadingState breadcrumbs={breadcrumbs} loadingLabel={l.loading} />;
   }
 
   if (status === "error" || !group) {
     return (
-      <div>
-        <nav className="breadcrumb">
-          <Link href="/groups">{l.groups}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>Error</span>
-        </nav>
-        <div className="banner banner-error">{errorMsg || "Not found"}</div>
-        <Link className="btn-link" href="/groups">
-          <ArrowLeftIcon size={14} />{l.backToGroups}
-        </Link>
-      </div>
+      <PageErrorState
+        backHref="/groups"
+        backLabel={l.backToGroups}
+        breadcrumbs={breadcrumbs}
+        errorMsg={errorMsg}
+      />
     );
   }
 
@@ -151,32 +135,19 @@ export function GroupDetailPage({ id }: { id: string }) {
           </p>
         </div>
         <div className="page-header-actions">
-          {deleteState === "confirming" ? (
-            <div className="inline-confirm">
-              <span className="inline-confirm-msg">{l.confirmDeleteTitle}</span>
-              <button className="btn-link" onClick={() => setDeleteState("idle")} type="button">
-                {l.cancel}
-              </button>
-              <button className="btn btn-danger" onClick={handleDelete} type="button">
-                {l.deleteBtn}
-              </button>
-            </div>
-          ) : (
-            <>
-              <Link className="btn btn-secondary" href={`/groups/${id}/edit`}>
-                <EditIcon size={15} />{l.editGroup}
-              </Link>
-              <button
-                className="btn btn-danger"
-                disabled={deleteState === "deleting"}
-                onClick={() => setDeleteState("confirming")}
-                type="button"
-              >
-                <TrashIcon size={15} />
-                {deleteState === "deleting" ? l.deleting : l.deleteGroup}
-              </button>
-            </>
-          )}
+          <DeleteConfirmActions
+            cancelLabel={l.cancel}
+            confirmLabel={l.deleteBtn}
+            confirmMsg={l.confirmDeleteTitle}
+            deleteLabel={l.deleteGroup}
+            deleteState={deleteState}
+            deletingLabel={l.deleting}
+            editHref={`/groups/${id}/edit`}
+            editLabel={l.editGroup}
+            onCancel={() => setDeleteState("idle")}
+            onConfirm={() => setDeleteState("confirming")}
+            onDelete={handleDelete}
+          />
         </div>
       </div>
 
@@ -245,33 +216,20 @@ export function GroupDetailPage({ id }: { id: string }) {
         </div>
 
         <div className="stat-cards" style={{ marginBottom: 0 }}>
-          <div className="stat-card">
-            <div className="stat-card-icon blue">
-              <svg fill="none" height={20} stroke="currentColor" strokeLinecap="round"
-                strokeLinejoin="round" strokeWidth={1.75} viewBox="0 0 24 24" width={20}>
-                <rect height="18" rx="2" width="18" x="3" y="4" />
-                <line x1="16" x2="16" y1="2" y2="6" />
-                <line x1="8" x2="8" y1="2" y2="6" />
-                <line x1="3" x2="21" y1="10" y2="10" />
-              </svg>
-            </div>
-            <div className="stat-card-value">{meetingCount}</div>
-            <div className="stat-card-label">{l.colMeetings}</div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-card-icon purple">
-              <svg fill="none" height={20} stroke="currentColor" strokeLinecap="round"
-                strokeLinejoin="round" strokeWidth={1.75} viewBox="0 0 24 24" width={20}>
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                <circle cx="9" cy="7" r="4" />
-              </svg>
-            </div>
-            <div className="stat-card-value">{memberships.length}</div>
-            <div className="stat-card-label">{l.groupMembers}</div>
-          </div>
+          <StatCard
+            icon={<CalendarIcon size={20} />}
+            iconColor="blue"
+            label={l.colMeetings}
+            value={meetingCount}
+          />
+          <StatCard
+            icon={<UsersIcon size={20} />}
+            iconColor="purple"
+            label={l.groupMembers}
+            value={memberships.length}
+          />
         </div>
 
-        {/* Steering Committee */}
         {memberships.some((a) => a.position) ? (
           <div className="card">
             <div className="card-header">
@@ -281,10 +239,9 @@ export function GroupDetailPage({ id }: { id: string }) {
               <div className="detail-grid">
                 {(["president", "secretary", "treasurer"] as const).map((pos) => {
                   const member = memberships.find((a) => a.position === pos);
-                  const label = pos === "president" ? l.positionPresident : pos === "secretary" ? l.positionSecretary : l.positionTreasurer;
                   return (
                     <div className="detail-field" key={pos}>
-                      <span className="detail-label">{label}</span>
+                      <span className="detail-label">{positionLabel(pos)}</span>
                       <span className="detail-value">
                         {member ? member.displayName : <span className="text-muted">—</span>}
                       </span>
@@ -319,9 +276,7 @@ export function GroupDetailPage({ id }: { id: string }) {
                     <td>{a.displayName}</td>
                     <td>
                       {a.position ? (
-                        <span className="badge badge-default">
-                          {a.position === "president" ? l.positionPresident : a.position === "secretary" ? l.positionSecretary : l.positionTreasurer}
-                        </span>
+                        <span className="badge badge-default">{positionLabel(a.position)}</span>
                       ) : (
                         <span className="text-muted text-sm">—</span>
                       )}

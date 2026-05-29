@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { formatDisplayDate } from "@diaconia/shared";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { t } from "./adminLabels";
-import { ArrowLeftIcon, EditIcon, TrashIcon } from "./icons";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
+import { ArrowLeftIcon } from "./icons";
+import { DeleteConfirmActions } from "./DeleteConfirmActions";
+import { PageErrorState } from "./PageErrorState";
+import { PageLoadingState } from "./PageLoadingState";
 
 type MeetingDetail = {
   id: string;
@@ -44,6 +46,12 @@ type PrayerRequest = {
 };
 
 type MeetingMedia = { id: string; type: string; url: string };
+
+type MeetingDetailResponse = {
+  meeting: MeetingDetail;
+  attendance: AttendanceRecord[];
+  prayerRequests: PrayerRequest[];
+};
 
 function followUpColor(cat: string) {
   const map: Record<string, string> = {
@@ -92,94 +100,64 @@ export function MeetingDetailPage({ id }: { id: string }) {
   async function load() {
     if (!token) return;
     setStatus("loading");
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
-    try {
-      const [detailRes, mediaRes] = await Promise.all([
-        fetch(`${apiUrl}/meetings/${id}`, { headers }),
-        fetch(`${apiUrl}/meetings/${id}/media`, { headers }),
-      ]);
 
-      if (!detailRes.ok) {
-        const payload = (await detailRes.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${detailRes.status}`);
-        setStatus("error");
-        return;
-      }
+    const [detailResult, mediaResult] = await Promise.all([
+      apiFetch<MeetingDetailResponse>(`/meetings/${id}`, token),
+      apiFetch<{ media: MeetingMedia[] }>(`/meetings/${id}/media`, token),
+    ]);
 
-      const data = (await detailRes.json()) as {
-        meeting: MeetingDetail;
-        attendance: AttendanceRecord[];
-        prayerRequests: PrayerRequest[];
-      };
-
-      setMeeting(data.meeting);
-      setAttendance(data.attendance);
-      setPrayers(data.prayerRequests);
-
-      if (mediaRes.ok) {
-        const mediaData = (await mediaRes.json()) as { media: MeetingMedia[] };
-        setMedia(mediaData.media);
-      }
-
-      setStatus("done");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
+    if (!detailResult.ok) {
+      setErrorMsg(detailResult.error);
       setStatus("error");
+      return;
     }
+
+    setMeeting(detailResult.data.meeting);
+    setAttendance(detailResult.data.attendance);
+    setPrayers(detailResult.data.prayerRequests);
+
+    if (mediaResult.ok) {
+      setMedia(mediaResult.data.media);
+    }
+
+    setStatus("done");
   }
 
   async function handleDelete() {
-    if (!token) {
-      setErrorMsg(l.authMissingSession);
+    if (!token) { setErrorMsg(l.authMissingSession); return; }
+    setDeleteState("deleting");
+    const result = await apiFetch(`/meetings/${id}`, token, { method: "DELETE" });
+    if (!result.ok) {
+      setErrorMsg(result.error);
+      setDeleteState("idle");
       return;
     }
-    setDeleteState("deleting");
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
-    try {
-      const res = await fetch(`${apiUrl}/meetings/${id}`, { method: "DELETE", headers });
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string } | null;
-        setErrorMsg(payload?.error ?? `Error ${res.status}`);
-        setDeleteState("idle");
-        return;
-      }
-      router.push("/meetings");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
-      setDeleteState("idle");
-    }
+    router.push("/meetings");
   }
 
+  const breadcrumbs = [
+    { label: l.meetings, href: "/meetings" },
+    {
+      label: status === "loading"
+        ? l.loading
+        : meeting
+          ? `${meeting.groupName} · ${formatDisplayDate(meeting.heldAt, locale)}`
+          : "Error",
+    },
+  ];
+
   if (status === "loading") {
-    return (
-      <div>
-        <nav className="breadcrumb">
-          <Link href="/meetings">{l.meetings}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>{l.loading}</span>
-        </nav>
-        <div className="status-bar">
-          <span className="loading-dot" />
-          <span>{l.loading}</span>
-        </div>
-      </div>
-    );
+    return <PageLoadingState breadcrumbs={breadcrumbs} loadingLabel={l.loading} />;
   }
 
   if (status === "error" || !meeting) {
     return (
-      <div>
-        <nav className="breadcrumb">
-          <Link href="/meetings">{l.meetings}</Link>
-          <span className="breadcrumb-sep">›</span>
-          <span>Error</span>
-        </nav>
-        <div className="banner banner-error">{errorMsg || "Not found"}</div>
-        <Link className="btn btn-ghost" href="/meetings">
-          <ArrowLeftIcon size={15} />
-          {l.backToMeetings}
-        </Link>
-      </div>
+      <PageErrorState
+        backHref="/meetings"
+        backLabel={l.backToMeetings}
+        breadcrumbs={breadcrumbs}
+        errorMsg={errorMsg}
+      />
     );
   }
 
@@ -199,44 +177,25 @@ export function MeetingDetailPage({ id }: { id: string }) {
           <p className="page-subtitle">{formatDisplayDate(meeting.heldAt, locale)}</p>
         </div>
         <div className="page-header-actions">
-          {deleteState === "confirming" ? (
-            <div className="inline-confirm">
-              <span className="inline-confirm-msg">{l.confirmDeleteTitle}</span>
-              <button
-                className="btn-link"
-                onClick={() => setDeleteState("idle")}
-                type="button"
-              >
-                {l.cancel}
-              </button>
-              <button className="btn btn-danger" onClick={handleDelete} type="button">
-                {l.deleteBtn}
-              </button>
-            </div>
-          ) : (
-            <>
-              <Link className="btn btn-secondary" href={`/meetings/${id}/edit`}>
-                <EditIcon size={15} />
-                {l.editMeeting}
-              </Link>
-              <button
-                className="btn btn-danger"
-                disabled={deleteState === "deleting"}
-                onClick={() => setDeleteState("confirming")}
-                type="button"
-              >
-                <TrashIcon size={15} />
-                {deleteState === "deleting" ? l.deleting : l.deleteMeeting}
-              </button>
-            </>
-          )}
+          <DeleteConfirmActions
+            cancelLabel={l.cancel}
+            confirmLabel={l.deleteBtn}
+            confirmMsg={l.confirmDeleteTitle}
+            deleteLabel={l.deleteMeeting}
+            deleteState={deleteState}
+            deletingLabel={l.deleting}
+            editHref={`/meetings/${id}/edit`}
+            editLabel={l.editMeeting}
+            onCancel={() => setDeleteState("idle")}
+            onConfirm={() => setDeleteState("confirming")}
+            onDelete={handleDelete}
+          />
         </div>
       </div>
 
       {errorMsg ? <div className="banner banner-error">{errorMsg}</div> : null}
 
       <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-        {/* Overview */}
         <div className="card">
           <div className="card-header">
             <span className="card-title">{l.overview}</span>
@@ -293,8 +252,7 @@ export function MeetingDetailPage({ id }: { id: string }) {
               {meeting.notes ? (
                 <div className="detail-field" style={{ gridColumn: "1 / -1" }}>
                   <span className="detail-label">{l.colNotes}</span>
-                  <span className="detail-value"
-                    style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+                  <span className="detail-value" style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
                     {meeting.notes}
                   </span>
                 </div>
@@ -303,7 +261,6 @@ export function MeetingDetailPage({ id }: { id: string }) {
           </div>
         </div>
 
-        {/* Follow-up */}
         {meeting.followUpCategory && meeting.followUpCategory !== "none" ? (
           <div className="card">
             <div className="card-header">
@@ -322,12 +279,11 @@ export function MeetingDetailPage({ id }: { id: string }) {
           </div>
         ) : null}
 
-        {/* Attendance */}
         <div className="card">
           <div className="card-header">
             <span className="card-title">{l.attendance}</span>
             {attendance.length > 0 ? (
-              <span className="text-sm text-muted">{attendance.length} {locale === "es" ? "personas" : "people"}</span>
+              <span className="text-sm text-muted">{l.attendanceCount(attendance.length)}</span>
             ) : null}
           </div>
           <div className="table-wrapper">
@@ -355,12 +311,11 @@ export function MeetingDetailPage({ id }: { id: string }) {
           </div>
         </div>
 
-        {/* Prayer Requests */}
         <div className="card">
           <div className="card-header">
             <span className="card-title">{l.prayerRequests}</span>
             {prayers.length > 0 ? (
-              <span className="text-sm text-muted">{prayers.length} requests</span>
+              <span className="text-sm text-muted">{l.prayerRequestsCount(prayers.length)}</span>
             ) : null}
           </div>
           {prayers.length > 0 ? (
@@ -368,7 +323,7 @@ export function MeetingDetailPage({ id }: { id: string }) {
               <table>
                 <thead>
                   <tr>
-                    <th>{locale === "es" ? "Petición" : "Request"}</th>
+                    <th>{l.colRequest}</th>
                     <th>{l.colStatus}</th>
                   </tr>
                 </thead>
@@ -389,12 +344,11 @@ export function MeetingDetailPage({ id }: { id: string }) {
           )}
         </div>
 
-        {/* Photos */}
         {media.length > 0 ? (
           <div className="card">
             <div className="card-header">
               <span className="card-title">{l.photos}</span>
-              <span className="text-sm text-muted">{media.length} photos</span>
+              <span className="text-sm text-muted">{media.length}</span>
             </div>
             <div className="card-body">
               <div

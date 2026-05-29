@@ -2,6 +2,7 @@
 
 import { type SupportedLocale } from "@diaconia/shared";
 import { type CSSProperties } from "react";
+import { t } from "./adminLabels";
 import { DeferredMeetingLocationsMap } from "./DeferredMeetingLocationsMap";
 import type { AdminMeeting } from "./meetingTypes";
 
@@ -33,7 +34,7 @@ export function MeetingsMap({
   return (
     <DeferredMeetingLocationsMap
       locale={locale}
-      loadingLabel={locale === "es" ? "Cargando..." : "Loading..."}
+      loadingLabel={t(locale).loading}
       {...(height ? { height } : {})}
       meetings={meetings}
       onSelect={onSelect}

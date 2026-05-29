@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "./api";
 import { useAuth } from "./AuthContext";
 import { localizeRouteError, t } from "./adminLabels";
 import { ChevronRightIcon, PlusIcon, UsersIcon } from "./icons";
 import { AvatarCircle } from "./AvatarCircle";
-
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
 type AdminUser = {
   id: string;
@@ -41,29 +40,16 @@ export function MembersListPage() {
   }, [isLoaded, token]);
 
   async function load() {
-    if (!token) {
-      setErrorMsg(l.authMissingSession);
+    if (!token) { setErrorMsg(l.authMissingSession); setStatus("error"); return; }
+    setStatus("loading");
+    const result = await apiFetch<{ users: AdminUser[]; warning?: string }>("/users", token);
+    if (!result.ok) {
+      setErrorMsg(localizeRouteError({ error: result.error }, l));
       setStatus("error");
       return;
     }
-
-    setStatus("loading");
-    const headers: Record<string, string> = { authorization: `Bearer ${token}` };
-    try {
-      const res = await fetch(`${apiUrl}/users`, { headers });
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { error?: string; code?: string } | null;
-        setErrorMsg(localizeRouteError(payload, l, res.status));
-        setStatus("error");
-        return;
-      }
-      const data = (await res.json()) as { users: AdminUser[]; warning?: string };
-      setMembers(data.users);
-      setStatus("done");
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Error");
-      setStatus("error");
-    }
+    setMembers(result.data.users);
+    setStatus("done");
   }
 
   function roleBadge(role: string) {

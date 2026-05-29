@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAuth as useClerkAuth, useClerk, useUser } from "@clerk/nextjs";
 import type { Role, SupportedLocale, UserStatus } from "@diaconia/shared";
+import { apiUrl } from "./api";
 
 export type CurrentUserProfile = {
   id?: string;
@@ -31,7 +32,6 @@ type AuthContextValue = {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const LOCALE_KEY = "diaconia:admin:locale";
-const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const jwtTemplate = process.env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE ?? "diaconia-api";
 const devBypass = process.env.NEXT_PUBLIC_AUTH_DEV_BYPASS === "true";
 const hasClerkKey = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
