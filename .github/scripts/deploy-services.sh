@@ -32,7 +32,15 @@ terraform -chdir=infra init \
   -backend-config="region=${AWS_REGION}" \
   -backend-config="encrypt=true"
 
+# Main/branch deploys intentionally target only the service image rollout and
+# the ALB API routing rules the admin bundle depends on. The routing rules must
+# stay in this service deploy path because admin fetches shared paths such as
+# /me, /meetings, and /groups through the same public ALB host.
 terraform -chdir=infra plan \
+  -target=aws_lb_listener_rule.api_auth_1 \
+  -target=aws_lb_listener_rule.api_auth_2 \
+  -target=aws_lb_listener_rule.api_auth_3 \
+  -target=aws_lb_listener_rule.api_auth_4 \
   -target=aws_ecs_task_definition.api \
   -target=aws_ecs_task_definition.admin \
   -target=aws_ecs_service.api \
