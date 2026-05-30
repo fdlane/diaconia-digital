@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { SupportedLocale } from "@diaconia/shared";
+import type { MobileOfflineSnapshot } from "./offlineStore";
 import type { LocalMeeting, LocalMember, LocalUser } from "./types";
 
 const keys = {
@@ -7,6 +8,7 @@ const keys = {
   locale: "diaconia:locale",
   members: "diaconia:members",
   meetings: "diaconia:meetings",
+  offlineSnapshot: "diaconia:offlineSnapshot:v1",
 };
 
 export async function loadUser() {
@@ -43,6 +45,14 @@ export async function loadMeetings() {
 
 export async function saveMeetings(meetings: LocalMeeting[]) {
   await AsyncStorage.setItem(keys.meetings, JSON.stringify(meetings));
+}
+
+export async function loadOfflineSnapshot(fallback: MobileOfflineSnapshot) {
+  return readJson<MobileOfflineSnapshot>(keys.offlineSnapshot, fallback);
+}
+
+export async function saveOfflineSnapshot(snapshot: MobileOfflineSnapshot) {
+  await AsyncStorage.setItem(keys.offlineSnapshot, JSON.stringify(snapshot));
 }
 
 async function readJson<T>(key: string, fallback: T): Promise<T> {

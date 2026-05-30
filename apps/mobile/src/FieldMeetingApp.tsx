@@ -22,17 +22,32 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import diaconiaLogo from "../assets/logo.png";
 import { pickImage } from "./media";
+import {
+  bootstrapSnapshot,
+  createMembershipFromMember,
+  createUserFromMember,
+  enqueueMutation,
+  markMutationBatchSynced,
+  selectLocalGroups,
+  selectLocalMembers,
+  toLocalMeeting,
+  type MobileOfflineSnapshot,
+  type OfflineGroup,
+  type OfflineMutation,
+} from "./offlineStore";
 import { adminUserId, defaultGroupId, facilitatorUserId, seedGroups, seedMembers } from "./seed";
-import { replayMeetingWrite, uploadPhotoAsset } from "./sync/zero";
+import { pendingMutationsReadyForSync, syncOfflineMutations } from "./sync/offlineMutations";
+import { uploadPhotoAsset } from "./sync/zero";
 import {
   loadMeetings,
   loadLocale,
-  loadMembers,
+  loadOfflineSnapshot,
   loadUser,
   removeUser,
   saveMeetings,
   saveLocale,
   saveMembers,
+  saveOfflineSnapshot,
   saveUser,
 } from "./storage";
 import type { LocalGroup, LocalMeeting, LocalMember, LocalPrayerRequest, LocalUser } from "./types";
@@ -45,6 +60,15 @@ export type AuthenticatedSession = {
 };
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
+
+function createBootstrapOfflineSnapshot(meetings: LocalMeeting[] = []): MobileOfflineSnapshot {
+  const now = new Date().toISOString();
+  const users = seedMembers.map((member) => createUserFromMember(member, now));
+  const memberships = seedMembers.map((member, index) => createMembershipFromMember(member, now, `${member.groupId}-${member.id}-${index}`));
+  const groups = seedGroups.map((group) => ({ ...group, active: true, createdAt: now, updatedAt: now }) satisfies OfflineGroup);
+  return bootstrapSnapshot({ users, groups, memberships, meetings });
+}
+
 const brand = {
   background: "#f4f6fb",
   surface: "#ffffff",
@@ -74,6 +98,9 @@ const ui = {
     prayerPlaceholder: "Escribe una petición pública de oración",
     addPrayer: "Agregar petición",
     addPerson: "Agregar persona",
+    addGroup: "Agregar grupo",
+    newGroupName: "Nombre del grupo",
+    newGroupCommunity: "Comunidad",
     newPersonName: "Nombre completo",
     newPersonPhone: "Teléfono",
     makeFacilitator: "Facilitador",
@@ -110,6 +137,9 @@ const ui = {
     prayerPlaceholder: "Write a public prayer request",
     addPrayer: "Add request",
     addPerson: "Add person",
+    addGroup: "Add group",
+    newGroupName: "Group name",
+    newGroupCommunity: "Community",
     newPersonName: "Full name",
     newPersonPhone: "Phone",
     makeFacilitator: "Facilitator",
@@ -142,7 +172,8 @@ function statusLabel(status: AttendanceStatus, locale: SupportedLocale) {
 export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession?: AuthenticatedSession }) {
   const [locale, setLocale] = useState<SupportedLocale>("es");
   const [user, setUser] = useState<LocalUser | null>(null);
-  const [groups] = useState<LocalGroup[]>(seedGroups);
+  const [offlineSnapshot, setOfflineSnapshot] = useState<MobileOfflineSnapshot>(() => createBootstrapOfflineSnapshot());
+  const [groups, setGroups] = useState<LocalGroup[]>(seedGroups);
   const [members, setMembers] = useState<LocalMember[]>(seedMembers);
   const [meetings, setMeetings] = useState<LocalMeeting[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState(defaultGroupId);
@@ -153,6 +184,8 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   const [meetingPhotos, setMeetingPhotos] = useState<LocalMeeting["meetingPhotos"]>([]);
   const [prayerRequests, setPrayerRequests] = useState<LocalPrayerRequest[]>([]);
   const [newPrayer, setNewPrayer] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupCommunity, setNewGroupCommunity] = useState("");
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonPhone, setNewPersonPhone] = useState("");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -170,14 +203,18 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     async function hydrate() {
       const storedLocale = await loadLocale();
       setLocale(storedLocale);
+      const storedMeetings = await loadMeetings();
+      const storedSnapshot = await loadOfflineSnapshot(createBootstrapOfflineSnapshot(storedMeetings));
+      setOfflineSnapshot(storedSnapshot);
+      setGroups(selectLocalGroups(storedSnapshot));
+      setMembers(selectLocalMembers(storedSnapshot));
+      setMeetings(storedSnapshot.meetings.length ? storedSnapshot.meetings : storedMeetings);
       if (authenticatedSession) {
         setUser(authenticatedSession.user);
         setProfileName(authenticatedSession.user.displayName);
         setProfileEmail(authenticatedSession.user.email ?? "");
         setProfilePhone(authenticatedSession.user.phone ?? "");
         setAccessToken("");
-        setMembers(await loadMembers(seedMembers));
-        setMeetings(await loadMeetings());
         return;
       }
       const storedUser = await loadUser();
@@ -188,8 +225,6 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
         setProfilePhone(storedUser.phone ?? "");
         setAccessToken(storedUser.token === "local-dev-token" ? "" : storedUser.token);
       }
-      setMembers(await loadMembers(seedMembers));
-      setMeetings(await loadMeetings());
     }
 
     void hydrate();
@@ -213,6 +248,16 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       return authenticatedSession.getToken();
     }
     return user?.token ?? "";
+  }
+
+  async function persistOfflineSnapshot(nextSnapshot: MobileOfflineSnapshot) {
+    setOfflineSnapshot(nextSnapshot);
+    setGroups(selectLocalGroups(nextSnapshot));
+    setMembers(selectLocalMembers(nextSnapshot));
+    setMeetings(nextSnapshot.meetings);
+    await saveOfflineSnapshot(nextSnapshot);
+    await saveMembers(selectLocalMembers(nextSnapshot));
+    await saveMeetings(nextSnapshot.meetings);
   }
 
   async function updateLocale(nextLocale: SupportedLocale) {
@@ -241,6 +286,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
 
   async function saveProfile() {
     if (!user) return;
+    const now = new Date().toISOString();
     const nextUser: LocalUser = {
       ...user,
       displayName: profileName.trim() || user.displayName,
@@ -250,8 +296,15 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     };
     setUser(nextUser);
     await saveUser(nextUser);
+    const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === nextUser.id);
+    const nextSnapshot = enqueueMutation(offlineSnapshot, {
+      type: "user.upsert",
+      user: { ...offlineUser, ...nextUser, updatedAt: now },
+    });
+    await persistOfflineSnapshot(nextSnapshot);
     setProfileEditorOpen(false);
     setProfileMenuOpen(false);
+    setStatus(copy.meetingQueued);
   }
 
   async function signOut() {
@@ -270,43 +323,38 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     if (!user) return;
     const photo = await pickImage("user_profile_photo");
     if (!photo) return;
-    let remoteMediaId = user.profilePhotoRemoteMediaId;
-    try {
-      const token = await getApiToken();
-      remoteMediaId = await uploadPhotoAsset({ apiUrl, token, photo, ownerUserId: user.id });
-      await fetch(`${apiUrl}/me/profile-photo`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ mediaId: remoteMediaId }),
-      });
-    } catch {
-      setStatus(copy.profilePhotoPending);
-    }
-    const nextUser = remoteMediaId
-      ? { ...user, profilePhotoUri: photo.uri, profilePhotoRemoteMediaId: remoteMediaId }
-      : { ...user, profilePhotoUri: photo.uri };
+    const now = new Date().toISOString();
+    const nextUser = { ...user, profilePhotoUri: photo.uri };
     setUser(nextUser);
     await saveUser(nextUser);
+    const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === user.id);
+    const nextSnapshot = enqueueMutation(offlineSnapshot, {
+      type: "user.upsert",
+      user: { ...offlineUser, ...nextUser, pendingProfilePhoto: photo, updatedAt: now },
+    });
+    await persistOfflineSnapshot(nextSnapshot);
+    setStatus(copy.profilePhotoPending);
   }
 
   async function updateMemberPhoto(memberId: string) {
     const photo = await pickImage("user_profile_photo");
     if (!photo) return;
-    let remoteMediaId: string | undefined;
-    try {
-      remoteMediaId = await uploadPhotoAsset({ apiUrl, token: await getApiToken(), photo, ownerUserId: memberId });
-    } catch {
-      setStatus(copy.memberPhotoPending);
-    }
-    const nextMembers = members.map((member) =>
-      member.id === memberId
-        ? remoteMediaId
-          ? { ...member, profilePhotoUri: photo.uri, profilePhotoRemoteMediaId: remoteMediaId }
-          : { ...member, profilePhotoUri: photo.uri }
-        : member,
-    );
-    setMembers(nextMembers);
-    await saveMembers(nextMembers);
+    const now = new Date().toISOString();
+    const currentMember = members.find((member) => member.id === memberId);
+    if (!currentMember) return;
+    const nextMember = { ...currentMember, profilePhotoUri: photo.uri };
+    const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === memberId);
+    const nextSnapshot = enqueueMutation(offlineSnapshot, {
+      type: "user.upsert",
+      user: {
+        ...offlineUser,
+        ...createUserFromMember(nextMember, now),
+        pendingProfilePhoto: photo,
+        updatedAt: now,
+      },
+    });
+    await persistOfflineSnapshot(nextSnapshot);
+    setStatus(copy.memberPhotoPending);
   }
 
   async function addMeetingPhoto() {
@@ -314,9 +362,31 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     if (photo) setMeetingPhotos((value) => [...value, photo]);
   }
 
+  async function addGroup() {
+    if (!user || !newGroupName.trim()) return;
+    const now = new Date().toISOString();
+    const group: OfflineGroup = {
+      id: await uuidv7(),
+      name: newGroupName.trim(),
+      community: newGroupCommunity.trim() || "Paraguay",
+      facilitatorId: user.role === "facilitator" ? user.id : facilitatorUserId,
+      chaplainUserId: null,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "group.upsert", group });
+    await persistOfflineSnapshot(nextSnapshot);
+    setSelectedGroupId(group.id);
+    setNewGroupName("");
+    setNewGroupCommunity("");
+    setStatus(copy.meetingQueued);
+  }
+
   async function addPerson() {
     if (!newPersonName.trim()) return;
     const phone = newPersonPhone.trim();
+    const now = new Date().toISOString();
     const nextPerson: LocalMember = {
       id: await uuidv7(),
       groupId: selectedGroup.id,
@@ -324,21 +394,28 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       role: "member",
       ...(phone ? { phone } : {}),
     };
-    const nextMembers = [...members, nextPerson];
-    setMembers(nextMembers);
-    await saveMembers(nextMembers);
+    const userMutation = createUserFromMember(nextPerson, now);
+    const membershipMutation = createMembershipFromMember(nextPerson, now, await uuidv7());
+    let nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: userMutation });
+    nextSnapshot = enqueueMutation(nextSnapshot, { type: "membership.upsert", membership: membershipMutation });
+    await persistOfflineSnapshot(nextSnapshot);
     setNewPersonName("");
     setNewPersonPhone("");
+    setStatus(copy.meetingQueued);
   }
 
   async function toggleFacilitator(memberId: string) {
-    const nextMembers: LocalMember[] = members.map((member) => {
-      if (member.id !== memberId) return member;
-      const role: Role = member.role === "facilitator" ? "member" : "facilitator";
-      return { ...member, role };
-    });
-    setMembers(nextMembers);
-    await saveMembers(nextMembers);
+    const now = new Date().toISOString();
+    const existing = offlineSnapshot.users.find((candidate) => candidate.id === memberId);
+    const currentMember = members.find((member) => member.id === memberId);
+    if (!existing && !currentMember) return;
+    const nextRole: Role = (existing?.role ?? currentMember?.role) === "facilitator" ? "member" : "facilitator";
+    const nextUser = existing
+      ? { ...existing, role: nextRole, updatedAt: now }
+      : createUserFromMember({ ...currentMember!, role: nextRole }, now);
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: nextUser });
+    await persistOfflineSnapshot(nextSnapshot);
+    setStatus(copy.meetingQueued);
   }
 
   async function addPrayerRequest() {
@@ -356,9 +433,11 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
 
   async function saveDraft(syncNow: boolean) {
     if (!user) return;
-    const meeting: LocalMeeting = {
+    const meeting: LocalMeeting = toLocalMeeting({
       id: await uuidv7(),
       groupId: selectedGroup.id,
+      facilitatorId: user.id,
+      chaplainUserId: selectedGroup.chaplainUserId ?? null,
       scheduledStartAt: new Date().toISOString(),
       occurredAt: new Date().toISOString(),
       status: "completed",
@@ -375,69 +454,135 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       prayerRequests,
       meetingPhotos,
       syncStatus: syncNow ? "pending" : "draft",
-    };
-    const nextMeetings = [meeting, ...meetings];
-    setMeetings(nextMeetings);
-    await saveMeetings(nextMeetings);
+    });
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "meeting.upsert", meeting });
+    await persistOfflineSnapshot(nextSnapshot);
     setNotes("");
     setFollowUpCategory("none");
     setFollowUpNotes("");
     setPrayerRequests([]);
     setMeetingPhotos([]);
     setStatus(syncNow ? copy.meetingQueued : copy.draftSaved);
-    if (syncNow) await syncPending(nextMeetings);
+    if (syncNow) await syncPending(nextSnapshot);
   }
 
-  async function syncPending(source = meetings) {
+  async function syncPending(snapshot: MobileOfflineSnapshot = offlineSnapshot) {
     if (!user) return;
     setStatus(copy.syncing);
-    const nextMeetings: LocalMeeting[] = [];
-    for (const meeting of source) {
-      if (meeting.syncStatus !== "pending" && meeting.syncStatus !== "failed") {
-        nextMeetings.push(meeting);
-        continue;
-      }
-      let uploadedMeetingPhotos = meeting.meetingPhotos;
-      try {
-        for (const photo of meeting.meetingPhotos) {
-          const token = await getApiToken();
-          const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token, photo, meetingId: meeting.id }));
-          uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) =>
-            candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate,
+    const mutationsToSync = pendingMutationsReadyForSync(snapshot.pendingMutations);
+
+    try {
+      const token = await getApiToken();
+      await syncOfflineMutations({ apiUrl, token, mutations: mutationsToSync });
+
+      const failedMeetingPhotoIds = new Set<string>();
+      const failedProfilePhotoUserIds = new Set<string>();
+      let meetingsWithUploadedPhotos = snapshot.meetings;
+      let usersWithUploadedPhotos = snapshot.users;
+      const followUpProfileMutations: OfflineMutation[] = [];
+
+      for (const mutation of mutationsToSync) {
+        if (mutation.type !== "meeting.upsert") continue;
+        let uploadedMeetingPhotos = mutation.meeting.meetingPhotos;
+        try {
+          for (const photo of mutation.meeting.meetingPhotos) {
+            const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token, photo, meetingId: mutation.meeting.id }));
+            uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) =>
+              candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate,
+            );
+          }
+          meetingsWithUploadedPhotos = meetingsWithUploadedPhotos.map((meeting) =>
+            meeting.id === mutation.meeting.id
+              ? { ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" as const }
+              : meeting,
+          );
+        } catch {
+          failedMeetingPhotoIds.add(mutation.meeting.id);
+          meetingsWithUploadedPhotos = meetingsWithUploadedPhotos.map((meeting) =>
+            meeting.id === mutation.meeting.id
+              ? { ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" as const }
+              : meeting,
           );
         }
-        await replayMeetingWrite({
-          apiUrl,
-          token: await getApiToken(),
-          payload: {
-            id: meeting.id,
-            groupId: meeting.groupId,
-            scheduledStartAt: meeting.scheduledStartAt,
-            scheduledEndAt: meeting.scheduledEndAt,
-            occurredAt: meeting.occurredAt,
-            status: meeting.status,
-            latitude: meeting.latitude,
-            longitude: meeting.longitude,
-            locationName: meeting.locationName,
-            address: meeting.address,
-            locationCapturedAt: meeting.locationCapturedAt,
-            locationSource: meeting.locationSource,
-            notes: meeting.notes,
-            followUpCategory: meeting.followUpCategory,
-            followUpNotes: meeting.followUpNotes,
-            attendance: Object.entries(meeting.attendance).map(([userId, value]) => ({ userId, status: value, note: "" })),
-            prayerRequests: meeting.prayerRequests,
-            meetingPhotoMediaIds: uploadedMeetingPhotos.map((photo) => photo.remoteMediaId).filter((id): id is string => Boolean(id)),
-          },
-        });
-        nextMeetings.push({ ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" });
-      } catch {
-        nextMeetings.push({ ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" });
       }
+
+      for (const mutation of mutationsToSync) {
+        if (mutation.type !== "user.upsert" || !mutation.user.pendingProfilePhoto || mutation.user.profilePhotoRemoteMediaId) continue;
+        try {
+          const remoteMediaId = await uploadPhotoAsset({ apiUrl, token, photo: mutation.user.pendingProfilePhoto, ownerUserId: mutation.user.id });
+          const uploadedUser = {
+            ...mutation.user,
+            profilePhotoRemoteMediaId: remoteMediaId,
+            pendingProfilePhoto: { ...mutation.user.pendingProfilePhoto, uploaded: true, remoteMediaId },
+          };
+          usersWithUploadedPhotos = usersWithUploadedPhotos.map((candidate) =>
+            candidate.id === uploadedUser.id ? { ...candidate, ...uploadedUser } : candidate,
+          );
+          followUpProfileMutations.push({ ...mutation, user: uploadedUser });
+          if (user.id === uploadedUser.id) {
+            const nextUser = { ...user, profilePhotoRemoteMediaId: remoteMediaId };
+            setUser(nextUser);
+            await saveUser(nextUser);
+          }
+        } catch {
+          failedProfilePhotoUserIds.add(mutation.user.id);
+        }
+      }
+
+      if (followUpProfileMutations.length) {
+        try {
+          await syncOfflineMutations({ apiUrl, token, mutations: followUpProfileMutations });
+        } catch {
+          for (const mutation of followUpProfileMutations) {
+            if (mutation.type === "user.upsert") failedProfilePhotoUserIds.add(mutation.user.id);
+          }
+        }
+      }
+
+      const snapshotWithUploadedMedia: MobileOfflineSnapshot = {
+        ...snapshot,
+        users: usersWithUploadedPhotos,
+        meetings: meetingsWithUploadedPhotos,
+        pendingMutations: snapshot.pendingMutations.map((mutation) => {
+          if (mutation.type === "meeting.upsert") {
+            const updatedMeeting = meetingsWithUploadedPhotos.find((meeting) => meeting.id === mutation.meeting.id);
+            return updatedMeeting ? { ...mutation, meeting: updatedMeeting } : mutation;
+          }
+          if (mutation.type === "user.upsert") {
+            const updatedUser = usersWithUploadedPhotos.find((candidate) => candidate.id === mutation.user.id);
+            return updatedUser ? { ...mutation, user: updatedUser } : mutation;
+          }
+          return mutation;
+        }),
+      };
+      const acknowledgedMutations = mutationsToSync.filter((mutation) => {
+        if (mutation.type === "meeting.upsert") return !failedMeetingPhotoIds.has(mutation.meeting.id);
+        if (mutation.type === "user.upsert") return !failedProfilePhotoUserIds.has(mutation.user.id);
+        return true;
+      });
+      const finalizedSnapshot = markMutationBatchSynced(snapshotWithUploadedMedia, acknowledgedMutations);
+      setMeetings(finalizedSnapshot.meetings);
+      await saveOfflineSnapshot(finalizedSnapshot);
+      setOfflineSnapshot(finalizedSnapshot);
+      await saveMeetings(finalizedSnapshot.meetings);
+      setStatus(
+        finalizedSnapshot.pendingMutations.length || finalizedSnapshot.meetings.some((meeting) => meeting.syncStatus === "failed")
+          ? copy.syncError
+          : copy.syncComplete,
+      );
+    } catch {
+      const failedSnapshot = {
+        ...snapshot,
+        meetings: snapshot.meetings.map((meeting) =>
+          meeting.syncStatus === "pending" ? { ...meeting, syncStatus: "failed" as const } : meeting,
+        ),
+      };
+      setMeetings(failedSnapshot.meetings);
+      await saveOfflineSnapshot(failedSnapshot);
+      setOfflineSnapshot(failedSnapshot);
+      await saveMeetings(failedSnapshot.meetings);
+      setStatus(copy.syncError);
     }
-    setMeetings(nextMeetings);
-    await saveMeetings(nextMeetings);
-    setStatus(nextMeetings.some((meeting) => meeting.syncStatus === "failed") ? copy.syncError : copy.syncComplete);
   }
 
   const languageSwitch = (
@@ -551,6 +696,11 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
               </View>
             </View>
             <View style={styles.formRow}>
+              <TextInput onChangeText={setNewGroupName} placeholder={text.newGroupName} style={styles.input} value={newGroupName} />
+              <TextInput onChangeText={setNewGroupCommunity} placeholder={text.newGroupCommunity} style={styles.input} value={newGroupCommunity} />
+            </View>
+            <Pressable onPress={addGroup} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.addGroup}</Text></Pressable>
+            <View style={styles.formRow}>
               <TextInput onChangeText={setNewPersonName} placeholder={text.newPersonName} style={styles.input} value={newPersonName} />
               <TextInput onChangeText={setNewPersonPhone} placeholder={text.newPersonPhone} style={styles.input} value={newPersonPhone} />
             </View>
@@ -562,7 +712,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
           <Text style={styles.sectionTitle}>{copy.attendance}</Text>
           {groupMembers.map((member) => (
             <View key={member.id} style={styles.memberCard}>
-              <Pressable onPress={() => updateMemberPhoto(member.id)} style={styles.smallAvatar}>
+              <Pressable onPress={canAdmin || member.id === user.id ? () => updateMemberPhoto(member.id) : undefined} style={styles.smallAvatar}>
                 {member.profilePhotoUri ? <Image source={{ uri: member.profilePhotoUri }} style={styles.smallAvatarImage} /> : <Text style={styles.smallAvatarText}>+</Text>}
               </Pressable>
               <View style={styles.memberInfo}>

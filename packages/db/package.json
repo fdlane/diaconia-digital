@@ -19,7 +19,8 @@
   "dependencies": {
     "@rocicorp/zero": "^0.23.2025090100",
     "drizzle-orm": "^0.38.4",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@types/pg": "^8.11.10",

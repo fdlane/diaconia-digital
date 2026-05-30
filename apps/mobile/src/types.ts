@@ -50,6 +50,8 @@ export type LocalPhoto = {
 export type LocalMeeting = {
   id: string;
   groupId: string;
+  facilitatorId?: string;
+  chaplainUserId?: string | null;
   scheduledStartAt: string;
   scheduledEndAt?: string | null;
   occurredAt?: string | null;

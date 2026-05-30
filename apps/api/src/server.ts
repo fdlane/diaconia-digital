@@ -299,10 +299,16 @@ api.post("/zero/query", async (c) => {
 });
 
 api.post("/zero/mutate", async (c) => {
-  const { response } = await requireActor(c);
+  const { actor, response } = await requireActor(c);
   if (response) return response;
 
   try {
+    const mobileEnvelope = await c.req.raw.clone().json().catch(() => null);
+    if (mobileEnvelope?.mode === "mobile-offline-replay") {
+      const result = await zeroSync.mobileMutate(zeroContextFromActor(actor!), mobileEnvelope);
+      return c.json(result);
+    }
+
     const result = await zeroSync.mutate(c.req.raw);
     return c.json(result);
   } catch (error) {
