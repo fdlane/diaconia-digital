@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import diaconiaLogo from "../assets/logo.png";
+import { getApiBaseUrl } from "./config/endpoints";
 import { pickImage } from "./media";
 import {
   bootstrapSnapshot,
@@ -59,7 +60,7 @@ export type AuthenticatedSession = {
   signOut: () => Promise<void>;
 };
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
+const apiUrl = getApiBaseUrl(process.env, Platform.OS);
 
 function createBootstrapOfflineSnapshot(meetings: LocalMeeting[] = []): MobileOfflineSnapshot {
   const now = new Date().toISOString();

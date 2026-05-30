@@ -12,6 +12,7 @@ The first deploy target is a `dev` environment in `sa-east-1` using the AWS Appl
 - ECS Fargate services for the API and admin app
 - RDS PostgreSQL for Drizzle data
 - S3 media bucket for profile and meeting images
+- S3 + CloudFront mobile web hosting for the Expo web build
 - External OIDC identity provider integration, with invite-first access controlled by the API
 - KMS key, Secrets Manager database URL, and CloudWatch log groups
 
@@ -80,10 +81,30 @@ The deployment workflows are:
 - `3a. Deploy infra to AWS`: manual full Terraform apply for infrastructure changes
 - `3b. Run db migrations`: manual Drizzle migration task in ECS
 
-Code deploy workflows build or reuse API/admin images, then update only the ECS
-task definitions and services to the selected image tags. Infrastructure changes
-and database migrations are intentionally manual through the `3a` and `3b`
-workflows.
+Code deploy workflows build or reuse API/admin images, update the ECS task definitions/services, and deploy the mobile web static bundle to S3/CloudFront. Infrastructure changes and database migrations are still primarily manual through the `3a` and `3b` workflows; the main deploy workflow only targets the mobile web hosting resources needed to publish the web bundle.
+
+## Mobile Web Hosting
+
+The Expo mobile web build is deployed as static files to a private S3 bucket and served through CloudFront. CloudFront uses the S3 bucket for app assets and proxies server paths such as `/me`, `/media/*`, `/meetings/*`, `/users/*`, `/groups/*`, `/chaplains*`, `/zero/*`, and `/api/*` to the existing ALB-backed API service. That keeps the web app cheap/static while still allowing web, iOS, and Android to use the server as needed.
+
+Optional custom domain settings:
+
+```hcl
+mobile_web_domain_name         = "mobile.example.org"
+route53_zone_id                = "Z0123456789"
+mobile_web_acm_certificate_arn = "arn:aws:acm:us-east-1:123456789012:certificate/..."
+```
+
+Leave those blank to use the generated CloudFront domain. CloudFront certificates must be in `us-east-1`, even when the application region is `sa-east-1`.
+
+The deployment workflow runs `.github/scripts/deploy-mobile-web.sh`, which:
+
+1. Ensures the S3/CloudFront resources exist.
+2. Builds `@diaconia/mobile` with `pnpm --filter @diaconia/mobile web:export`.
+3. Syncs `apps/mobile/dist` to S3.
+4. Invalidates CloudFront for the entry points.
+
+The web build uses same-origin API paths by default, so CloudFront can forward server calls to the ALB. Native iOS/Android builds should continue to set explicit `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_ZERO_CACHE_URL` values for their target environment.
 
 Capture the outputs:
 
@@ -91,6 +112,8 @@ Capture the outputs:
 terraform -chdir=infra output load_balancer_dns_name
 terraform -chdir=infra output api_ecr_repository_url
 terraform -chdir=infra output admin_ecr_repository_url
+terraform -chdir=infra output mobile_web_url
+terraform -chdir=infra output mobile_web_cloudfront_distribution_id
 ```
 
 ## Build And Push Images

@@ -4,14 +4,14 @@ import { normalizePhoneNumber } from "@diaconia/shared";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { getApiUrl } from "../config/endpoints";
 import { FieldMeetingApp, type AuthenticatedSession } from "../FieldMeetingApp";
 import type { LocalUser } from "../types";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
 const jwtTemplate = process.env.EXPO_PUBLIC_CLERK_JWT_TEMPLATE ?? "diaconia-api";
 const redirectUrl = AuthSession.makeRedirectUri({ scheme: "diaconiamobile", path: "sign-in" });
 
@@ -109,7 +109,7 @@ export function ClerkAuthGate() {
       try {
         const token = await getToken({ template: jwtTemplate });
         if (!token) throw new Error("No se pudo crear un token de sesion.");
-        const response = await fetch(`${apiUrl}/me`, {
+        const response = await fetch(getApiUrl("/me", process.env, Platform.OS), {
           headers: { authorization: `Bearer ${token}` },
         });
         if (!response.ok) {

@@ -19,6 +19,19 @@ data "aws_caller_identity" "current" {}
 
 data "aws_partition" "current" {}
 
+
+data "aws_cloudfront_cache_policy" "caching_optimized" {
+  name = "Managed-CachingOptimized"
+}
+
+data "aws_cloudfront_cache_policy" "caching_disabled" {
+  name = "Managed-CachingDisabled"
+}
+
+data "aws_cloudfront_origin_request_policy" "all_viewer_except_host_header" {
+  name = "Managed-AllViewerExceptHostHeader"
+}
+
 resource "random_password" "database" {
   length  = 32
   special = true
@@ -136,6 +149,53 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "media" {
     apply_server_side_encryption_by_default {
       kms_master_key_id = aws_kms_key.app.arn
       sse_algorithm     = "aws:kms"
+    }
+  }
+}
+
+
+resource "aws_s3_bucket" "mobile_web" {
+  bucket = "${local.name}-mobile-web"
+  tags   = merge(local.common_tags, { Name = "${local.name}-mobile-web" })
+}
+
+resource "aws_s3_bucket_public_access_block" "mobile_web" {
+  bucket                  = aws_s3_bucket.mobile_web.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "mobile_web" {
+  bucket = aws_s3_bucket.mobile_web.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "mobile_web" {
+  bucket = aws_s3_bucket.mobile_web.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "mobile_web" {
+  bucket = aws_s3_bucket.mobile_web.id
+
+  rule {
+    id     = "expire-old-mobile-web-versions"
+    status = "Enabled"
+
+    filter {}
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
     }
   }
 }
@@ -538,6 +598,153 @@ resource "aws_lb_listener_rule" "api_auth_4" {
       http_header_name = "Authorization"
       values           = ["Bearer *"]
     }
+  }
+}
+
+
+resource "aws_cloudfront_origin_access_control" "mobile_web" {
+  name                              = "${local.name}-mobile-web"
+  description                       = "Allow CloudFront to read the private mobile web bucket"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
+resource "aws_cloudfront_distribution" "mobile_web" {
+  enabled             = true
+  comment             = "${local.name} mobile web"
+  default_root_object = "index.html"
+  aliases             = var.mobile_web_domain_name != "" ? [var.mobile_web_domain_name] : []
+  price_class         = var.mobile_web_cloudfront_price_class
+
+  origin {
+    origin_id                = "mobile-web-s3"
+    domain_name              = aws_s3_bucket.mobile_web.bucket_regional_domain_name
+    origin_access_control_id = aws_cloudfront_origin_access_control.mobile_web.id
+  }
+
+  origin {
+    origin_id   = "app-alb"
+    domain_name = aws_lb.app.dns_name
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "http-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
+  }
+
+  default_cache_behavior {
+    target_origin_id       = "mobile-web-s3"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD", "OPTIONS"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+    cache_policy_id        = data.aws_cloudfront_cache_policy.caching_optimized.id
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = toset([
+      "/health",
+      "/openapi.json",
+      "/me*",
+      "/media*",
+      "/zero*",
+      "/meetings*",
+      "/users*",
+      "/groups*",
+      "/chaplains*",
+      "/api/*",
+    ])
+
+    content {
+      path_pattern             = ordered_cache_behavior.value
+      target_origin_id         = "app-alb"
+      viewer_protocol_policy   = "redirect-to-https"
+      allowed_methods          = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+      cached_methods           = ["GET", "HEAD", "OPTIONS"]
+      compress                 = true
+      cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+      origin_request_policy_id = data.aws_cloudfront_origin_request_policy.all_viewer_except_host_header.id
+    }
+  }
+
+  custom_error_response {
+    error_code         = 403
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  custom_error_response {
+    error_code         = 404
+    response_code      = 200
+    response_page_path = "/index.html"
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    acm_certificate_arn            = var.mobile_web_acm_certificate_arn != "" ? var.mobile_web_acm_certificate_arn : null
+    cloudfront_default_certificate = var.mobile_web_acm_certificate_arn == "" ? true : null
+    minimum_protocol_version       = var.mobile_web_acm_certificate_arn != "" ? "TLSv1.2_2021" : null
+    ssl_support_method             = var.mobile_web_acm_certificate_arn != "" ? "sni-only" : null
+  }
+
+  tags = merge(local.common_tags, { Name = "${local.name}-mobile-web" })
+}
+
+resource "aws_s3_bucket_policy" "mobile_web_cloudfront" {
+  bucket = aws_s3_bucket.mobile_web.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowCloudFrontRead"
+        Effect = "Allow"
+        Principal = {
+          Service = "cloudfront.amazonaws.com"
+        }
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.mobile_web.arn}/*"
+        Condition = {
+          StringEquals = {
+            "AWS:SourceArn" = aws_cloudfront_distribution.mobile_web.arn
+          }
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_route53_record" "mobile_web_a" {
+  count   = var.route53_zone_id != "" && var.mobile_web_domain_name != "" ? 1 : 0
+  zone_id = var.route53_zone_id
+  name    = var.mobile_web_domain_name
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.mobile_web.domain_name
+    zone_id                = aws_cloudfront_distribution.mobile_web.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+resource "aws_route53_record" "mobile_web_aaaa" {
+  count   = var.route53_zone_id != "" && var.mobile_web_domain_name != "" ? 1 : 0
+  zone_id = var.route53_zone_id
+  name    = var.mobile_web_domain_name
+  type    = "AAAA"
+
+  alias {
+    name                   = aws_cloudfront_distribution.mobile_web.domain_name
+    zone_id                = aws_cloudfront_distribution.mobile_web.hosted_zone_id
+    evaluate_target_health = false
   }
 }
 
