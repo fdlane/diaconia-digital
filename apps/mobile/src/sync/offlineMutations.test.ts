@@ -8,6 +8,7 @@ describe("offline Zero mutation adapter", () => {
       meeting: {
         id: "019e606b-ce98-7134-b1d1-958703c36595",
         groupId: "019e606b-ce98-7134-b1d1-958703c36596",
+        facilitatorId: "019e606b-ce98-7134-b1d1-958703c36599",
         scheduledStartAt: "2026-01-01T00:00:00.000Z",
         occurredAt: "2026-01-01T00:00:00.000Z",
         status: "completed",

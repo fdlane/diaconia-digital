@@ -6,6 +6,7 @@ export type SyncState = "local" | "pending" | "synced" | "failed";
 export type OfflineUser = LocalUser & {
   authProvider?: string;
   authSubject?: string | null;
+  pendingProfilePhoto?: LocalPhoto;
   updatedAt?: string;
   syncState?: SyncState;
 };
@@ -163,22 +164,29 @@ export function applyMutation(snapshot: MobileOfflineSnapshot, mutation: Offline
   }
 }
 
-export function markPendingMutationsSynced(snapshot: MobileOfflineSnapshot): MobileOfflineSnapshot {
+export function markMutationBatchSynced(snapshot: MobileOfflineSnapshot, syncedMutations: OfflineMutation[]): MobileOfflineSnapshot {
+  const syncedKeys = new Set(syncedMutations.map(mutationKey));
   return {
     ...snapshot,
-    users: snapshot.users.map((item) => item.syncState === "pending" ? { ...item, syncState: "synced" } : item),
-    groups: snapshot.groups.map((item) => item.syncState === "pending" ? { ...item, syncState: "synced" } : item),
-    memberships: snapshot.memberships.map((item) => item.syncState === "pending" ? { ...item, syncState: "synced" } : item),
-    meetings: snapshot.meetings.map((item) => item.syncStatus === "pending" ? { ...item, syncStatus: "synced" } : item),
-    mediaAssets: snapshot.mediaAssets.map((item) => item.uploadStatus === "pending" ? { ...item, uploadStatus: "uploaded" } : item),
-    pendingMutations: [],
+    users: snapshot.users.map((item) => syncedKeys.has(`user.upsert:${item.id}`) ? { ...item, syncState: "synced" } : item),
+    groups: snapshot.groups.map((item) => syncedKeys.has(`group.upsert:${item.id}`) ? { ...item, syncState: "synced" } : item),
+    memberships: snapshot.memberships.map((item) => syncedKeys.has(`membership.upsert:${item.id}`) ? { ...item, syncState: "synced" } : item),
+    meetings: snapshot.meetings.map((item) => syncedKeys.has(`meeting.upsert:${item.id}`) ? { ...item, syncStatus: "synced" } : item),
+    mediaAssets: snapshot.mediaAssets.map((item) => syncedKeys.has(`media.upsert:${item.id}`) ? { ...item, uploadStatus: "uploaded" } : item),
+    pendingMutations: snapshot.pendingMutations.filter((mutation) => !syncedKeys.has(mutationKey(mutation))),
   };
+}
+
+export function markPendingMutationsSynced(snapshot: MobileOfflineSnapshot): MobileOfflineSnapshot {
+  return markMutationBatchSynced(snapshot, snapshot.pendingMutations);
 }
 
 export function toLocalMeeting(input: CanonicalMeetingInput): LocalMeeting {
   return {
     id: input.id,
     groupId: input.groupId,
+    ...(input.facilitatorId ? { facilitatorId: input.facilitatorId } : {}),
+    ...(input.chaplainUserId ? { chaplainUserId: input.chaplainUserId } : {}),
     scheduledStartAt: input.scheduledStartAt,
     status: input.status,
     notes: input.notes,
@@ -235,4 +243,19 @@ function upsertById<T extends { id: string }>(items: T[], item: T) {
 
 function dedupeById<T extends { id: string }>(items: T[]) {
   return items.reduce<T[]>((accumulator, item) => upsertById(accumulator, item), []);
+}
+
+function mutationKey(mutation: OfflineMutation) {
+  switch (mutation.type) {
+    case "user.upsert":
+      return `${mutation.type}:${mutation.user.id}`;
+    case "group.upsert":
+      return `${mutation.type}:${mutation.group.id}`;
+    case "membership.upsert":
+      return `${mutation.type}:${mutation.membership.id}`;
+    case "meeting.upsert":
+      return `${mutation.type}:${mutation.meeting.id}`;
+    case "media.upsert":
+      return `${mutation.type}:${mutation.media.id}`;
+  }
 }

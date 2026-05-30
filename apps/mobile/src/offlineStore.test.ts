@@ -5,6 +5,7 @@ import {
   createUserFromMember,
   enqueueMutation,
   markPendingMutationsSynced,
+  markMutationBatchSynced,
   selectLocalMembers,
   toLocalMeeting,
 } from "./offlineStore";
@@ -59,5 +60,22 @@ describe("offline store", () => {
 
     expect(snapshot.meetings[0]?.syncStatus).toBe("pending");
     expect(markPendingMutationsSynced(snapshot).pendingMutations).toHaveLength(0);
+  });
+
+  it("keeps unsynced mutations pending when only a batch is acknowledged", () => {
+    const now = "2026-01-01T00:00:00.000Z";
+    const ana = { id: "019e606b-ce98-7134-b1d1-958703c36595", groupId: "019e606b-ce98-7134-b1d1-958703c36597", displayName: "Ana", phone: "+595", role: "member" as const };
+    const beto = { id: "019e606b-ce98-7134-b1d1-958703c36596", groupId: "019e606b-ce98-7134-b1d1-958703c36597", displayName: "Beto", phone: "+595", role: "member" as const };
+    const anaMutation = { type: "user.upsert" as const, user: createUserFromMember(ana, now) };
+    const betoMutation = { type: "user.upsert" as const, user: createUserFromMember(beto, now) };
+    let snapshot = bootstrapSnapshot({ users: [], groups: [], memberships: [] });
+    snapshot = enqueueMutation(snapshot, anaMutation);
+    snapshot = enqueueMutation(snapshot, betoMutation);
+
+    const next = markMutationBatchSynced(snapshot, [anaMutation]);
+
+    expect(next.pendingMutations).toEqual([betoMutation]);
+    expect(next.users.find((candidate) => candidate.id === ana.id)?.syncState).toBe("synced");
+    expect(next.users.find((candidate) => candidate.id === beto.id)?.syncState).toBe("pending");
   });
 });

@@ -27,15 +27,17 @@ import {
   createMembershipFromMember,
   createUserFromMember,
   enqueueMutation,
-  markPendingMutationsSynced,
+  markMutationBatchSynced,
   selectLocalGroups,
   selectLocalMembers,
   toLocalMeeting,
   type MobileOfflineSnapshot,
   type OfflineGroup,
+  type OfflineMutation,
 } from "./offlineStore";
 import { adminUserId, defaultGroupId, facilitatorUserId, seedGroups, seedMembers } from "./seed";
-import { replayMeetingWrite, uploadPhotoAsset } from "./sync/zero";
+import { pendingMutationsReadyForSync, syncOfflineMutations } from "./sync/offlineMutations";
+import { uploadPhotoAsset } from "./sync/zero";
 import {
   loadMeetings,
   loadLocale,
@@ -284,6 +286,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
 
   async function saveProfile() {
     if (!user) return;
+    const now = new Date().toISOString();
     const nextUser: LocalUser = {
       ...user,
       displayName: profileName.trim() || user.displayName,
@@ -293,8 +296,15 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     };
     setUser(nextUser);
     await saveUser(nextUser);
+    const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === nextUser.id);
+    const nextSnapshot = enqueueMutation(offlineSnapshot, {
+      type: "user.upsert",
+      user: { ...offlineUser, ...nextUser, updatedAt: now },
+    });
+    await persistOfflineSnapshot(nextSnapshot);
     setProfileEditorOpen(false);
     setProfileMenuOpen(false);
+    setStatus(copy.meetingQueued);
   }
 
   async function signOut() {
@@ -313,43 +323,38 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     if (!user) return;
     const photo = await pickImage("user_profile_photo");
     if (!photo) return;
-    let remoteMediaId = user.profilePhotoRemoteMediaId;
-    try {
-      const token = await getApiToken();
-      remoteMediaId = await uploadPhotoAsset({ apiUrl, token, photo, ownerUserId: user.id });
-      await fetch(`${apiUrl}/me/profile-photo`, {
-        method: "POST",
-        headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-        body: JSON.stringify({ mediaId: remoteMediaId }),
-      });
-    } catch {
-      setStatus(copy.profilePhotoPending);
-    }
-    const nextUser = remoteMediaId
-      ? { ...user, profilePhotoUri: photo.uri, profilePhotoRemoteMediaId: remoteMediaId }
-      : { ...user, profilePhotoUri: photo.uri };
+    const now = new Date().toISOString();
+    const nextUser = { ...user, profilePhotoUri: photo.uri };
     setUser(nextUser);
     await saveUser(nextUser);
+    const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === user.id);
+    const nextSnapshot = enqueueMutation(offlineSnapshot, {
+      type: "user.upsert",
+      user: { ...offlineUser, ...nextUser, pendingProfilePhoto: photo, updatedAt: now },
+    });
+    await persistOfflineSnapshot(nextSnapshot);
+    setStatus(copy.profilePhotoPending);
   }
 
   async function updateMemberPhoto(memberId: string) {
     const photo = await pickImage("user_profile_photo");
     if (!photo) return;
-    let remoteMediaId: string | undefined;
-    try {
-      remoteMediaId = await uploadPhotoAsset({ apiUrl, token: await getApiToken(), photo, ownerUserId: memberId });
-    } catch {
-      setStatus(copy.memberPhotoPending);
-    }
-    const nextMembers = members.map((member) =>
-      member.id === memberId
-        ? remoteMediaId
-          ? { ...member, profilePhotoUri: photo.uri, profilePhotoRemoteMediaId: remoteMediaId }
-          : { ...member, profilePhotoUri: photo.uri }
-        : member,
-    );
-    setMembers(nextMembers);
-    await saveMembers(nextMembers);
+    const now = new Date().toISOString();
+    const currentMember = members.find((member) => member.id === memberId);
+    if (!currentMember) return;
+    const nextMember = { ...currentMember, profilePhotoUri: photo.uri };
+    const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === memberId);
+    const nextSnapshot = enqueueMutation(offlineSnapshot, {
+      type: "user.upsert",
+      user: {
+        ...offlineUser,
+        ...createUserFromMember(nextMember, now),
+        pendingProfilePhoto: photo,
+        updatedAt: now,
+      },
+    });
+    await persistOfflineSnapshot(nextSnapshot);
+    setStatus(copy.memberPhotoPending);
   }
 
   async function addMeetingPhoto() {
@@ -458,62 +463,126 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     setPrayerRequests([]);
     setMeetingPhotos([]);
     setStatus(syncNow ? copy.meetingQueued : copy.draftSaved);
-    if (syncNow) await syncPending([meeting, ...meetings]);
+    if (syncNow) await syncPending(nextSnapshot);
   }
 
-  async function syncPending(source = meetings) {
+  async function syncPending(snapshot: MobileOfflineSnapshot = offlineSnapshot) {
     if (!user) return;
     setStatus(copy.syncing);
-    const nextMeetings: LocalMeeting[] = [];
-    for (const meeting of source) {
-      if (meeting.syncStatus !== "pending" && meeting.syncStatus !== "failed") {
-        nextMeetings.push(meeting);
-        continue;
-      }
-      let uploadedMeetingPhotos = meeting.meetingPhotos;
-      try {
-        for (const photo of meeting.meetingPhotos) {
-          const token = await getApiToken();
-          const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token, photo, meetingId: meeting.id }));
-          uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) =>
-            candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate,
+    const mutationsToSync = pendingMutationsReadyForSync(snapshot.pendingMutations);
+
+    try {
+      const token = await getApiToken();
+      await syncOfflineMutations({ apiUrl, token, mutations: mutationsToSync });
+
+      const failedMeetingPhotoIds = new Set<string>();
+      const failedProfilePhotoUserIds = new Set<string>();
+      let meetingsWithUploadedPhotos = snapshot.meetings;
+      let usersWithUploadedPhotos = snapshot.users;
+      const followUpProfileMutations: OfflineMutation[] = [];
+
+      for (const mutation of mutationsToSync) {
+        if (mutation.type !== "meeting.upsert") continue;
+        let uploadedMeetingPhotos = mutation.meeting.meetingPhotos;
+        try {
+          for (const photo of mutation.meeting.meetingPhotos) {
+            const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token, photo, meetingId: mutation.meeting.id }));
+            uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) =>
+              candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate,
+            );
+          }
+          meetingsWithUploadedPhotos = meetingsWithUploadedPhotos.map((meeting) =>
+            meeting.id === mutation.meeting.id
+              ? { ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" as const }
+              : meeting,
+          );
+        } catch {
+          failedMeetingPhotoIds.add(mutation.meeting.id);
+          meetingsWithUploadedPhotos = meetingsWithUploadedPhotos.map((meeting) =>
+            meeting.id === mutation.meeting.id
+              ? { ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" as const }
+              : meeting,
           );
         }
-        await replayMeetingWrite({
-          apiUrl,
-          token: await getApiToken(),
-          payload: {
-            id: meeting.id,
-            groupId: meeting.groupId,
-            scheduledStartAt: meeting.scheduledStartAt,
-            scheduledEndAt: meeting.scheduledEndAt,
-            occurredAt: meeting.occurredAt,
-            status: meeting.status,
-            latitude: meeting.latitude,
-            longitude: meeting.longitude,
-            locationName: meeting.locationName,
-            address: meeting.address,
-            locationCapturedAt: meeting.locationCapturedAt,
-            locationSource: meeting.locationSource,
-            notes: meeting.notes,
-            followUpCategory: meeting.followUpCategory,
-            followUpNotes: meeting.followUpNotes,
-            attendance: Object.entries(meeting.attendance).map(([userId, value]) => ({ userId, status: value, note: "" })),
-            prayerRequests: meeting.prayerRequests,
-            meetingPhotoMediaIds: uploadedMeetingPhotos.map((photo) => photo.remoteMediaId).filter((id): id is string => Boolean(id)),
-          },
-        });
-        nextMeetings.push({ ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" });
-      } catch {
-        nextMeetings.push({ ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" });
       }
+
+      for (const mutation of mutationsToSync) {
+        if (mutation.type !== "user.upsert" || !mutation.user.pendingProfilePhoto || mutation.user.profilePhotoRemoteMediaId) continue;
+        try {
+          const remoteMediaId = await uploadPhotoAsset({ apiUrl, token, photo: mutation.user.pendingProfilePhoto, ownerUserId: mutation.user.id });
+          const uploadedUser = {
+            ...mutation.user,
+            profilePhotoRemoteMediaId: remoteMediaId,
+            pendingProfilePhoto: { ...mutation.user.pendingProfilePhoto, uploaded: true, remoteMediaId },
+          };
+          usersWithUploadedPhotos = usersWithUploadedPhotos.map((candidate) =>
+            candidate.id === uploadedUser.id ? { ...candidate, ...uploadedUser } : candidate,
+          );
+          followUpProfileMutations.push({ ...mutation, user: uploadedUser });
+          if (user.id === uploadedUser.id) {
+            const nextUser = { ...user, profilePhotoRemoteMediaId: remoteMediaId };
+            setUser(nextUser);
+            await saveUser(nextUser);
+          }
+        } catch {
+          failedProfilePhotoUserIds.add(mutation.user.id);
+        }
+      }
+
+      if (followUpProfileMutations.length) {
+        try {
+          await syncOfflineMutations({ apiUrl, token, mutations: followUpProfileMutations });
+        } catch {
+          for (const mutation of followUpProfileMutations) {
+            if (mutation.type === "user.upsert") failedProfilePhotoUserIds.add(mutation.user.id);
+          }
+        }
+      }
+
+      const snapshotWithUploadedMedia: MobileOfflineSnapshot = {
+        ...snapshot,
+        users: usersWithUploadedPhotos,
+        meetings: meetingsWithUploadedPhotos,
+        pendingMutations: snapshot.pendingMutations.map((mutation) => {
+          if (mutation.type === "meeting.upsert") {
+            const updatedMeeting = meetingsWithUploadedPhotos.find((meeting) => meeting.id === mutation.meeting.id);
+            return updatedMeeting ? { ...mutation, meeting: updatedMeeting } : mutation;
+          }
+          if (mutation.type === "user.upsert") {
+            const updatedUser = usersWithUploadedPhotos.find((candidate) => candidate.id === mutation.user.id);
+            return updatedUser ? { ...mutation, user: updatedUser } : mutation;
+          }
+          return mutation;
+        }),
+      };
+      const acknowledgedMutations = mutationsToSync.filter((mutation) => {
+        if (mutation.type === "meeting.upsert") return !failedMeetingPhotoIds.has(mutation.meeting.id);
+        if (mutation.type === "user.upsert") return !failedProfilePhotoUserIds.has(mutation.user.id);
+        return true;
+      });
+      const finalizedSnapshot = markMutationBatchSynced(snapshotWithUploadedMedia, acknowledgedMutations);
+      setMeetings(finalizedSnapshot.meetings);
+      await saveOfflineSnapshot(finalizedSnapshot);
+      setOfflineSnapshot(finalizedSnapshot);
+      await saveMeetings(finalizedSnapshot.meetings);
+      setStatus(
+        finalizedSnapshot.pendingMutations.length || finalizedSnapshot.meetings.some((meeting) => meeting.syncStatus === "failed")
+          ? copy.syncError
+          : copy.syncComplete,
+      );
+    } catch {
+      const failedSnapshot = {
+        ...snapshot,
+        meetings: snapshot.meetings.map((meeting) =>
+          meeting.syncStatus === "pending" ? { ...meeting, syncStatus: "failed" as const } : meeting,
+        ),
+      };
+      setMeetings(failedSnapshot.meetings);
+      await saveOfflineSnapshot(failedSnapshot);
+      setOfflineSnapshot(failedSnapshot);
+      await saveMeetings(failedSnapshot.meetings);
+      setStatus(copy.syncError);
     }
-    setMeetings(nextMeetings);
-    const syncedSnapshot = markPendingMutationsSynced({ ...offlineSnapshot, meetings: nextMeetings });
-    await saveOfflineSnapshot(syncedSnapshot);
-    setOfflineSnapshot(syncedSnapshot);
-    await saveMeetings(nextMeetings);
-    setStatus(nextMeetings.some((meeting) => meeting.syncStatus === "failed") ? copy.syncError : copy.syncComplete);
   }
 
   const languageSwitch = (
@@ -643,7 +712,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
           <Text style={styles.sectionTitle}>{copy.attendance}</Text>
           {groupMembers.map((member) => (
             <View key={member.id} style={styles.memberCard}>
-              <Pressable onPress={() => updateMemberPhoto(member.id)} style={styles.smallAvatar}>
+              <Pressable onPress={canAdmin || member.id === user.id ? () => updateMemberPhoto(member.id) : undefined} style={styles.smallAvatar}>
                 {member.profilePhotoUri ? <Image source={{ uri: member.profilePhotoUri }} style={styles.smallAvatarImage} /> : <Text style={styles.smallAvatarText}>+</Text>}
               </Pressable>
               <View style={styles.memberInfo}>

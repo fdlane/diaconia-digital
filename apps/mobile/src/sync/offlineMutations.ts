@@ -6,6 +6,12 @@ export type ZeroMutationCall = {
   args: Record<string, unknown>;
 };
 
+export type SyncOfflineMutationsArgs = {
+  apiUrl: string;
+  token: string;
+  mutations: OfflineMutation[];
+};
+
 function isoToZeroTimestamp(value: string | null | undefined) {
   return value ? Date.parse(value) : null;
 }
@@ -16,10 +22,28 @@ function definedEntries(record: Record<string, unknown>) {
 
 export function toZeroMutationCalls(mutation: OfflineMutation): ZeroMutationCall[] {
   switch (mutation.type) {
-    case "user.upsert":
-      return [{ namespace: "users", method: "create", args: definedEntries({ ...mutation.user, updatedAt: isoToZeroTimestamp(mutation.user.updatedAt) ?? Date.now() }) }];
+    case "user.upsert": {
+      const now = isoToZeroTimestamp(mutation.user.updatedAt) ?? Date.now();
+      return [{
+        namespace: "users",
+        method: "upsert",
+        args: definedEntries({
+          id: mutation.user.id,
+          authProvider: "clerk",
+          authSubject: undefined,
+          displayName: mutation.user.displayName,
+          email: mutation.user.email ?? null,
+          phone: mutation.user.phone ?? "",
+          role: mutation.user.role,
+          status: mutation.user.status ?? "active",
+          profilePhotoMediaId: mutation.user.profilePhotoRemoteMediaId,
+          createdAt: now,
+          updatedAt: now,
+        }),
+      }];
+    }
     case "group.upsert":
-      return [{ namespace: "groups", method: "create", args: definedEntries({ ...mutation.group, createdAt: isoToZeroTimestamp(mutation.group.createdAt) ?? Date.now(), updatedAt: isoToZeroTimestamp(mutation.group.updatedAt) ?? Date.now() }) }];
+      return [{ namespace: "groups", method: "upsert", args: definedEntries({ ...mutation.group, createdAt: isoToZeroTimestamp(mutation.group.createdAt) ?? Date.now(), updatedAt: isoToZeroTimestamp(mutation.group.updatedAt) ?? Date.now() }) }];
     case "membership.upsert":
       return [{ namespace: "groupMemberships", method: "upsert", args: definedEntries({ ...mutation.membership, joinedAt: isoToZeroTimestamp(mutation.membership.joinedAt) ?? Date.now(), leftAt: isoToZeroTimestamp(mutation.membership.leftAt), createdAt: isoToZeroTimestamp(mutation.membership.createdAt) ?? Date.now(), updatedAt: isoToZeroTimestamp(mutation.membership.updatedAt) ?? Date.now() }) }];
     case "meeting.upsert": {
@@ -31,7 +55,8 @@ export function toZeroMutationCalls(mutation: OfflineMutation): ZeroMutationCall
         args: definedEntries({
           id: meeting.id,
           groupId: meeting.groupId,
-          facilitatorId: "__current_user__",
+          facilitatorId: meeting.facilitatorId,
+          chaplainUserId: meeting.chaplainUserId ?? null,
           scheduledStartAt: isoToZeroTimestamp(meeting.scheduledStartAt) ?? now,
           scheduledEndAt: isoToZeroTimestamp(meeting.scheduledEndAt),
           occurredAt: isoToZeroTimestamp(meeting.occurredAt),
@@ -54,7 +79,7 @@ export function toZeroMutationCalls(mutation: OfflineMutation): ZeroMutationCall
       const attendanceCalls = Object.entries(meeting.attendance).map(([userId, status]) => ({
         namespace: "meetingAttendance",
         method: "upsert",
-        args: { id: `${meeting.id}-${userId}`, meetingId: meeting.id, userId, status, note: "", createdAt: now, updatedAt: now },
+        args: { meetingId: meeting.id, userId, status, note: "", createdAt: now, updatedAt: now },
       } satisfies ZeroMutationCall));
       const prayerCalls = meeting.prayerRequests.map((request) => ({
         namespace: "prayerRequests",
@@ -66,4 +91,28 @@ export function toZeroMutationCalls(mutation: OfflineMutation): ZeroMutationCall
     case "media.upsert":
       return [{ namespace: "mediaAssets", method: "upsert", args: definedEntries({ ...mutation.media, createdAt: isoToZeroTimestamp(mutation.media.createdAt) ?? Date.now() }) }];
   }
+}
+
+export function pendingMutationsReadyForSync(mutations: OfflineMutation[]) {
+  return mutations.filter((mutation) => mutation.type !== "meeting.upsert" || mutation.meeting.syncStatus !== "draft");
+}
+
+export async function syncOfflineMutations({ apiUrl, token, mutations }: SyncOfflineMutationsArgs) {
+  const calls = mutations.flatMap(toZeroMutationCalls);
+  if (calls.length === 0) return { applied: 0 };
+
+  const response = await fetch(`${apiUrl}/zero/mutate`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ mode: "mobile-offline-replay", mutations: calls }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Zero mutation replay failed with ${response.status}`);
+  }
+
+  return response.json() as Promise<{ applied: number }>;
 }
