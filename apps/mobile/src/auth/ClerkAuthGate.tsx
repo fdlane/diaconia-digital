@@ -244,6 +244,7 @@ export function ClerkAuthGate() {
     setLoadingMessage("Verificando código");
     setLoading(true);
     setError("");
+    let sessionActivated = false;
 
     try {
       let sessionId: string | null = null;
@@ -265,12 +266,14 @@ export function ClerkAuthGate() {
 
       const activate = setActive ?? setActiveSignUp;
       if (sessionId && activate) {
+        setLoadingMessage("Abriendo Diaconia");
         await withTimeout(activate({ session: sessionId }), "Clerk tardó demasiado en activar la sesión.");
+        sessionActivated = true;
       }
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
     } finally {
-      setLoading(false);
+      if (!sessionActivated) setLoading(false);
     }
   }
 
@@ -278,6 +281,7 @@ export function ClerkAuthGate() {
     setLoadingMessage(strategy === "oauth_google" ? "Abriendo Google" : "Abriendo Apple");
     setLoading(true);
     setError("");
+    let sessionActivated = false;
     try {
       const result: any = await withTimeout(
         startSSOFlow({ redirectUrl, strategy }),
@@ -289,14 +293,16 @@ export function ClerkAuthGate() {
         result.signUp?.createdSessionId ??
         null;
       if (sessionId && result.setActive) {
+        setLoadingMessage("Abriendo Diaconia");
         await withTimeout(result.setActive({ session: sessionId }), "Clerk tardó demasiado en activar la sesión.");
+        sessionActivated = true;
         return;
       }
       throw new Error("No se pudo completar el ingreso social.");
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
     } finally {
-      setLoading(false);
+      if (!sessionActivated) setLoading(false);
     }
   }
 
