@@ -9,6 +9,17 @@ locals {
 
   api_container_name   = "api"
   admin_container_name = "admin"
+
+  mobile_web_origins = distinct(compact([
+    "https://${aws_cloudfront_distribution.mobile_web.domain_name}",
+    var.mobile_web_domain_name != "" ? "https://${var.mobile_web_domain_name}" : "",
+  ]))
+
+  browser_allowed_origins = distinct(concat(
+    var.allowed_callback_urls,
+    local.mobile_web_origins,
+    ["http://${aws_lb.app.dns_name}"],
+  ))
 }
 
 data "aws_availability_zones" "available" {
@@ -589,7 +600,7 @@ resource "aws_lb_listener_rule" "api_auth_4" {
 
   condition {
     path_pattern {
-      values = ["/media/*", "/api/*"]
+      values = ["/media/*", "/zero/*", "/api/*"]
     }
   }
 
@@ -950,10 +961,10 @@ resource "aws_ecs_task_definition" "api" {
         { name = "MEDIA_BUCKET_NAME", value = aws_s3_bucket.media.bucket },
         { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main.id },
         { name = "COGNITO_APP_CLIENT_ID", value = aws_cognito_user_pool_client.facilitator.id },
-        { name = "ALLOWED_ORIGINS", value = join(",", concat(var.allowed_callback_urls, ["http://${aws_lb.app.dns_name}"])) },
+        { name = "ALLOWED_ORIGINS", value = join(",", local.browser_allowed_origins) },
         { name = "AUTH_AUTO_PROVISION_CLERK_USERS", value = tostring(var.auth_auto_provision_clerk_users) },
         { name = "CLERK_JWT_AUDIENCE", value = "diaconia-api" },
-        { name = "CLERK_AUTHORIZED_PARTIES", value = join(",", concat(var.allowed_callback_urls, ["http://${aws_lb.app.dns_name}"])) }
+        { name = "CLERK_AUTHORIZED_PARTIES", value = join(",", local.browser_allowed_origins) }
       ]
       secrets = [
         { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },

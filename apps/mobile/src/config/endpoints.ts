@@ -1,4 +1,5 @@
-type PublicEnv = Record<string, string | undefined>;
+import { getEffectivePublicEnv, type PublicEnv } from "./publicEnv";
+
 type PlatformOS = "ios" | "android" | "web" | string;
 
 const nativeDevelopmentApiUrl = "http://localhost:4000";
@@ -15,8 +16,9 @@ function normalizePath(path: string) {
 }
 
 export function getApiBaseUrl(env: PublicEnv = process.env, platform: PlatformOS = "web") {
-  if (env.EXPO_PUBLIC_API_URL !== undefined) {
-    return normalizeBaseUrl(env.EXPO_PUBLIC_API_URL);
+  const effectiveEnv = getEffectivePublicEnv(env);
+  if (effectiveEnv.EXPO_PUBLIC_API_URL !== undefined) {
+    return normalizeBaseUrl(effectiveEnv.EXPO_PUBLIC_API_URL);
   }
 
   return platform === "web" ? "" : nativeDevelopmentApiUrl;
@@ -35,7 +37,8 @@ export type ZeroRuntimeConfig = {
 };
 
 export function getZeroRuntimeConfig(env: PublicEnv = process.env, platform: PlatformOS = "web"): ZeroRuntimeConfig {
-  const configuredCacheUrl = normalizeBaseUrl(env.EXPO_PUBLIC_ZERO_CACHE_URL);
+  const effectiveEnv = getEffectivePublicEnv(env);
+  const configuredCacheUrl = normalizeBaseUrl(effectiveEnv.EXPO_PUBLIC_ZERO_CACHE_URL);
   const defaultCacheUrl = platform === "web" ? getApiUrl("/zero/cache", env, platform) : nativeDevelopmentZeroCacheUrl;
 
   return {

@@ -81,7 +81,8 @@ jobs:
       - name: Deploy mobile web
         id: mobile-web
         env:
-          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_CLERK_JWT_TEMPLATE: ${{ env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE }}
         run: >
           .github/scripts/deploy-mobile-web.sh
           dev

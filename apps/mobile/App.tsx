@@ -4,10 +4,15 @@ import { StatusBar } from "expo-status-bar";
 import { Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkAuthGate, devAuthenticatedSession } from "./src/auth/ClerkAuthGate";
+import { getPublicEnvValue } from "./src/config/publicEnv";
 import { FieldMeetingApp } from "./src/FieldMeetingApp";
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
-const devBypass = process.env.EXPO_PUBLIC_AUTH_DEV_BYPASS === "true";
+const publishableKey = getPublicEnvValue(
+  "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY",
+  process.env,
+  "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY",
+);
+const devBypass = getPublicEnvValue("EXPO_PUBLIC_AUTH_DEV_BYPASS") === "true";
 
 export default function App() {
   const content =

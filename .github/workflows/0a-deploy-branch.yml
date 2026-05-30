@@ -67,6 +67,15 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
       - uses: docker/setup-qemu-action@v3
 
       - uses: docker/setup-buildx-action@v3
@@ -92,3 +101,15 @@ jobs:
           "${{ steps.tfvars.outputs.tfvars_file }}"
           -var="api_image_tag=${{ steps.images.outputs.image_tag }}"
           -var="admin_image_tag=${{ steps.images.outputs.image_tag }}"
+
+      - name: Deploy mobile web
+        id: mobile-web
+        env:
+          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_CLERK_JWT_TEMPLATE: ${{ env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE }}
+        run: >
+          .github/scripts/deploy-mobile-web.sh
+          "${{ inputs.environment }}"
+          "${{ steps.tfvars.outputs.tfvars_file }}"
+          -var="clerk_publishable_key=${{ secrets.CLERK_PUBLISHABLE_KEY }}"
+          -var="clerk_secret_key=${{ secrets.CLERK_SECRET_KEY }}"
