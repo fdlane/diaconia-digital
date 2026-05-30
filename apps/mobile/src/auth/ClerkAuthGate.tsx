@@ -3,7 +3,7 @@ import { useSignIn, useSignUp } from "@clerk/expo/legacy";
 import { normalizePhoneNumber } from "@diaconia/shared";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiUrl } from "../config/endpoints";
@@ -92,9 +92,16 @@ export function ClerkAuthGate() {
   const [loading, setLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState("Preparando sesion segura");
   const [clerkLoadTimedOut, setClerkLoadTimedOut] = useState(false);
+  const [internalUserRetry, setInternalUserRetry] = useState(0);
   const [error, setError] = useState("");
   const [pendingSocialPhone, setPendingSocialPhone] = useState<any>(null);
   const verifiedPhone = user?.primaryPhoneNumber?.phoneNumber ?? null;
+  const getTokenRef = useRef(getToken);
+  const internalUserLoadKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    getTokenRef.current = getToken;
+  }, [getToken]);
 
   const authenticatedSession = useMemo<AuthenticatedSession | null>(() => {
     if (!sessionUser) return null;
@@ -127,48 +134,71 @@ export function ClerkAuthGate() {
   }, [isLoaded]);
 
   useEffect(() => {
+    let active = true;
+    const abortController = new AbortController();
+
     async function loadInternalUser() {
       if (!isLoaded || !isSignedIn) {
+        internalUserLoadKeyRef.current = null;
         setSessionUser(null);
+        setLoading(false);
         return;
       }
 
       if (!verifiedPhone) {
+        internalUserLoadKeyRef.current = null;
+        setLoading(false);
         setStep("verify-social-phone");
         return;
       }
+
+      const loadKey = `${verifiedPhone}:${internalUserRetry}`;
+      if (internalUserLoadKeyRef.current === loadKey) return;
+      internalUserLoadKeyRef.current = loadKey;
 
       setLoadingMessage("Cargando usuario de Diaconia");
       setLoading(true);
       setError("");
       try {
         const token = await withTimeout(
-          getToken({ template: jwtTemplate }),
+          getTokenRef.current({ template: jwtTemplate }),
           "La sesion de Clerk se creó, pero el token de API tardó demasiado.",
         );
+        if (!active) return;
         if (!token) throw new Error("No se pudo crear un token de sesion.");
+        const apiUrl = getApiUrl("/me", getEffectivePublicEnv(), Platform.OS);
         const response = await withTimeout(
-          fetch(getApiUrl("/me", getEffectivePublicEnv(), Platform.OS), {
+          fetch(apiUrl, {
             headers: { authorization: `Bearer ${token}` },
+            signal: abortController.signal,
           }),
-          "La sesion se autenticó, pero la API tardó demasiado en cargar el usuario.",
+          `La sesion se autenticó, pero la API tardó demasiado en cargar el usuario desde ${apiUrl}.`,
         );
+        if (!active) return;
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Este numero no tiene invitacion activa.");
         }
         const payload = (await response.json()) as MeResponse;
+        if (!active) return;
         setSessionUser(toLocalUser(payload.user));
       } catch (caughtError) {
+        if (!active || abortController.signal.aborted) return;
+        internalUserLoadKeyRef.current = null;
         setSessionUser(null);
         setError(getErrorMessage(caughtError));
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
 
     void loadInternalUser();
-  }, [getToken, isLoaded, isSignedIn, verifiedPhone]);
+
+    return () => {
+      active = false;
+      abortController.abort();
+    };
+  }, [internalUserRetry, isLoaded, isSignedIn, verifiedPhone]);
 
   async function startPhoneOtp() {
     if (!signIn || !signUp) return;
@@ -330,6 +360,20 @@ export function ClerkAuthGate() {
             <Text style={styles.primaryButtonText}>Recargar</Text>
           </Pressable>
         ) : null}
+      </SafeAreaView>
+    );
+  }
+
+  if (error && isSignedIn) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text style={styles.error}>{error}</Text>
+        <Pressable onPress={() => setInternalUserRetry((value) => value + 1)} style={styles.primaryButton}>
+          <Text style={styles.primaryButtonText}>Intentar de nuevo</Text>
+        </Pressable>
+        <Pressable onPress={() => signOut()} style={styles.linkButton}>
+          <Text style={styles.linkButtonText}>Salir y volver a ingresar</Text>
+        </Pressable>
       </SafeAreaView>
     );
   }
