@@ -8,17 +8,7 @@ import {
   type SupportedLocale,
 } from "@diaconia/shared";
 import { useEffect, useMemo, useState } from "react";
-import {
-  Image,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import diaconiaLogo from "../assets/logo.png";
 import { getApiBaseUrl } from "./config/endpoints";
@@ -41,18 +31,19 @@ import { adminUserId, defaultGroupId, facilitatorUserId, seedGroups, seedMembers
 import { pendingMutationsReadyForSync, syncOfflineMutations } from "./sync/offlineMutations";
 import { uploadPhotoAsset } from "./sync/zero";
 import {
-  loadMeetings,
   loadLocale,
+  loadMeetings,
   loadOfflineSnapshot,
   loadUser,
   removeUser,
-  saveMeetings,
   saveLocale,
+  saveMeetings,
   saveMembers,
   saveOfflineSnapshot,
   saveUser,
 } from "./storage";
 import type { LocalGroup, LocalMeeting, LocalMember, LocalPrayerRequest, LocalUser } from "./types";
+import { EmptyState, Avatar, Chip, MetricTile, NativeTitle, Page, PillButton, Row, Section, nativeTokens } from "./ui/nativeField";
 import { uuidv7 } from "./uuid";
 
 export type AuthenticatedSession = {
@@ -60,6 +51,8 @@ export type AuthenticatedSession = {
   getToken: () => Promise<string>;
   signOut: () => Promise<void>;
 };
+
+type AppTab = "today" | "capture" | "history";
 
 const apiUrl = getApiBaseUrl(getEffectivePublicEnv(), Platform.OS);
 
@@ -71,108 +64,147 @@ function createBootstrapOfflineSnapshot(meetings: LocalMeeting[] = []): MobileOf
   return bootstrapSnapshot({ users, groups, memberships, meetings });
 }
 
-const brand = {
-  background: "#f4f6fb",
-  surface: "#ffffff",
-  surfaceAlt: "#eef2ff",
-  ink: "#17202a",
-  muted: "#65717d",
-  line: "#dfe5ee",
-  primary: "#2e3192",
-  primaryStrong: "#202369",
-  accent: "#00a78e",
-  warning: "#f3a712",
-  danger: "#d64545",
-  dark: "#121c22",
-};
-
-const ui = {
+const copyByLocale = {
   es: {
-    heroTitle: "Reunión del grupo de confianza",
-    heroSubtitle: "Asistencia, fotos, peticiones de oración y notas — listo aun sin conexión.",
-    adminMode: "Administración",
-    facilitatorMode: "Facilitador",
-    present: "Presente",
-    absent: "Ausente",
-    excused: "Justificado",
-    meetingReport: "Informe de reunión",
-    prayerRequests: "Peticiones de oración",
-    prayerPlaceholder: "Escribe una petición pública de oración",
-    addPrayer: "Agregar petición",
-    addPerson: "Agregar persona",
+    today: "Hoy",
+    capture: "Captura",
+    history: "Historial",
+    homeTitle: "Trabajo de campo",
+    homeSubtitle: "Captura reuniones, fotos y cambios aunque no haya conexión.",
+    currentMeeting: "Reunión actual",
+    currentMeetingSub: "Lista para guardar localmente primero",
+    quickActions: "Acciones rápidas",
+    recentReports: "Reportes recientes",
+    syncCenter: "Estado de sincronización",
+    allLocal: "Todo queda guardado en este dispositivo antes de sincronizar.",
+    startMeeting: "Nueva reunión",
+    addPhoto: "Foto",
+    addPrayer: "Oración",
+    chooseGroup: "Elegir grupo",
+    groupPeople: "Personas del grupo",
+    meetingForm: "Informe",
+    offlineReady: "Offline listo",
+    pending: "Pendiente",
+    synced: "Sincronizado",
+    failed: "Revisar",
+    draft: "Borrador",
+    savedLocal: "Guardado localmente",
+    signedInAs: "Ingresaste como",
+    profile: "Perfil",
+    editProfile: "Editar perfil",
+    signOut: "Salir",
+    adminTools: "Administración",
     addGroup: "Agregar grupo",
+    addPerson: "Agregar persona",
     newGroupName: "Nombre del grupo",
     newGroupCommunity: "Comunidad",
     newPersonName: "Nombre completo",
     newPersonPhone: "Teléfono",
-    makeFacilitator: "Facilitador",
+    facilitator: "Facilitador",
+    makeFacilitator: "Marcar facilitador",
     removeFacilitator: "Quitar facilitador",
-    roleHelp: "Los administradores pueden agregar personas y marcar facilitadores.",
-    facilitatorBadge: "Facilitador",
-    metricsAttendance: "Asistencia",
-    metricsPrayers: "Oración",
-    metricsPhotos: "Fotos",
-    reportHistory: "Reportes locales",
+    present: "Presente",
+    absent: "Ausente",
+    excused: "Justificado",
+    prayerRequests: "Peticiones de oración",
+    prayerPlaceholder: "Escribe una petición pública de oración",
     noPrayers: "Sin peticiones todavía.",
-    signedInAs: "Ingresaste como",
-    myProfile: "Mi perfil",
-    editProfile: "Editar perfil",
+    followUp: "Seguimiento",
+    photosHelp: "Las fotos se conservan en el borrador cuando guardas; luego se suben después de crear la reunión.",
+    noPhotos: "Sin fotos todavía.",
+    retrySync: "Reintentar sync",
     displayName: "Nombre",
     email: "Correo",
     phone: "Teléfono",
     accessToken: "Token de acceso",
-    accessTokenHelp: "Pega un token de acceso cuando esté configurado; demo local sigue disponible.",
     saveProfile: "Guardar perfil",
-    signOut: "Salir",
     cancel: "Cancelar",
+    devSignIn: "Ingreso demo",
+    fieldLogin: "Entrada de campo",
+    fieldLoginBody: "Diseñado como una app nativa: listas simples, captura rápida y confianza offline desde el primer toque.",
   },
   en: {
-    heroTitle: "Trust group meeting",
-    heroSubtitle: "Attendance, photos, prayer requests, and notes — ready even offline.",
-    adminMode: "Administration",
-    facilitatorMode: "Facilitator",
-    present: "Present",
-    absent: "Absent",
-    excused: "Excused",
-    meetingReport: "Meeting report",
-    prayerRequests: "Prayer requests",
-    prayerPlaceholder: "Write a public prayer request",
-    addPrayer: "Add request",
-    addPerson: "Add person",
+    today: "Today",
+    capture: "Capture",
+    history: "History",
+    homeTitle: "Field work",
+    homeSubtitle: "Capture meetings, photos, and changes even without a connection.",
+    currentMeeting: "Current meeting",
+    currentMeetingSub: "Ready to save locally first",
+    quickActions: "Quick actions",
+    recentReports: "Recent reports",
+    syncCenter: "Sync status",
+    allLocal: "Everything is saved on this device before it syncs.",
+    startMeeting: "New meeting",
+    addPhoto: "Photo",
+    addPrayer: "Prayer",
+    chooseGroup: "Choose group",
+    groupPeople: "Group people",
+    meetingForm: "Report",
+    offlineReady: "Offline ready",
+    pending: "Pending",
+    synced: "Synced",
+    failed: "Review",
+    draft: "Draft",
+    savedLocal: "Saved locally",
+    signedInAs: "Signed in as",
+    profile: "Profile",
+    editProfile: "Edit profile",
+    signOut: "Sign out",
+    adminTools: "Administration",
     addGroup: "Add group",
+    addPerson: "Add person",
     newGroupName: "Group name",
     newGroupCommunity: "Community",
     newPersonName: "Full name",
     newPersonPhone: "Phone",
-    makeFacilitator: "Facilitator",
+    facilitator: "Facilitator",
+    makeFacilitator: "Make facilitator",
     removeFacilitator: "Remove facilitator",
-    roleHelp: "Administrators can add people and mark facilitators.",
-    facilitatorBadge: "Facilitator",
-    metricsAttendance: "Attendance",
-    metricsPrayers: "Prayer",
-    metricsPhotos: "Photos",
-    reportHistory: "Local reports",
+    present: "Present",
+    absent: "Absent",
+    excused: "Excused",
+    prayerRequests: "Prayer requests",
+    prayerPlaceholder: "Write a public prayer request",
     noPrayers: "No requests yet.",
-    signedInAs: "Signed in as",
-    myProfile: "My profile",
-    editProfile: "Edit profile",
+    followUp: "Follow-up",
+    photosHelp: "Photos stay with the draft when you save; then they upload after the meeting row exists.",
+    noPhotos: "No photos yet.",
+    retrySync: "Retry sync",
     displayName: "Name",
     email: "Email",
     phone: "Phone",
     accessToken: "Access token",
-    accessTokenHelp: "Paste an access token once it is configured; local demo stays available.",
     saveProfile: "Save profile",
-    signOut: "Sign out",
     cancel: "Cancel",
+    devSignIn: "Demo sign-in",
+    fieldLogin: "Field entry",
+    fieldLoginBody: "Designed like a native app: simple lists, fast capture, and offline confidence from the first tap.",
   },
 } satisfies Record<SupportedLocale, Record<string, string>>;
 
-function statusLabel(status: AttendanceStatus, locale: SupportedLocale) {
-  return ui[locale][status];
+function attendanceLabel(status: AttendanceStatus, locale: SupportedLocale) {
+  return copyByLocale[locale][status];
+}
+
+function syncTone(syncStatus?: LocalMeeting["syncStatus"]): "neutral" | "success" | "warning" | "danger" {
+  if (syncStatus === "synced") return "success";
+  if (syncStatus === "pending") return "warning";
+  if (syncStatus === "failed") return "danger";
+  return "neutral";
+}
+
+function syncLabel(syncStatus: LocalMeeting["syncStatus"] | undefined, locale: SupportedLocale) {
+  const text = copyByLocale[locale];
+  if (syncStatus === "synced") return text.synced;
+  if (syncStatus === "pending") return text.pending;
+  if (syncStatus === "failed") return text.failed;
+  return text.draft;
 }
 
 export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession?: AuthenticatedSession }) {
   const [locale, setLocale] = useState<SupportedLocale>("es");
+  const [activeTab, setActiveTab] = useState<AppTab>("today");
   const [user, setUser] = useState<LocalUser | null>(null);
   const [offlineSnapshot, setOfflineSnapshot] = useState<MobileOfflineSnapshot>(() => createBootstrapOfflineSnapshot());
   const [groups, setGroups] = useState<LocalGroup[]>(seedGroups);
@@ -197,7 +229,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   const [profilePhone, setProfilePhone] = useState("");
   const [accessToken, setAccessToken] = useState("");
   const copy = labels[locale];
-  const text = ui[locale];
+  const text = copyByLocale[locale];
   const [status, setStatus] = useState(copy.ready);
   const authLocked = Boolean(authenticatedSession);
 
@@ -205,6 +237,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     async function hydrate() {
       const storedLocale = await loadLocale();
       setLocale(storedLocale);
+      setStatus(labels[storedLocale].ready);
       const storedMeetings = await loadMeetings();
       const storedSnapshot = await loadOfflineSnapshot(createBootstrapOfflineSnapshot(storedMeetings));
       setOfflineSnapshot(storedSnapshot);
@@ -233,22 +266,17 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   }, [authenticatedSession]);
 
   const selectedGroup =
-    groups.find((group) => group.id === selectedGroupId) ?? groups[0] ?? {
-      id: defaultGroupId,
-      name: "Grupo demo",
-      community: "Paraguay",
-    };
-  const groupMembers = useMemo(
-    () => members.filter((member) => member.groupId === selectedGroup.id),
-    [members, selectedGroup.id],
-  );
+    groups.find((group) => group.id === selectedGroupId) ?? groups[0] ?? { id: defaultGroupId, name: "Grupo demo", community: "Paraguay" };
+  const groupMembers = useMemo(() => members.filter((member) => member.groupId === selectedGroup.id), [members, selectedGroup.id]);
   const presentCount = groupMembers.filter((member) => (attendance[member.id] ?? "present") === "present").length;
+  const syncPendingCount = pendingMutationsReadyForSync(offlineSnapshot.pendingMutations).length;
+  const draftCount = meetings.filter((meeting) => meeting.syncStatus === "draft").length;
+  const localQueueCount = syncPendingCount + draftCount;
+  const failedCount = meetings.filter((meeting) => meeting.syncStatus === "failed").length;
   const canAdmin = user?.role === "admin";
 
   async function getApiToken() {
-    if (authenticatedSession) {
-      return authenticatedSession.getToken();
-    }
+    if (authenticatedSession) return authenticatedSession.getToken();
     return user?.token ?? "";
   }
 
@@ -277,6 +305,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       phone: isAdmin ? "+595 21 000 100" : "+595 21 000 200",
       role,
       token: token.trim() || "local-dev-token",
+      status: "active",
     };
     setUser(nextUser);
     setProfileName(nextUser.displayName);
@@ -289,20 +318,11 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   async function saveProfile() {
     if (!user) return;
     const now = new Date().toISOString();
-    const nextUser: LocalUser = {
-      ...user,
-      displayName: profileName.trim() || user.displayName,
-      email: profileEmail.trim() || null,
-      phone: profilePhone.trim() || null,
-      token: authLocked ? user.token : accessToken.trim() || user.token,
-    };
+    const nextUser: LocalUser = { ...user, displayName: profileName.trim() || user.displayName, email: profileEmail.trim() || null, phone: profilePhone.trim() || null, token: authLocked ? user.token : accessToken.trim() || user.token };
     setUser(nextUser);
     await saveUser(nextUser);
     const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === nextUser.id);
-    const nextSnapshot = enqueueMutation(offlineSnapshot, {
-      type: "user.upsert",
-      user: { ...offlineUser, ...nextUser, updatedAt: now },
-    });
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: { ...offlineUser, ...nextUser, updatedAt: now } });
     await persistOfflineSnapshot(nextSnapshot);
     setProfileEditorOpen(false);
     setProfileMenuOpen(false);
@@ -330,10 +350,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     setUser(nextUser);
     await saveUser(nextUser);
     const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === user.id);
-    const nextSnapshot = enqueueMutation(offlineSnapshot, {
-      type: "user.upsert",
-      user: { ...offlineUser, ...nextUser, pendingProfilePhoto: photo, updatedAt: now },
-    });
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: { ...offlineUser, ...nextUser, pendingProfilePhoto: photo, updatedAt: now } });
     await persistOfflineSnapshot(nextSnapshot);
     setStatus(copy.profilePhotoPending);
   }
@@ -346,15 +363,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     if (!currentMember) return;
     const nextMember = { ...currentMember, profilePhotoUri: photo.uri };
     const offlineUser = offlineSnapshot.users.find((candidate) => candidate.id === memberId);
-    const nextSnapshot = enqueueMutation(offlineSnapshot, {
-      type: "user.upsert",
-      user: {
-        ...offlineUser,
-        ...createUserFromMember(nextMember, now),
-        pendingProfilePhoto: photo,
-        updatedAt: now,
-      },
-    });
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: { ...offlineUser, ...createUserFromMember(nextMember, now), pendingProfilePhoto: photo, updatedAt: now } });
     await persistOfflineSnapshot(nextSnapshot);
     setStatus(copy.memberPhotoPending);
   }
@@ -367,16 +376,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   async function addGroup() {
     if (!user || !newGroupName.trim()) return;
     const now = new Date().toISOString();
-    const group: OfflineGroup = {
-      id: await uuidv7(),
-      name: newGroupName.trim(),
-      community: newGroupCommunity.trim() || "Paraguay",
-      facilitatorId: user.role === "facilitator" ? user.id : facilitatorUserId,
-      chaplainUserId: null,
-      active: true,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const group: OfflineGroup = { id: await uuidv7(), name: newGroupName.trim(), community: newGroupCommunity.trim() || "Paraguay", facilitatorId: user.role === "facilitator" ? user.id : facilitatorUserId, chaplainUserId: null, active: true, createdAt: now, updatedAt: now };
     const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "group.upsert", group });
     await persistOfflineSnapshot(nextSnapshot);
     setSelectedGroupId(group.id);
@@ -389,13 +389,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     if (!newPersonName.trim()) return;
     const phone = newPersonPhone.trim();
     const now = new Date().toISOString();
-    const nextPerson: LocalMember = {
-      id: await uuidv7(),
-      groupId: selectedGroup.id,
-      displayName: newPersonName.trim(),
-      role: "member",
-      ...(phone ? { phone } : {}),
-    };
+    const nextPerson: LocalMember = { id: await uuidv7(), groupId: selectedGroup.id, displayName: newPersonName.trim(), role: "member", ...(phone ? { phone } : {}) };
     const userMutation = createUserFromMember(nextPerson, now);
     const membershipMutation = createMembershipFromMember(nextPerson, now, await uuidv7());
     let nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: userMutation });
@@ -412,9 +406,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     const currentMember = members.find((member) => member.id === memberId);
     if (!existing && !currentMember) return;
     const nextRole: Role = (existing?.role ?? currentMember?.role) === "facilitator" ? "member" : "facilitator";
-    const nextUser = existing
-      ? { ...existing, role: nextRole, updatedAt: now }
-      : createUserFromMember({ ...currentMember!, role: nextRole }, now);
+    const nextUser = existing ? { ...existing, role: nextRole, updatedAt: now } : createUserFromMember({ ...currentMember!, role: nextRole }, now);
     const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: nextUser });
     await persistOfflineSnapshot(nextSnapshot);
     setStatus(copy.meetingQueued);
@@ -423,13 +415,8 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   async function addPrayerRequest() {
     if (!newPrayer.trim()) return;
     const id = await uuidv7();
-    setPrayerRequests((value) => [
-      ...value,
-      {
-        id,
-        request: newPrayer.trim(),
-      },
-    ]);
+    const request = newPrayer.trim();
+    setPrayerRequests((value) => [...value, { id, request }]);
     setNewPrayer("");
   }
 
@@ -465,6 +452,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     setPrayerRequests([]);
     setMeetingPhotos([]);
     setStatus(syncNow ? copy.meetingQueued : copy.draftSaved);
+    setActiveTab("history");
     if (syncNow) await syncPending(nextSnapshot);
   }
 
@@ -476,7 +464,6 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     try {
       const token = await getApiToken();
       await syncOfflineMutations({ apiUrl, token, mutations: mutationsToSync });
-
       const failedMeetingPhotoIds = new Set<string>();
       const failedProfilePhotoUserIds = new Set<string>();
       let meetingsWithUploadedPhotos = snapshot.meetings;
@@ -489,22 +476,12 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
         try {
           for (const photo of mutation.meeting.meetingPhotos) {
             const remoteMediaId = photo.remoteMediaId ?? (await uploadPhotoAsset({ apiUrl, token, photo, meetingId: mutation.meeting.id }));
-            uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) =>
-              candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate,
-            );
+            uploadedMeetingPhotos = uploadedMeetingPhotos.map((candidate) => candidate.id === photo.id ? { ...candidate, uploaded: true, remoteMediaId } : candidate);
           }
-          meetingsWithUploadedPhotos = meetingsWithUploadedPhotos.map((meeting) =>
-            meeting.id === mutation.meeting.id
-              ? { ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" as const }
-              : meeting,
-          );
+          meetingsWithUploadedPhotos = meetingsWithUploadedPhotos.map((meeting) => meeting.id === mutation.meeting.id ? { ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "synced" as const } : meeting);
         } catch {
           failedMeetingPhotoIds.add(mutation.meeting.id);
-          meetingsWithUploadedPhotos = meetingsWithUploadedPhotos.map((meeting) =>
-            meeting.id === mutation.meeting.id
-              ? { ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" as const }
-              : meeting,
-          );
+          meetingsWithUploadedPhotos = meetingsWithUploadedPhotos.map((meeting) => meeting.id === mutation.meeting.id ? { ...meeting, meetingPhotos: uploadedMeetingPhotos, syncStatus: "failed" as const } : meeting);
         }
       }
 
@@ -512,14 +489,8 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
         if (mutation.type !== "user.upsert" || !mutation.user.pendingProfilePhoto || mutation.user.profilePhotoRemoteMediaId) continue;
         try {
           const remoteMediaId = await uploadPhotoAsset({ apiUrl, token, photo: mutation.user.pendingProfilePhoto, ownerUserId: mutation.user.id });
-          const uploadedUser = {
-            ...mutation.user,
-            profilePhotoRemoteMediaId: remoteMediaId,
-            pendingProfilePhoto: { ...mutation.user.pendingProfilePhoto, uploaded: true, remoteMediaId },
-          };
-          usersWithUploadedPhotos = usersWithUploadedPhotos.map((candidate) =>
-            candidate.id === uploadedUser.id ? { ...candidate, ...uploadedUser } : candidate,
-          );
+          const uploadedUser = { ...mutation.user, profilePhotoRemoteMediaId: remoteMediaId, pendingProfilePhoto: { ...mutation.user.pendingProfilePhoto, uploaded: true, remoteMediaId } };
+          usersWithUploadedPhotos = usersWithUploadedPhotos.map((candidate) => candidate.id === uploadedUser.id ? { ...candidate, ...uploadedUser } : candidate);
           followUpProfileMutations.push({ ...mutation, user: uploadedUser });
           if (user.id === uploadedUser.id) {
             const nextUser = { ...user, profilePhotoRemoteMediaId: remoteMediaId };
@@ -535,9 +506,7 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
         try {
           await syncOfflineMutations({ apiUrl, token, mutations: followUpProfileMutations });
         } catch {
-          for (const mutation of followUpProfileMutations) {
-            if (mutation.type === "user.upsert") failedProfilePhotoUserIds.add(mutation.user.id);
-          }
+          for (const mutation of followUpProfileMutations) if (mutation.type === "user.upsert") failedProfilePhotoUserIds.add(mutation.user.id);
         }
       }
 
@@ -567,18 +536,9 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       await saveOfflineSnapshot(finalizedSnapshot);
       setOfflineSnapshot(finalizedSnapshot);
       await saveMeetings(finalizedSnapshot.meetings);
-      setStatus(
-        finalizedSnapshot.pendingMutations.length || finalizedSnapshot.meetings.some((meeting) => meeting.syncStatus === "failed")
-          ? copy.syncError
-          : copy.syncComplete,
-      );
+      setStatus(finalizedSnapshot.pendingMutations.length || finalizedSnapshot.meetings.some((meeting) => meeting.syncStatus === "failed") ? copy.syncError : copy.syncComplete);
     } catch {
-      const failedSnapshot = {
-        ...snapshot,
-        meetings: snapshot.meetings.map((meeting) =>
-          meeting.syncStatus === "pending" ? { ...meeting, syncStatus: "failed" as const } : meeting,
-        ),
-      };
+      const failedSnapshot = { ...snapshot, meetings: snapshot.meetings.map((meeting) => meeting.syncStatus === "pending" ? { ...meeting, syncStatus: "failed" as const } : meeting) };
       setMeetings(failedSnapshot.meetings);
       await saveOfflineSnapshot(failedSnapshot);
       setOfflineSnapshot(failedSnapshot);
@@ -588,9 +548,9 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   }
 
   const languageSwitch = (
-    <View style={styles.segmented} accessibilityRole="tablist">
+    <View accessibilityRole="tablist" style={styles.segmented}>
       {(["es", "en"] as const).map((option) => (
-        <Pressable key={option} onPress={() => updateLocale(option)} style={[styles.segment, locale === option && styles.segmentActive]}>
+        <Pressable accessibilityRole="tab" accessibilityState={{ selected: locale === option }} key={option} onPress={() => updateLocale(option)} style={[styles.segment, locale === option && styles.segmentActive]}>
           <Text style={[styles.segmentText, locale === option && styles.segmentTextActive]}>{option.toUpperCase()}</Text>
         </Pressable>
       ))}
@@ -600,315 +560,260 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   if (!user) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.signInCard}>
+        <Page style={styles.signInPage}>
           {languageSwitch}
-          <Image source={diaconiaLogo} style={styles.signInLogo} resizeMode="contain" />
-          <Text style={styles.heroTitle}>{text.heroTitle}</Text>
-          <Text style={styles.heroSubtitle}>{text.heroSubtitle}</Text>
-          <View style={styles.signInButtons}>
-            <TextInput
-              onChangeText={setAccessToken}
-              placeholder={text.accessToken}
-              style={styles.input}
-              value={accessToken}
-            />
-            <Text style={styles.microcopy}>{text.accessTokenHelp}</Text>
-            <Pressable onPress={() => signIn("facilitator", accessToken)} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>{text.facilitatorMode}</Text>
-            </Pressable>
-            <Pressable onPress={() => signIn("admin", accessToken)} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>{text.adminMode}</Text>
-            </Pressable>
+          <View style={styles.loginBrandRow}>
+            <Image source={diaconiaLogo} style={styles.loginLogo} resizeMode="contain" />
+            <Chip label={text.offlineReady} tone="success" />
           </View>
-          <Text style={styles.microcopy}>{copy.signInHelp}</Text>
-        </View>
+          <NativeTitle title={text.fieldLogin} subtitle={text.fieldLoginBody} />
+          <Section title={text.devSignIn} subtitle={copy.signInHelp}>
+            <View style={styles.formBlock}>
+              <NativeInput onChangeText={setAccessToken} placeholder={text.accessToken} value={accessToken} />
+              <PillButton label={text.facilitator} onPress={() => signIn("facilitator", accessToken)} variant="primary" />
+              <PillButton label={text.adminTools} onPress={() => signIn("admin", accessToken)} />
+            </View>
+          </Section>
+        </Page>
       </SafeAreaView>
+    );
+  }
+
+  const currentUser = user as LocalUser;
+
+  const renderTab = () => {
+    if (activeTab === "capture") return renderCapture();
+    if (activeTab === "history") return renderHistory();
+    return renderToday();
+  };
+
+  function renderToday() {
+    return (
+      <>
+        <Section title={text.currentMeeting} subtitle={text.currentMeetingSub}>
+          <Row
+            title={selectedGroup.name}
+            subtitle={`${selectedGroup.community} · ${presentCount}/${groupMembers.length} ${copy.attendance.toLowerCase()}`}
+            leading={<Avatar label={selectedGroup.name.slice(0, 2).toUpperCase()} />}
+            trailing={<Chip label={text.savedLocal} tone="success" />}
+            onPress={() => setActiveTab("capture")}
+          />
+        </Section>
+        <View style={styles.metricsRow}>
+          <MetricTile value={`${presentCount}/${groupMembers.length}`} label={copy.attendance} />
+          <MetricTile value={`${meetingPhotos.length}`} label={copy.photos} tone="success" />
+          <MetricTile value={`${localQueueCount}`} label={copy.localQueue} tone={localQueueCount ? "warning" : "success"} />
+        </View>
+        <Section title={text.quickActions}>
+          <View style={styles.quickGrid}>
+            <QuickAction label={text.startMeeting} value="＋" onPress={() => setActiveTab("capture")} />
+            <QuickAction label={text.addPhoto} value="▣" onPress={addMeetingPhoto} />
+            <QuickAction label={text.addPrayer} value="✚" onPress={() => setActiveTab("capture")} />
+          </View>
+        </Section>
+        <Section title={text.syncCenter} subtitle={text.allLocal} trailing={<PillButton label={text.retrySync} onPress={() => syncPending()} variant="ghost" />}>
+          <Row title={status} subtitle={syncPendingCount ? `${syncPendingCount} ${copy.syncPending.toLowerCase()}` : text.allLocal} trailing={<Chip label={failedCount ? text.failed : syncPendingCount ? text.pending : text.synced} tone={failedCount ? "danger" : syncPendingCount ? "warning" : "success"} />} />
+        </Section>
+        <MeetingHistoryPreview meetings={meetings} locale={locale} />
+      </>
+    );
+  }
+
+  function renderCapture() {
+    return (
+      <>
+        <Section title={text.chooseGroup}>
+          {groups.map((group) => (
+            <Row key={group.id} title={group.name} subtitle={group.community} onPress={() => setSelectedGroupId(group.id)} trailing={group.id === selectedGroup.id ? <Chip label="✓" tone="primary" /> : null} />
+          ))}
+        </Section>
+        {canAdmin ? renderAdminTools() : null}
+        <Section title={text.groupPeople} subtitle={`${presentCount}/${groupMembers.length} ${copy.attendance.toLowerCase()}`}>
+          {groupMembers.map((member) => (
+            <View key={member.id} style={styles.personBlock}>
+              <Row
+                title={member.displayName}
+                subtitle={[member.phone, member.position].filter(Boolean).join(" · ")}
+                leading={member.profilePhotoUri ? <Image source={{ uri: member.profilePhotoUri }} style={styles.rowImage} /> : <Avatar label={getProfileInitials(member.displayName)} />}
+                trailing={member.role === "facilitator" ? <Chip label={text.facilitator} tone="primary" /> : null}
+                onPress={canAdmin || member.id === currentUser.id ? () => updateMemberPhoto(member.id) : undefined}
+              />
+              <View style={styles.statusRow}>{(["present", "absent", "excused"] as const).map((value) => <PillChoice key={value} label={attendanceLabel(value, locale)} active={(attendance[member.id] ?? "present") === value} onPress={() => setAttendance((state) => ({ ...state, [member.id]: value }))} />)}</View>
+              {canAdmin ? <PillButton label={member.role === "facilitator" ? text.removeFacilitator : text.makeFacilitator} onPress={() => toggleFacilitator(member.id)} variant="ghost" /> : null}
+            </View>
+          ))}
+        </Section>
+        <Section title={text.prayerRequests}>
+          <NativeInput multiline onChangeText={setNewPrayer} placeholder={text.prayerPlaceholder} value={newPrayer} />
+          <PillButton label={text.addPrayer} onPress={addPrayerRequest} />
+          {prayerRequests.length ? prayerRequests.map((request) => <Row key={request.id} title={request.request} />) : <EmptyState title={text.noPrayers} body={text.allLocal} />}
+        </Section>
+        <Section title={text.meetingForm}>
+          <NativeInput multiline onChangeText={setNotes} placeholder={copy.meetingNotesPlaceholder} value={notes} tall />
+          <Text style={styles.fieldLabel}>{text.followUp}</Text>
+          <View style={styles.choiceGrid}>{(["none", "financial", "training", "wellbeing", "documentation", "other"] as const).map((value) => <PillChoice key={value} label={value} active={followUpCategory === value} onPress={() => setFollowUpCategory(value)} />)}</View>
+          <NativeInput onChangeText={setFollowUpNotes} placeholder={copy.followUpDetailPlaceholder} value={followUpNotes} />
+        </Section>
+        <Section title={copy.photos} subtitle={text.photosHelp} trailing={<PillButton label={copy.add} onPress={addMeetingPhoto} />}>
+          {meetingPhotos.length ? <ScrollView horizontal contentContainerStyle={styles.photoStrip}>{meetingPhotos.map((photo) => <Image key={photo.id} source={{ uri: photo.uri }} style={styles.meetingPhoto} />)}</ScrollView> : <EmptyState title={text.noPhotos} body={text.photosHelp} />}
+        </Section>
+        <View style={styles.actionBar}>
+          <PillButton label={copy.saveDraft} onPress={() => saveDraft(false)} grow />
+          <PillButton label={copy.saveAndSync} onPress={() => saveDraft(true)} variant="primary" grow />
+        </View>
+      </>
+    );
+  }
+
+  function renderAdminTools() {
+    return (
+      <Section title={text.adminTools}>
+        <NativeInput onChangeText={setNewGroupName} placeholder={text.newGroupName} value={newGroupName} />
+        <NativeInput onChangeText={setNewGroupCommunity} placeholder={text.newGroupCommunity} value={newGroupCommunity} />
+        <PillButton label={text.addGroup} onPress={addGroup} />
+        <View style={styles.separator} />
+        <NativeInput onChangeText={setNewPersonName} placeholder={text.newPersonName} value={newPersonName} />
+        <NativeInput onChangeText={setNewPersonPhone} placeholder={text.newPersonPhone} value={newPersonPhone} />
+        <PillButton label={text.addPerson} onPress={addPerson} variant="primary" />
+      </Section>
+    );
+  }
+
+  function renderHistory() {
+    return (
+      <Section title={text.recentReports} trailing={<PillButton label={text.retrySync} onPress={() => syncPending()} variant="ghost" />}>
+        {meetings.length ? meetings.map((meeting) => {
+          const present = Object.values(meeting.attendance).filter((value) => value === "present").length;
+          const total = Object.keys(meeting.attendance).length;
+          return <Row key={meeting.id} title={formatDisplayDate(meeting.occurredAt ?? meeting.scheduledStartAt, locale)} subtitle={`${present}/${total} · ${meeting.locationName ?? selectedGroup.name}`} trailing={<Chip label={syncLabel(meeting.syncStatus, locale)} tone={syncTone(meeting.syncStatus)} />} />;
+        }) : <EmptyState title={copy.noMeetings} body={text.allLocal} />}
+      </Section>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.heroCard}>
-          <View style={styles.headerRow}>
-            <Image source={diaconiaLogo} style={styles.headerLogo} resizeMode="contain" />
-            <View style={styles.headerActions}>
-              {languageSwitch}
-              <Pressable onPress={() => setProfileMenuOpen((value) => !value)} style={styles.headerAvatarButton}>
-                {user.profilePhotoUri ? (
-                  <Image source={{ uri: user.profilePhotoUri }} style={styles.headerAvatar} />
-                ) : (
-                  <Text style={styles.headerAvatarText}>{getProfileInitials(user.displayName, user.email)}</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-          {profileMenuOpen ? (
-            <View style={styles.profileMenu}>
-              <Text style={styles.menuTitle}>{text.myProfile}</Text>
-              <Text style={styles.menuName}>{user.displayName}</Text>
-              <Text style={styles.menuMeta}>{user.email ?? user.phone ?? user.role}</Text>
-              <Pressable onPress={() => setProfileEditorOpen(true)} style={styles.menuItem}>
-                <Text style={styles.menuItemText}>{text.editProfile}</Text>
-              </Pressable>
-              <Pressable onPress={updateUserPhoto} style={styles.menuItem}>
-                <Text style={styles.menuItemText}>{copy.profilePhoto}</Text>
-              </Pressable>
-              <Pressable onPress={signOut} style={styles.menuItemDanger}>
-                <Text style={styles.menuItemDangerText}>{text.signOut}</Text>
-              </Pressable>
-            </View>
-          ) : null}
-          <Text style={styles.overline}>{selectedGroup.community}</Text>
-          <Text style={styles.heroTitleLight}>{text.heroTitle}</Text>
-          <Text style={styles.heroSubtitleLight}>{text.heroSubtitle}</Text>
-          <View style={styles.userRow}>
-            <Pressable onPress={updateUserPhoto} style={styles.avatarButton}>
-              {user.profilePhotoUri ? <Image source={{ uri: user.profilePhotoUri }} style={styles.avatar} /> : <Text style={styles.avatarText}>{getProfileInitials(user.displayName, user.email)}</Text>}
-            </Pressable>
-            <View style={styles.userCopy}>
-              <Text style={styles.microcopyLight}>{text.signedInAs}</Text>
-              <Text style={styles.rowTitleLight}>{user.displayName}</Text>
-            </View>
-            <Text style={styles.rolePill}>{user.role}</Text>
-          </View>
+      <Page>
+        <View style={styles.appHeader}>
+          <Image source={diaconiaLogo} style={styles.headerLogo} resizeMode="contain" />
+          <View style={styles.headerRight}>{languageSwitch}<Pressable onPress={() => setProfileMenuOpen((value) => !value)}>{user.profilePhotoUri ? <Image source={{ uri: user.profilePhotoUri }} style={styles.headerAvatar} /> : <Avatar label={getProfileInitials(user.displayName, user.email)} size={42} />}</Pressable></View>
         </View>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupRail}>
-          {groups.map((group) => (
-            <Pressable key={group.id} onPress={() => setSelectedGroupId(group.id)} style={[styles.groupCard, group.id === selectedGroup.id && styles.groupCardActive]}>
-              <Text style={styles.groupName}>{group.name}</Text>
-              <Text style={styles.body}>{group.community}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-
-        <View style={styles.metricRow}>
-          <Metric label={text.metricsAttendance} value={`${presentCount}/${groupMembers.length}`} />
-          <Metric label={text.metricsPrayers} value={`${prayerRequests.length}`} />
-          <Metric label={text.metricsPhotos} value={`${meetingPhotos.length}`} />
-        </View>
-
-        {canAdmin ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <View>
-                <Text style={styles.sectionTitle}>{text.adminMode}</Text>
-                <Text style={styles.body}>{text.roleHelp}</Text>
-              </View>
-            </View>
-            <View style={styles.formRow}>
-              <TextInput onChangeText={setNewGroupName} placeholder={text.newGroupName} style={styles.input} value={newGroupName} />
-              <TextInput onChangeText={setNewGroupCommunity} placeholder={text.newGroupCommunity} style={styles.input} value={newGroupCommunity} />
-            </View>
-            <Pressable onPress={addGroup} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.addGroup}</Text></Pressable>
-            <View style={styles.formRow}>
-              <TextInput onChangeText={setNewPersonName} placeholder={text.newPersonName} style={styles.input} value={newPersonName} />
-              <TextInput onChangeText={setNewPersonPhone} placeholder={text.newPersonPhone} style={styles.input} value={newPersonPhone} />
-            </View>
-            <Pressable onPress={addPerson} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{text.addPerson}</Text></Pressable>
-          </View>
+        {profileMenuOpen ? (
+          <Section>
+            <Row title={user.displayName} subtitle={user.email ?? user.phone ?? user.role} trailing={<Chip label={user.role} tone="primary" />} />
+            <Row title={text.editProfile} onPress={() => setProfileEditorOpen(true)} />
+            <Row title={copy.profilePhoto} onPress={updateUserPhoto} />
+            <Row title={text.signOut} onPress={signOut} danger />
+          </Section>
         ) : null}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{copy.attendance}</Text>
-          {groupMembers.map((member) => (
-            <View key={member.id} style={styles.memberCard}>
-              <Pressable onPress={canAdmin || member.id === user.id ? () => updateMemberPhoto(member.id) : undefined} style={styles.smallAvatar}>
-                {member.profilePhotoUri ? <Image source={{ uri: member.profilePhotoUri }} style={styles.smallAvatarImage} /> : <Text style={styles.smallAvatarText}>+</Text>}
-              </Pressable>
-              <View style={styles.memberInfo}>
-                <View style={styles.nameLine}>
-                  <Text style={styles.rowTitle}>{member.displayName}</Text>
-                  {member.role === "facilitator" ? <Text style={styles.facilitatorPill}>{text.facilitatorBadge}</Text> : null}
-                  {member.position ? <Text style={styles.facilitatorPill}>{member.position}</Text> : null}
-                </View>
-                <Text style={styles.body}>{member.phone}</Text>
-                <View style={styles.statusRow}>
-                  {(["present", "absent", "excused"] as const).map((value) => (
-                    <Pressable key={value} onPress={() => setAttendance((state) => ({ ...state, [member.id]: value }))} style={[styles.statusPill, (attendance[member.id] ?? "present") === value && styles.statusPillActive]}>
-                      <Text style={[styles.statusPillText, (attendance[member.id] ?? "present") === value && styles.statusPillTextActive]}>{statusLabel(value, locale)}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {canAdmin ? (
-                  <Pressable onPress={() => toggleFacilitator(member.id)} style={styles.linkButton}>
-                    <Text style={styles.linkText}>{member.role === "facilitator" ? text.removeFacilitator : text.makeFacilitator}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            </View>
-          ))}
+        <NativeTitle title={activeTab === "today" ? text.homeTitle : activeTab === "capture" ? text.meetingForm : text.history} subtitle={activeTab === "today" ? text.homeSubtitle : `${selectedGroup.name} · ${selectedGroup.community}`} />
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>{renderTab()}</ScrollView>
+        <View style={styles.tabs}>
+          <TabButton active={activeTab === "today"} label={text.today} onPress={() => setActiveTab("today")} />
+          <TabButton active={activeTab === "capture"} label={text.capture} onPress={() => setActiveTab("capture")} />
+          <TabButton active={activeTab === "history"} label={text.history} onPress={() => setActiveTab("history")} badge={syncPendingCount || failedCount} />
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{text.prayerRequests}</Text>
-          <TextInput multiline onChangeText={setNewPrayer} placeholder={text.prayerPlaceholder} style={styles.textAreaSmall} value={newPrayer} />
-          <Pressable onPress={addPrayerRequest} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.addPrayer}</Text></Pressable>
-          {prayerRequests.length ? prayerRequests.map((request) => (
-            <View key={request.id} style={styles.prayerCard}><Text style={styles.body}>{request.request}</Text></View>
-          )) : <Text style={styles.body}>{text.noPrayers}</Text>}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{text.meetingReport}</Text>
-          <TextInput multiline onChangeText={setNotes} placeholder={copy.meetingNotesPlaceholder} style={styles.textArea} value={notes} />
-          <Text style={styles.label}>{copy.followUp}</Text>
-          <View style={styles.followUpGrid}>
-            {(["none", "financial", "training", "wellbeing", "documentation", "other"] as const).map((value) => (
-              <Pressable key={value} onPress={() => setFollowUpCategory(value)} style={[styles.choice, followUpCategory === value && styles.choiceActive]}>
-                <Text style={[styles.choiceText, followUpCategory === value && styles.choiceTextActive]}>{value}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <TextInput onChangeText={setFollowUpNotes} placeholder={copy.followUpDetailPlaceholder} style={styles.input} value={followUpNotes} />
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{copy.photos}</Text>
-            <Pressable onPress={addMeetingPhoto} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{copy.add}</Text></Pressable>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoStrip}>
-            {meetingPhotos.map((photo) => <Image key={photo.id} source={{ uri: photo.uri }} style={styles.meetingPhoto} />)}
-            {!meetingPhotos.length ? <Text style={styles.body}>{copy.noMeetingPhotos}</Text> : null}
-          </ScrollView>
-        </View>
-
-        <View style={styles.actions}>
-          <Pressable onPress={() => saveDraft(false)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{copy.saveDraft}</Text></Pressable>
-          <Pressable onPress={() => saveDraft(true)} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{copy.saveAndSync}</Text></Pressable>
-        </View>
-
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{text.reportHistory}</Text>
-            <Pressable onPress={() => syncPending()} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{copy.retry}</Text></Pressable>
-          </View>
-          <Text style={styles.body}>{status}</Text>
-          {meetings.slice(0, 5).map((meeting) => (
-            <View key={meeting.id} style={styles.queueRow}>
-              <Text style={styles.rowTitle}>{formatDisplayDate(meeting.occurredAt ?? meeting.scheduledStartAt, locale)}</Text>
-              <Text style={styles.body}>{meeting.syncStatus} · {Object.values(meeting.attendance).filter((value) => value === "present").length} / {Object.keys(meeting.attendance).length}</Text>
-            </View>
-          ))}
-        </View>
-      </ScrollView>
-      <Modal animationType="fade" onRequestClose={() => setProfileEditorOpen(false)} transparent visible={profileEditorOpen}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.sectionTitle}>{text.editProfile}</Text>
-            <TextInput onChangeText={setProfileName} placeholder={text.displayName} style={styles.input} value={profileName} />
-            <TextInput autoCapitalize="none" keyboardType="email-address" onChangeText={setProfileEmail} placeholder={text.email} style={styles.input} value={profileEmail} />
-            <TextInput keyboardType="phone-pad" onChangeText={setProfilePhone} placeholder={text.phone} style={styles.input} value={profilePhone} />
-            {authLocked ? null : (
-              <TextInput autoCapitalize="none" multiline onChangeText={setAccessToken} placeholder={text.accessToken} style={styles.textAreaSmall} value={accessToken} />
-            )}
-            <View style={styles.actions}>
-              <Pressable onPress={() => setProfileEditorOpen(false)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.cancel}</Text></Pressable>
-              <Pressable onPress={saveProfile} style={styles.primaryButton}><Text style={styles.primaryButtonText}>{text.saveProfile}</Text></Pressable>
+        <Modal animationType="fade" onRequestClose={() => setProfileEditorOpen(false)} transparent visible={profileEditorOpen}>
+          <View style={styles.modalBackdrop}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>{text.editProfile}</Text>
+              <NativeInput onChangeText={setProfileName} placeholder={text.displayName} value={profileName} />
+              <NativeInput autoCapitalize="none" keyboardType="email-address" onChangeText={setProfileEmail} placeholder={text.email} value={profileEmail} />
+              <NativeInput keyboardType="phone-pad" onChangeText={setProfilePhone} placeholder={text.phone} value={profilePhone} />
+              {authLocked ? null : <NativeInput autoCapitalize="none" multiline onChangeText={setAccessToken} placeholder={text.accessToken} value={accessToken} />}
+              <View style={styles.actionBar}><PillButton label={text.cancel} onPress={() => setProfileEditorOpen(false)} grow /><PillButton label={text.saveProfile} onPress={saveProfile} variant="primary" grow /></View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+      </Page>
     </SafeAreaView>
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <View style={styles.metricCard}><Text style={styles.metricValue}>{value}</Text><Text style={styles.metricLabel}>{label}</Text></View>;
+function MeetingHistoryPreview({ meetings, locale }: { meetings: LocalMeeting[]; locale: SupportedLocale }) {
+  const text = copyByLocale[locale];
+  return (
+    <Section title={text.recentReports}>
+      {meetings.slice(0, 3).length ? meetings.slice(0, 3).map((meeting) => <Row key={meeting.id} title={formatDisplayDate(meeting.occurredAt ?? meeting.scheduledStartAt, locale)} subtitle={meeting.locationName ?? text.savedLocal} trailing={<Chip label={syncLabel(meeting.syncStatus, locale)} tone={syncTone(meeting.syncStatus)} />} />) : <EmptyState title={labels[locale].noMeetings} body={text.allLocal} />}
+    </Section>
+  );
+}
+
+function QuickAction({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.quickAction, pressed && styles.pressed]}>
+      <Text style={styles.quickIcon}>{value}</Text>
+      <Text style={styles.quickLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function PillChoice({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={[styles.pillChoice, active && styles.pillChoiceActive]}>
+      <Text style={[styles.pillChoiceText, active && styles.pillChoiceTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function TabButton({ label, active, onPress, badge = 0 }: { label: string; active: boolean; onPress: () => void; badge?: number }) {
+  return (
+    <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} onPress={onPress} style={[styles.tabButton, active && styles.tabButtonActive]}>
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+      {badge ? <Text style={styles.tabBadge}>{badge}</Text> : null}
+    </Pressable>
+  );
+}
+
+function NativeInput(props: React.ComponentProps<typeof TextInput> & { tall?: boolean }) {
+  const { style, tall, ...rest } = props;
+  return <TextInput placeholderTextColor={nativeTokens.color.tertiary} style={[styles.input, tall && styles.inputTall, style]} textAlignVertical={props.multiline ? "top" : "center"} {...rest} />;
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, alignItems: "center", backgroundColor: brand.background },
-  content: { width: "100%", maxWidth: 560, gap: 14, padding: 14, paddingBottom: 32 },
-  signInCard: { flex: 1, justifyContent: "center", width: "100%", maxWidth: 560, gap: 16, padding: 24, backgroundColor: brand.background },
-  signInLogo: { width: 260, height: 82, alignSelf: "flex-start" },
-  heroCard: { gap: 12, borderRadius: 28, padding: 20, backgroundColor: brand.dark, ...Platform.select({ web: { boxShadow: "0 24px 60px rgba(18,28,34,.22)" } }) },
-  headerRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  headerActions: { flexDirection: "row", alignItems: "center", gap: 10 },
-  headerLogo: { width: 160, height: 48, backgroundColor: brand.surface, borderRadius: 14 },
-  heroTitle: { color: brand.ink, fontSize: 30, fontWeight: "900", letterSpacing: -0.8 },
-  heroTitleLight: { color: "white", fontSize: 30, fontWeight: "900", letterSpacing: -0.8 },
-  heroSubtitle: { color: brand.muted, fontSize: 16, lineHeight: 23 },
-  heroSubtitleLight: { color: "#d8ddff", fontSize: 16, lineHeight: 23 },
-  overline: { color: "#aeb8ff", fontSize: 12, fontWeight: "900", letterSpacing: 1.4, textTransform: "uppercase" },
-  userRow: { flexDirection: "row", alignItems: "center", gap: 12, borderTopWidth: 1, borderTopColor: "rgba(255,255,255,.13)", paddingTop: 14 },
-  userCopy: { flex: 1 },
-  avatarButton: { width: 54, height: 54, alignItems: "center", justifyContent: "center", overflow: "hidden", borderRadius: 18, backgroundColor: brand.surfaceAlt },
-  headerAvatarButton: { width: 42, height: 42, alignItems: "center", justifyContent: "center", overflow: "hidden", borderRadius: 999, backgroundColor: brand.surface },
-  headerAvatar: { width: 42, height: 42 },
-  headerAvatarText: { color: brand.primaryStrong, fontSize: 13, fontWeight: "900" },
-  profileMenu: { alignSelf: "flex-end", width: 230, gap: 8, borderRadius: 18, padding: 14, backgroundColor: brand.surface, ...Platform.select({ web: { boxShadow: "0 16px 42px rgba(18,28,34,.20)" } }) },
-  menuTitle: { color: brand.muted, fontSize: 11, fontWeight: "900", textTransform: "uppercase" },
-  menuName: { color: brand.ink, fontSize: 16, fontWeight: "900" },
-  menuMeta: { color: brand.muted, fontSize: 12 },
-  menuItem: { borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 10 },
-  menuItemText: { color: brand.primary, fontWeight: "900" },
-  menuItemDanger: { borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 10 },
-  menuItemDangerText: { color: brand.danger, fontWeight: "900" },
-  avatar: { width: 54, height: 54 },
-  avatarText: { color: brand.primaryStrong, fontSize: 11, fontWeight: "900" },
-  rolePill: { overflow: "hidden", borderRadius: 999, backgroundColor: brand.accent, color: "white", fontSize: 12, fontWeight: "900", paddingHorizontal: 10, paddingVertical: 6, textTransform: "uppercase" },
-  segmented: { flexDirection: "row", overflow: "hidden", alignSelf: "flex-start", borderWidth: 1, borderColor: brand.line, borderRadius: 999, backgroundColor: brand.surface },
-  segment: { paddingHorizontal: 12, paddingVertical: 7 },
-  segmentActive: { backgroundColor: brand.primary },
-  segmentText: { color: brand.primaryStrong, fontWeight: "900", fontSize: 12 },
+  safeArea: { flex: 1, backgroundColor: nativeTokens.color.bg },
+  signInPage: { justifyContent: "center", gap: 14, padding: 16 },
+  loginBrandRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 14 },
+  loginLogo: { width: 190, height: 58 },
+  appHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, paddingHorizontal: 16, paddingTop: 6, paddingBottom: 4 },
+  headerLogo: { width: 142, height: 42 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  headerAvatar: { width: 42, height: 42, borderRadius: 21 },
+  content: { gap: 12, paddingBottom: 104 },
+  segmented: { flexDirection: "row", overflow: "hidden", borderWidth: StyleSheet.hairlineWidth, borderColor: nativeTokens.color.line, borderRadius: 999, backgroundColor: nativeTokens.color.surface },
+  segment: { paddingHorizontal: 11, paddingVertical: 7 },
+  segmentActive: { backgroundColor: nativeTokens.color.primary },
+  segmentText: { color: nativeTokens.color.secondary, fontSize: 12, fontWeight: "800" },
   segmentTextActive: { color: "white" },
-  signInButtons: { gap: 10 },
-  groupRail: { gap: 10, paddingHorizontal: 2 },
-  groupCard: { width: 220, gap: 4, borderWidth: 1, borderColor: brand.line, borderRadius: 20, padding: 16, backgroundColor: brand.surface },
-  groupCardActive: { borderColor: brand.primary, backgroundColor: brand.surfaceAlt },
-  groupName: { color: brand.ink, fontSize: 16, fontWeight: "900" },
-  metricRow: { flexDirection: "row", gap: 10 },
-  metricCard: { flex: 1, borderRadius: 18, padding: 14, backgroundColor: brand.surface },
-  metricValue: { color: brand.primaryStrong, fontSize: 24, fontWeight: "900" },
-  metricLabel: { color: brand.muted, fontSize: 12, fontWeight: "800" },
-  section: { gap: 12, borderWidth: 1, borderColor: brand.line, borderRadius: 24, padding: 16, backgroundColor: brand.surface },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  sectionTitle: { color: brand.ink, fontSize: 20, fontWeight: "900" },
-  body: { color: brand.muted, fontSize: 14, lineHeight: 20 },
-  microcopy: { color: brand.muted, fontSize: 12, fontWeight: "700" },
-  microcopyLight: { color: "#cbd2ff", fontSize: 12, fontWeight: "700" },
-  rowTitle: { color: brand.ink, fontSize: 15, fontWeight: "900" },
-  rowTitleLight: { color: "white", fontSize: 15, fontWeight: "900" },
-  formRow: { gap: 10 },
-  input: { minHeight: 48, borderWidth: 1, borderColor: brand.line, borderRadius: 14, paddingHorizontal: 14, backgroundColor: "white", color: brand.ink },
-  textArea: { minHeight: 120, borderWidth: 1, borderColor: brand.line, borderRadius: 18, padding: 14, backgroundColor: "white", color: brand.ink, textAlignVertical: "top" },
-  textAreaSmall: { minHeight: 72, borderWidth: 1, borderColor: brand.line, borderRadius: 18, padding: 14, backgroundColor: "white", color: brand.ink, textAlignVertical: "top" },
-  primaryButton: { alignItems: "center", justifyContent: "center", minHeight: 48, borderRadius: 16, backgroundColor: brand.primary, paddingHorizontal: 16 },
-  primaryButtonText: { color: "white", fontWeight: "900" },
-  secondaryButton: { alignItems: "center", justifyContent: "center", minHeight: 44, borderRadius: 16, backgroundColor: brand.surfaceAlt, paddingHorizontal: 16 },
-  secondaryButtonText: { color: brand.primaryStrong, fontWeight: "900" },
-  memberCard: { flexDirection: "row", gap: 12, borderWidth: 1, borderColor: brand.line, borderRadius: 20, padding: 12, backgroundColor: "#fbfcff" },
-  smallAvatar: { width: 54, height: 54, alignItems: "center", justifyContent: "center", overflow: "hidden", borderRadius: 18, backgroundColor: brand.surfaceAlt },
-  smallAvatarImage: { width: 54, height: 54 },
-  smallAvatarText: { color: brand.primary, fontSize: 24, fontWeight: "900" },
-  memberInfo: { flex: 1, gap: 8 },
-  nameLine: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 },
-  facilitatorPill: { overflow: "hidden", borderRadius: 999, backgroundColor: "#e8fbf7", color: "#047a67", fontSize: 11, fontWeight: "900", paddingHorizontal: 8, paddingVertical: 4 },
-  statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 7 },
-  statusPill: { borderWidth: 1, borderColor: brand.line, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: "white" },
-  statusPillActive: { borderColor: brand.primary, backgroundColor: brand.primary },
-  statusPillText: { color: brand.muted, fontSize: 12, fontWeight: "900" },
-  statusPillTextActive: { color: "white" },
-  linkButton: { alignSelf: "flex-start" },
-  linkText: { color: brand.primary, fontWeight: "900" },
-  prayerPeopleRail: { gap: 8 },
-  personChip: { borderWidth: 1, borderColor: brand.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: "white" },
-  personChipActive: { borderColor: brand.accent, backgroundColor: "#e8fbf7" },
-  personChipText: { color: brand.ink, fontSize: 12, fontWeight: "900" },
-  prayerCard: { gap: 4, borderLeftWidth: 4, borderLeftColor: brand.accent, borderRadius: 14, padding: 12, backgroundColor: "#f7fffd" },
-  label: { color: brand.muted, fontSize: 12, fontWeight: "900", textTransform: "uppercase" },
-  followUpGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  choice: { borderWidth: 1, borderColor: brand.line, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7, backgroundColor: "white" },
-  choiceActive: { borderColor: brand.primary, backgroundColor: brand.surfaceAlt },
-  choiceText: { color: brand.muted, fontSize: 12, fontWeight: "800" },
-  choiceTextActive: { color: brand.primaryStrong },
-  photoStrip: { alignItems: "center", gap: 10 },
-  meetingPhoto: { width: 96, height: 96, borderRadius: 18, borderWidth: 1, borderColor: brand.line },
-  actions: { flexDirection: "row", gap: 10 },
-  queueRow: { borderTopWidth: 1, borderTopColor: brand.line, paddingTop: 10, gap: 3 },
-  modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(18,28,34,.45)", padding: 18 },
-  modalCard: { width: "100%", maxWidth: 520, gap: 12, borderRadius: 24, padding: 18, backgroundColor: brand.surface },
+  metricsRow: { flexDirection: "row", gap: 10, paddingHorizontal: 14, marginTop: 10 },
+  quickGrid: { flexDirection: "row", gap: 10, padding: 12 },
+  quickAction: { flex: 1, alignItems: "center", gap: 8, borderRadius: nativeTokens.radius.card, paddingVertical: 18, backgroundColor: nativeTokens.color.primarySoft },
+  quickIcon: { color: nativeTokens.color.primary, fontSize: 24, fontWeight: "900" },
+  quickLabel: { color: nativeTokens.color.ink, fontSize: 12, fontWeight: "800", textAlign: "center" },
+  formBlock: { gap: 10, padding: 12 },
+  input: { minHeight: 48, borderWidth: 1, borderColor: nativeTokens.color.line, borderRadius: Platform.OS === "ios" ? 12 : 16, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: nativeTokens.color.surface, color: nativeTokens.color.ink, fontSize: 15 },
+  inputTall: { minHeight: 118 },
+  fieldLabel: { color: nativeTokens.color.secondary, fontSize: 12, fontWeight: "800", letterSpacing: 0.5, textTransform: "uppercase", marginHorizontal: 14, marginTop: 4 },
+  choiceGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 12, paddingBottom: 4 },
+  statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, paddingHorizontal: 14, paddingBottom: 8 },
+  pillChoice: { borderWidth: 1, borderColor: nativeTokens.color.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: nativeTokens.color.surface },
+  pillChoiceActive: { borderColor: nativeTokens.color.primary, backgroundColor: nativeTokens.color.primarySoft },
+  pillChoiceText: { color: nativeTokens.color.secondary, fontSize: 12, fontWeight: "800" },
+  pillChoiceTextActive: { color: nativeTokens.color.primary },
+  personBlock: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: nativeTokens.color.line, paddingBottom: 8 },
+  rowImage: { width: 44, height: 44, borderRadius: Platform.OS === "ios" ? 14 : 22 },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: nativeTokens.color.line, marginVertical: 2 },
+  photoStrip: { gap: 10, padding: 12 },
+  meetingPhoto: { width: 104, height: 104, borderRadius: 18, borderWidth: 1, borderColor: nativeTokens.color.line, backgroundColor: nativeTokens.color.primarySoft },
+  actionBar: { flexDirection: "row", gap: 10, paddingHorizontal: 14, marginTop: 2 },
+  tabs: { position: "absolute", left: 12, right: 12, bottom: 12, flexDirection: "row", gap: 8, borderWidth: 1, borderColor: nativeTokens.color.line, borderRadius: Platform.OS === "ios" ? 24 : 28, padding: 6, backgroundColor: nativeTokens.color.surface, ...Platform.select({ web: { boxShadow: "0 16px 44px rgba(16, 24, 40, 0.18)" }, ios: { shadowColor: "#101828", shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 8 } }, android: { elevation: 6 } }) },
+  tabButton: { flex: 1, minHeight: 44, alignItems: "center", justifyContent: "center", borderRadius: 999, flexDirection: "row", gap: 6 },
+  tabButtonActive: { backgroundColor: nativeTokens.color.primarySoft },
+  tabText: { color: nativeTokens.color.secondary, fontSize: 13, fontWeight: "800" },
+  tabTextActive: { color: nativeTokens.color.primary },
+  tabBadge: { overflow: "hidden", minWidth: 18, borderRadius: 9, paddingHorizontal: 5, paddingVertical: 1, color: "white", backgroundColor: nativeTokens.color.danger, fontSize: 11, fontWeight: "900", textAlign: "center" },
+  modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", padding: 18, backgroundColor: "rgba(16, 24, 40, 0.45)" },
+  modalCard: { width: "100%", maxWidth: 520, gap: 10, borderRadius: 24, padding: 18, backgroundColor: nativeTokens.color.surface },
+  modalTitle: { color: nativeTokens.color.ink, fontSize: 22, fontWeight: "900" },
+  pressed: { opacity: 0.68 },
 });
