@@ -19,6 +19,14 @@ allowed_logout_urls = [
 clerk_publishable_key = "pk_test_replace_me"
 clerk_secret_key      = "sk_test_replace_me"
 
+# Optional mobile web custom domain. Leave blank to use the CloudFront domain.
+# If mobile_web_domain_name is set, mobile_web_acm_certificate_arn must be an ACM
+# certificate in us-east-1 because CloudFront requires certificates there.
+mobile_web_domain_name             = ""
+mobile_web_acm_certificate_arn     = ""
+route53_zone_id                    = ""
+mobile_web_cloudfront_price_class  = "PriceClass_100"
+
 # Set these to pushed immutable image tags before applying with desired counts of 1.
 # If you need to create ECR before images exist, temporarily set both desired counts to 0.
 api_image_tag       = "bootstrap"

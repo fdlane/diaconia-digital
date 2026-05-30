@@ -42,3 +42,20 @@ output "api_service_name" {
 output "admin_service_name" {
   value = aws_ecs_service.admin.name
 }
+
+
+output "mobile_web_bucket_name" {
+  value = aws_s3_bucket.mobile_web.bucket
+}
+
+output "mobile_web_cloudfront_distribution_id" {
+  value = aws_cloudfront_distribution.mobile_web.id
+}
+
+output "mobile_web_cloudfront_domain_name" {
+  value = aws_cloudfront_distribution.mobile_web.domain_name
+}
+
+output "mobile_web_url" {
+  value = var.mobile_web_domain_name != "" ? "https://${var.mobile_web_domain_name}" : "https://${aws_cloudfront_distribution.mobile_web.domain_name}"
+}

@@ -1,4 +1,6 @@
 import type { CreateMeetingInput } from "@diaconia/shared";
+export { getZeroRuntimeConfig } from "../config/endpoints";
+export type { ZeroRuntimeConfig } from "../config/endpoints";
 
 type SyncMeetingArgs = {
   apiUrl: string;
@@ -19,20 +21,6 @@ export type UploadPhotoArgs = {
   ownerUserId?: string;
   meetingId?: string;
 };
-
-export type ZeroRuntimeConfig = {
-  cacheUrl: string;
-  queryUrl: string;
-  mutateUrl: string;
-};
-
-export function getZeroRuntimeConfig(): ZeroRuntimeConfig {
-  return {
-    cacheUrl: process.env.EXPO_PUBLIC_ZERO_CACHE_URL ?? "http://localhost:4848",
-    queryUrl: `${process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000"}/zero/query`,
-    mutateUrl: `${process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000"}/zero/mutate`,
-  };
-}
 
 export async function replayMeetingWrite({ apiUrl, token, payload }: SyncMeetingArgs) {
   const response = await fetch(`${apiUrl}/meetings`, {

@@ -130,3 +130,33 @@ variable "clerk_secret_key" {
   sensitive   = true
   default     = ""
 }
+
+
+variable "mobile_web_domain_name" {
+  description = "Optional custom domain for the Expo mobile web app, such as mobile.example.org. Leave blank to use the CloudFront domain."
+  type        = string
+  default     = ""
+}
+
+variable "route53_zone_id" {
+  description = "Optional Route53 hosted zone ID for creating mobile web A/AAAA alias records."
+  type        = string
+  default     = ""
+}
+
+variable "mobile_web_acm_certificate_arn" {
+  description = "Optional ACM certificate ARN in us-east-1 for CloudFront aliases."
+  type        = string
+  default     = ""
+}
+
+variable "mobile_web_cloudfront_price_class" {
+  description = "CloudFront price class for mobile web distribution. PriceClass_100 is the lowest-cost default."
+  type        = string
+  default     = "PriceClass_100"
+
+  validation {
+    condition     = contains(["PriceClass_100", "PriceClass_200", "PriceClass_All"], var.mobile_web_cloudfront_price_class)
+    error_message = "mobile_web_cloudfront_price_class must be PriceClass_100, PriceClass_200, or PriceClass_All."
+  }
+}
