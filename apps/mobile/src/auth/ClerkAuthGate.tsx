@@ -7,13 +7,15 @@ import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiUrl } from "../config/endpoints";
+import { getEffectivePublicEnv, getPublicEnvValue } from "../config/publicEnv";
 import { FieldMeetingApp, type AuthenticatedSession } from "../FieldMeetingApp";
 import type { LocalUser } from "../types";
 
 WebBrowser.maybeCompleteAuthSession();
 
-const jwtTemplate = process.env.EXPO_PUBLIC_CLERK_JWT_TEMPLATE ?? "diaconia-api";
+const jwtTemplate = getPublicEnvValue("EXPO_PUBLIC_CLERK_JWT_TEMPLATE", process.env, "NEXT_PUBLIC_CLERK_JWT_TEMPLATE") ?? "diaconia-api";
 const redirectUrl = AuthSession.makeRedirectUri({ scheme: "diaconiamobile", path: "sign-in" });
+const authLoadTimeoutMs = 15000;
 
 const devUser: LocalUser = {
   id: "019e606b-ce98-7134-b1d1-958703c36595",
@@ -59,6 +61,22 @@ function toLocalUser(payload: MeResponse["user"]): LocalUser {
 function getErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) return error.message;
   return "No se pudo completar el ingreso. Intentá de nuevo.";
+}
+
+function withTimeout<T>(promise: Promise<T>, message: string, timeoutMs = authLoadTimeoutMs) {
+  return new Promise<T>((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise.then(
+      (value) => {
+        clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
 }
 
 export function ClerkAuthGate() {
@@ -107,11 +125,17 @@ export function ClerkAuthGate() {
       setLoading(true);
       setError("");
       try {
-        const token = await getToken({ template: jwtTemplate });
+        const token = await withTimeout(
+          getToken({ template: jwtTemplate }),
+          "La sesion de Clerk se creó, pero el token de API tardó demasiado.",
+        );
         if (!token) throw new Error("No se pudo crear un token de sesion.");
-        const response = await fetch(getApiUrl("/me", process.env, Platform.OS), {
-          headers: { authorization: `Bearer ${token}` },
-        });
+        const response = await withTimeout(
+          fetch(getApiUrl("/me", getEffectivePublicEnv(), Platform.OS), {
+            headers: { authorization: `Bearer ${token}` },
+          }),
+          "La sesion se autenticó, pero la API tardó demasiado en cargar el usuario.",
+        );
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as { error?: string } | null;
           throw new Error(payload?.error ?? "Este numero no tiene invitacion activa.");

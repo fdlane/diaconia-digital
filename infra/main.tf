@@ -589,7 +589,7 @@ resource "aws_lb_listener_rule" "api_auth_4" {
 
   condition {
     path_pattern {
-      values = ["/media/*", "/api/*"]
+      values = ["/media/*", "/zero/*", "/api/*"]
     }
   }
 
