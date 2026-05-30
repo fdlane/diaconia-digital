@@ -22,17 +22,30 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import diaconiaLogo from "../assets/logo.png";
 import { pickImage } from "./media";
+import {
+  bootstrapSnapshot,
+  createMembershipFromMember,
+  createUserFromMember,
+  enqueueMutation,
+  markPendingMutationsSynced,
+  selectLocalGroups,
+  selectLocalMembers,
+  toLocalMeeting,
+  type MobileOfflineSnapshot,
+  type OfflineGroup,
+} from "./offlineStore";
 import { adminUserId, defaultGroupId, facilitatorUserId, seedGroups, seedMembers } from "./seed";
 import { replayMeetingWrite, uploadPhotoAsset } from "./sync/zero";
 import {
   loadMeetings,
   loadLocale,
-  loadMembers,
+  loadOfflineSnapshot,
   loadUser,
   removeUser,
   saveMeetings,
   saveLocale,
   saveMembers,
+  saveOfflineSnapshot,
   saveUser,
 } from "./storage";
 import type { LocalGroup, LocalMeeting, LocalMember, LocalPrayerRequest, LocalUser } from "./types";
@@ -45,6 +58,15 @@ export type AuthenticatedSession = {
 };
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
+
+function createBootstrapOfflineSnapshot(meetings: LocalMeeting[] = []): MobileOfflineSnapshot {
+  const now = new Date().toISOString();
+  const users = seedMembers.map((member) => createUserFromMember(member, now));
+  const memberships = seedMembers.map((member, index) => createMembershipFromMember(member, now, `${member.groupId}-${member.id}-${index}`));
+  const groups = seedGroups.map((group) => ({ ...group, active: true, createdAt: now, updatedAt: now }) satisfies OfflineGroup);
+  return bootstrapSnapshot({ users, groups, memberships, meetings });
+}
+
 const brand = {
   background: "#f4f6fb",
   surface: "#ffffff",
@@ -74,6 +96,9 @@ const ui = {
     prayerPlaceholder: "Escribe una petición pública de oración",
     addPrayer: "Agregar petición",
     addPerson: "Agregar persona",
+    addGroup: "Agregar grupo",
+    newGroupName: "Nombre del grupo",
+    newGroupCommunity: "Comunidad",
     newPersonName: "Nombre completo",
     newPersonPhone: "Teléfono",
     makeFacilitator: "Facilitador",
@@ -110,6 +135,9 @@ const ui = {
     prayerPlaceholder: "Write a public prayer request",
     addPrayer: "Add request",
     addPerson: "Add person",
+    addGroup: "Add group",
+    newGroupName: "Group name",
+    newGroupCommunity: "Community",
     newPersonName: "Full name",
     newPersonPhone: "Phone",
     makeFacilitator: "Facilitator",
@@ -142,7 +170,8 @@ function statusLabel(status: AttendanceStatus, locale: SupportedLocale) {
 export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession?: AuthenticatedSession }) {
   const [locale, setLocale] = useState<SupportedLocale>("es");
   const [user, setUser] = useState<LocalUser | null>(null);
-  const [groups] = useState<LocalGroup[]>(seedGroups);
+  const [offlineSnapshot, setOfflineSnapshot] = useState<MobileOfflineSnapshot>(() => createBootstrapOfflineSnapshot());
+  const [groups, setGroups] = useState<LocalGroup[]>(seedGroups);
   const [members, setMembers] = useState<LocalMember[]>(seedMembers);
   const [meetings, setMeetings] = useState<LocalMeeting[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState(defaultGroupId);
@@ -153,6 +182,8 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
   const [meetingPhotos, setMeetingPhotos] = useState<LocalMeeting["meetingPhotos"]>([]);
   const [prayerRequests, setPrayerRequests] = useState<LocalPrayerRequest[]>([]);
   const [newPrayer, setNewPrayer] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupCommunity, setNewGroupCommunity] = useState("");
   const [newPersonName, setNewPersonName] = useState("");
   const [newPersonPhone, setNewPersonPhone] = useState("");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -170,14 +201,18 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     async function hydrate() {
       const storedLocale = await loadLocale();
       setLocale(storedLocale);
+      const storedMeetings = await loadMeetings();
+      const storedSnapshot = await loadOfflineSnapshot(createBootstrapOfflineSnapshot(storedMeetings));
+      setOfflineSnapshot(storedSnapshot);
+      setGroups(selectLocalGroups(storedSnapshot));
+      setMembers(selectLocalMembers(storedSnapshot));
+      setMeetings(storedSnapshot.meetings.length ? storedSnapshot.meetings : storedMeetings);
       if (authenticatedSession) {
         setUser(authenticatedSession.user);
         setProfileName(authenticatedSession.user.displayName);
         setProfileEmail(authenticatedSession.user.email ?? "");
         setProfilePhone(authenticatedSession.user.phone ?? "");
         setAccessToken("");
-        setMembers(await loadMembers(seedMembers));
-        setMeetings(await loadMeetings());
         return;
       }
       const storedUser = await loadUser();
@@ -188,8 +223,6 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
         setProfilePhone(storedUser.phone ?? "");
         setAccessToken(storedUser.token === "local-dev-token" ? "" : storedUser.token);
       }
-      setMembers(await loadMembers(seedMembers));
-      setMeetings(await loadMeetings());
     }
 
     void hydrate();
@@ -213,6 +246,16 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       return authenticatedSession.getToken();
     }
     return user?.token ?? "";
+  }
+
+  async function persistOfflineSnapshot(nextSnapshot: MobileOfflineSnapshot) {
+    setOfflineSnapshot(nextSnapshot);
+    setGroups(selectLocalGroups(nextSnapshot));
+    setMembers(selectLocalMembers(nextSnapshot));
+    setMeetings(nextSnapshot.meetings);
+    await saveOfflineSnapshot(nextSnapshot);
+    await saveMembers(selectLocalMembers(nextSnapshot));
+    await saveMeetings(nextSnapshot.meetings);
   }
 
   async function updateLocale(nextLocale: SupportedLocale) {
@@ -314,9 +357,31 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
     if (photo) setMeetingPhotos((value) => [...value, photo]);
   }
 
+  async function addGroup() {
+    if (!user || !newGroupName.trim()) return;
+    const now = new Date().toISOString();
+    const group: OfflineGroup = {
+      id: await uuidv7(),
+      name: newGroupName.trim(),
+      community: newGroupCommunity.trim() || "Paraguay",
+      facilitatorId: user.role === "facilitator" ? user.id : facilitatorUserId,
+      chaplainUserId: null,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "group.upsert", group });
+    await persistOfflineSnapshot(nextSnapshot);
+    setSelectedGroupId(group.id);
+    setNewGroupName("");
+    setNewGroupCommunity("");
+    setStatus(copy.meetingQueued);
+  }
+
   async function addPerson() {
     if (!newPersonName.trim()) return;
     const phone = newPersonPhone.trim();
+    const now = new Date().toISOString();
     const nextPerson: LocalMember = {
       id: await uuidv7(),
       groupId: selectedGroup.id,
@@ -324,21 +389,28 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       role: "member",
       ...(phone ? { phone } : {}),
     };
-    const nextMembers = [...members, nextPerson];
-    setMembers(nextMembers);
-    await saveMembers(nextMembers);
+    const userMutation = createUserFromMember(nextPerson, now);
+    const membershipMutation = createMembershipFromMember(nextPerson, now, await uuidv7());
+    let nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: userMutation });
+    nextSnapshot = enqueueMutation(nextSnapshot, { type: "membership.upsert", membership: membershipMutation });
+    await persistOfflineSnapshot(nextSnapshot);
     setNewPersonName("");
     setNewPersonPhone("");
+    setStatus(copy.meetingQueued);
   }
 
   async function toggleFacilitator(memberId: string) {
-    const nextMembers: LocalMember[] = members.map((member) => {
-      if (member.id !== memberId) return member;
-      const role: Role = member.role === "facilitator" ? "member" : "facilitator";
-      return { ...member, role };
-    });
-    setMembers(nextMembers);
-    await saveMembers(nextMembers);
+    const now = new Date().toISOString();
+    const existing = offlineSnapshot.users.find((candidate) => candidate.id === memberId);
+    const currentMember = members.find((member) => member.id === memberId);
+    if (!existing && !currentMember) return;
+    const nextRole: Role = (existing?.role ?? currentMember?.role) === "facilitator" ? "member" : "facilitator";
+    const nextUser = existing
+      ? { ...existing, role: nextRole, updatedAt: now }
+      : createUserFromMember({ ...currentMember!, role: nextRole }, now);
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "user.upsert", user: nextUser });
+    await persistOfflineSnapshot(nextSnapshot);
+    setStatus(copy.meetingQueued);
   }
 
   async function addPrayerRequest() {
@@ -356,9 +428,11 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
 
   async function saveDraft(syncNow: boolean) {
     if (!user) return;
-    const meeting: LocalMeeting = {
+    const meeting: LocalMeeting = toLocalMeeting({
       id: await uuidv7(),
       groupId: selectedGroup.id,
+      facilitatorId: user.id,
+      chaplainUserId: selectedGroup.chaplainUserId ?? null,
       scheduledStartAt: new Date().toISOString(),
       occurredAt: new Date().toISOString(),
       status: "completed",
@@ -375,17 +449,16 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       prayerRequests,
       meetingPhotos,
       syncStatus: syncNow ? "pending" : "draft",
-    };
-    const nextMeetings = [meeting, ...meetings];
-    setMeetings(nextMeetings);
-    await saveMeetings(nextMeetings);
+    });
+    const nextSnapshot = enqueueMutation(offlineSnapshot, { type: "meeting.upsert", meeting });
+    await persistOfflineSnapshot(nextSnapshot);
     setNotes("");
     setFollowUpCategory("none");
     setFollowUpNotes("");
     setPrayerRequests([]);
     setMeetingPhotos([]);
     setStatus(syncNow ? copy.meetingQueued : copy.draftSaved);
-    if (syncNow) await syncPending(nextMeetings);
+    if (syncNow) await syncPending([meeting, ...meetings]);
   }
 
   async function syncPending(source = meetings) {
@@ -436,6 +509,9 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
       }
     }
     setMeetings(nextMeetings);
+    const syncedSnapshot = markPendingMutationsSynced({ ...offlineSnapshot, meetings: nextMeetings });
+    await saveOfflineSnapshot(syncedSnapshot);
+    setOfflineSnapshot(syncedSnapshot);
     await saveMeetings(nextMeetings);
     setStatus(nextMeetings.some((meeting) => meeting.syncStatus === "failed") ? copy.syncError : copy.syncComplete);
   }
@@ -550,6 +626,11 @@ export function FieldMeetingApp({ authenticatedSession }: { authenticatedSession
                 <Text style={styles.body}>{text.roleHelp}</Text>
               </View>
             </View>
+            <View style={styles.formRow}>
+              <TextInput onChangeText={setNewGroupName} placeholder={text.newGroupName} style={styles.input} value={newGroupName} />
+              <TextInput onChangeText={setNewGroupCommunity} placeholder={text.newGroupCommunity} style={styles.input} value={newGroupCommunity} />
+            </View>
+            <Pressable onPress={addGroup} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>{text.addGroup}</Text></Pressable>
             <View style={styles.formRow}>
               <TextInput onChangeText={setNewPersonName} placeholder={text.newPersonName} style={styles.input} value={newPersonName} />
               <TextInput onChangeText={setNewPersonPhone} placeholder={text.newPersonPhone} style={styles.input} value={newPersonPhone} />

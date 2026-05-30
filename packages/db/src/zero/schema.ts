@@ -292,18 +292,24 @@ const allowIfAuthenticated = (<TTable extends TableName>(
   return eb.cmpLit(authSubject, "IS NOT", null);
 }) satisfies PermissionRule<AuthData, Schema, TableName>;
 
-const readOnly = {
+const readWriteIfAuthenticated = {
   row: {
     select: [allowIfAuthenticated],
+    insert: [allowIfAuthenticated],
+    update: {
+      preMutation: [allowIfAuthenticated],
+      postMutation: [allowIfAuthenticated],
+    },
+    delete: [allowIfAuthenticated],
   },
 };
 
 export const permissions = await definePermissions<AuthData, Schema>(schema, () => ({
-  users: readOnly,
-  groups: readOnly,
-  group_memberships: readOnly,
-  meetings: readOnly,
-  meeting_attendance: readOnly,
-  prayer_requests: readOnly,
-  media_assets: readOnly,
+  users: readWriteIfAuthenticated,
+  groups: readWriteIfAuthenticated,
+  group_memberships: readWriteIfAuthenticated,
+  meetings: readWriteIfAuthenticated,
+  meeting_attendance: readWriteIfAuthenticated,
+  prayer_requests: readWriteIfAuthenticated,
+  media_assets: readWriteIfAuthenticated,
 }));
