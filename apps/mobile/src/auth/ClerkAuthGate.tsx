@@ -4,8 +4,9 @@ import { normalizePhoneNumber } from "@diaconia/shared";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import diaconiaLogo from "../../assets/logo.png";
 import { getApiUrl } from "../config/endpoints";
 import { getEffectivePublicEnv, getPublicEnvValue } from "../config/publicEnv";
 import { FieldMeetingApp, type AuthenticatedSession } from "../FieldMeetingApp";
@@ -396,46 +397,62 @@ export function ClerkAuthGate() {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.card}>
-        <Text style={styles.title}>Diaconia Mobile</Text>
-        <Text style={styles.subtitle}>Ingresá con tu número de WhatsApp, Google o Apple.</Text>
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.logoWrap}>
+          <Image accessibilityIgnoresInvertColors source={diaconiaLogo} style={styles.logo} resizeMode="contain" />
+        </View>
+        <View style={styles.heading}>
+          <Text style={styles.title}>Diaconia Admin</Text>
+          <Text style={styles.subtitle}>Ingresá con tu número de WhatsApp, Google o Apple.</Text>
+        </View>
+        {error ? (
+          <View style={styles.alert}>
+            <Text style={styles.error}>{error}</Text>
+          </View>
+        ) : null}
         {step === "phone" || step === "verify-social-phone" ? (
           <>
             <TextInput
+              accessibilityLabel="Número de WhatsApp"
               keyboardType="phone-pad"
               onChangeText={setPhone}
               placeholder="+595..."
               style={styles.input}
               value={phone}
             />
-            <Pressable onPress={step === "verify-social-phone" ? addSocialPhone : startPhoneOtp} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Enviar codigo por SMS</Text>
+            <Pressable accessibilityRole="button" onPress={step === "verify-social-phone" ? addSocialPhone : startPhoneOtp} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Enviar código por SMS</Text>
             </Pressable>
           </>
         ) : (
           <>
             <TextInput
+              accessibilityLabel="Código de verificación"
               keyboardType="number-pad"
               onChangeText={setCode}
-              placeholder="Codigo"
+              placeholder="Código"
               style={styles.input}
               value={code}
             />
-            <Pressable onPress={pendingSocialPhone ? verifySocialPhone : verifyPhoneOtp} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Verificar codigo</Text>
+            <Pressable accessibilityRole="button" onPress={pendingSocialPhone ? verifySocialPhone : verifyPhoneOtp} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Verificar código</Text>
             </Pressable>
           </>
         )}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>o continuá con</Text>
+          <View style={styles.dividerLine} />
+        </View>
         <View style={styles.socialRow}>
-          <Pressable onPress={() => startSocial("oauth_google")} style={styles.secondaryButton}>
+          <Pressable accessibilityRole="button" onPress={() => startSocial("oauth_google")} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Google</Text>
           </Pressable>
-          <Pressable onPress={() => startSocial("oauth_apple")} style={styles.secondaryButton}>
+          <Pressable accessibilityRole="button" onPress={() => startSocial("oauth_apple")} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Apple</Text>
           </Pressable>
         </View>
         {isSignedIn ? (
-          <Pressable onPress={() => signOut()} style={styles.linkButton}>
+          <Pressable accessibilityRole="button" onPress={() => signOut()} style={styles.linkButton}>
             <Text style={styles.linkButtonText}>Salir</Text>
           </Pressable>
         ) : null}
@@ -445,17 +462,36 @@ export function ClerkAuthGate() {
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: "#f4f6fb" },
-  screen: { flex: 1, alignItems: "center", justifyContent: "center", padding: 20, backgroundColor: "#f4f6fb" },
-  card: { width: "100%", maxWidth: 520, gap: 14, padding: 22, backgroundColor: "#fff", borderRadius: 8 },
-  title: { color: "#17202a", fontSize: 24, fontWeight: "800" },
-  subtitle: { color: "#65717d", fontSize: 15, lineHeight: 21 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12, backgroundColor: "#f4f6fb", padding: 20 },
+  screen: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16, backgroundColor: "#f4f6fb" },
+  card: {
+    width: "100%",
+    maxWidth: 420,
+    gap: 24,
+    paddingHorizontal: 30,
+    paddingVertical: 34,
+    backgroundColor: "#fff",
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: "#dfe5ee",
+    ...Platform.select({
+      ios: { shadowColor: "#111827", shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.14, shadowRadius: 34 },
+      android: { elevation: 8 },
+      web: { boxShadow: "0 24px 60px rgba(17, 24, 39, 0.14)" },
+    }),
+  },
+  logoWrap: { alignItems: "center", justifyContent: "center" },
+  logo: { width: 220, height: 58 },
+  heading: { alignItems: "center", gap: 10 },
+  title: { color: "#17202a", fontSize: 26, fontWeight: "800", letterSpacing: -0.4, lineHeight: 32, textAlign: "center" },
+  subtitle: { color: "#65717d", fontSize: 15, lineHeight: 22, textAlign: "center" },
   help: { color: "#65717d" },
-  error: { color: "#d64545", fontWeight: "700" },
+  alert: { borderWidth: 1, borderColor: "#f0b8b8", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#fff5f5" },
+  error: { color: "#b42318", fontWeight: "700", lineHeight: 19, textAlign: "center" },
   input: {
     borderWidth: 1,
     borderColor: "#dfe5ee",
-    borderRadius: 8,
+    borderRadius: 10,
     minHeight: 48,
     paddingHorizontal: 14,
     color: "#17202a",
@@ -463,21 +499,25 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     minHeight: 48,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "#2e3192",
   },
-  primaryButtonText: { color: "#fff", fontWeight: "800" },
+  primaryButtonText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: -4 },
+  dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: "#dfe5ee" },
+  dividerText: { color: "#65717d", fontSize: 12, fontWeight: "700" },
   socialRow: { flexDirection: "row", gap: 10 },
   secondaryButton: {
     flex: 1,
     minHeight: 44,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
     borderColor: "#dfe5ee",
+    backgroundColor: "#fff",
   },
   secondaryButtonText: { color: "#17202a", fontWeight: "700" },
   linkButton: { alignItems: "center", padding: 8 },
