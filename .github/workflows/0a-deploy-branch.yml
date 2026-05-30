@@ -92,3 +92,15 @@ jobs:
           "${{ steps.tfvars.outputs.tfvars_file }}"
           -var="api_image_tag=${{ steps.images.outputs.image_tag }}"
           -var="admin_image_tag=${{ steps.images.outputs.image_tag }}"
+
+      - name: Deploy mobile web
+        id: mobile-web
+        env:
+          EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+          EXPO_PUBLIC_CLERK_JWT_TEMPLATE: ${{ env.NEXT_PUBLIC_CLERK_JWT_TEMPLATE }}
+        run: >
+          .github/scripts/deploy-mobile-web.sh
+          "${{ inputs.environment }}"
+          "${{ steps.tfvars.outputs.tfvars_file }}"
+          -var="clerk_publishable_key=${{ secrets.CLERK_PUBLISHABLE_KEY }}"
+          -var="clerk_secret_key=${{ secrets.CLERK_SECRET_KEY }}"

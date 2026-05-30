@@ -38,7 +38,7 @@ Required auth configuration:
 
 - API: `CLERK_SECRET_KEY` or `CLERK_JWT_KEY`, `CLERK_JWT_AUDIENCE=diaconia-api`, `CLERK_AUTHORIZED_PARTIES`
 - Admin: `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `NEXT_PUBLIC_CLERK_JWT_TEMPLATE=diaconia-api`, `NEXT_PUBLIC_API_URL`
-- Mobile: `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`, `EXPO_PUBLIC_CLERK_JWT_TEMPLATE=diaconia-api`, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_ZERO_CACHE_URL`
+- Mobile: reuses the shared Clerk publishable key (`CLERK_PUBLISHABLE_KEY` / `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`) and maps it to `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY` at build/deploy time; also uses `EXPO_PUBLIC_CLERK_JWT_TEMPLATE=diaconia-api`, `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_ZERO_CACHE_URL`
 - Zero cache: `ZERO_AUTH_JWKS_URL`, `ZERO_AUTH_ISSUER`, `ZERO_AUTH_AUDIENCE=diaconia-api`
 
 Local auth bypass is available only when `AUTH_DEV_BYPASS=true` is set on the API and the matching public bypass flag is set for the client. Do not enable bypass flags in production.

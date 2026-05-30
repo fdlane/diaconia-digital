@@ -6,15 +6,22 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ClerkAuthGate, devAuthenticatedSession } from "./src/auth/ClerkAuthGate";
 import { FieldMeetingApp } from "./src/FieldMeetingApp";
 
-function getPublicEnv(name: string) {
+function getPublicEnv(name: string, ...fallbackNames: string[]) {
   const runtimeEnv = (globalThis as typeof globalThis & {
     __DIACONIA_ENV__?: Record<string, string | undefined>;
   }).__DIACONIA_ENV__;
 
-  return process.env[name] ?? runtimeEnv?.[name];
+  for (const candidate of [name, ...fallbackNames]) {
+    const value = process.env[candidate] ?? runtimeEnv?.[candidate];
+    if (value) {
+      return value;
+    }
+  }
+
+  return undefined;
 }
 
-const publishableKey = getPublicEnv("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY");
+const publishableKey = getPublicEnv("EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY", "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY");
 const devBypass = getPublicEnv("EXPO_PUBLIC_AUTH_DEV_BYPASS") === "true";
 
 export default function App() {
