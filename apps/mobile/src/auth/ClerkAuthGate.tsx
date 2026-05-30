@@ -90,6 +90,8 @@ export function ClerkAuthGate() {
   const [code, setCode] = useState("");
   const [step, setStep] = useState<Step>("phone");
   const [loading, setLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Preparando sesion segura");
+  const [clerkLoadTimedOut, setClerkLoadTimedOut] = useState(false);
   const [error, setError] = useState("");
   const [pendingSocialPhone, setPendingSocialPhone] = useState<any>(null);
   const verifiedPhone = user?.primaryPhoneNumber?.phoneNumber ?? null;
@@ -111,6 +113,20 @@ export function ClerkAuthGate() {
   }, [getToken, sessionUser, signOut]);
 
   useEffect(() => {
+    if (isLoaded) {
+      setClerkLoadTimedOut(false);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      setClerkLoadTimedOut(true);
+      setError("Clerk tardó demasiado en preparar la sesión. Recargá la página e intentá de nuevo.");
+    }, authLoadTimeoutMs);
+
+    return () => clearTimeout(timeout);
+  }, [isLoaded]);
+
+  useEffect(() => {
     async function loadInternalUser() {
       if (!isLoaded || !isSignedIn) {
         setSessionUser(null);
@@ -122,6 +138,7 @@ export function ClerkAuthGate() {
         return;
       }
 
+      setLoadingMessage("Cargando usuario de Diaconia");
       setLoading(true);
       setError("");
       try {
@@ -155,16 +172,23 @@ export function ClerkAuthGate() {
 
   async function startPhoneOtp() {
     if (!signIn || !signUp) return;
+    setLoadingMessage("Enviando código por SMS");
     setLoading(true);
     setError("");
 
     try {
       const phoneNumber = normalizePhoneNumber(phone);
       try {
-        const attempt = await (signIn as any).create({ identifier: phoneNumber });
+        const attempt: any = await withTimeout(
+          (signIn as any).create({ identifier: phoneNumber }),
+          "Clerk tardó demasiado en iniciar el ingreso por SMS.",
+        );
         const factor = attempt.supportedFirstFactors?.find((item: any) => item.strategy === "phone_code");
         if (factor?.phoneNumberId) {
-          await (signIn as any).prepareFirstFactor({ strategy: "phone_code", phoneNumberId: factor.phoneNumberId });
+          await withTimeout(
+            (signIn as any).prepareFirstFactor({ strategy: "phone_code", phoneNumberId: factor.phoneNumberId }),
+            "Clerk tardó demasiado en enviar el código por SMS.",
+          );
           setStep("code");
           return;
         }
@@ -172,8 +196,11 @@ export function ClerkAuthGate() {
         // If the phone has not created a Clerk user yet, continue into sign-up.
       }
 
-      await (signUp as any).create({ phoneNumber });
-      await (signUp as any).preparePhoneNumberVerification({ strategy: "phone_code" });
+      await withTimeout((signUp as any).create({ phoneNumber }), "Clerk tardó demasiado en crear el usuario.");
+      await withTimeout(
+        (signUp as any).preparePhoneNumberVerification({ strategy: "phone_code" }),
+        "Clerk tardó demasiado en enviar el código por SMS.",
+      );
       setStep("code");
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
@@ -184,24 +211,31 @@ export function ClerkAuthGate() {
 
   async function verifyPhoneOtp() {
     if (!signIn || !signUp) return;
+    setLoadingMessage("Verificando código");
     setLoading(true);
     setError("");
 
     try {
       let sessionId: string | null = null;
       if ((signIn as any).status === "needs_first_factor") {
-        const attempt = await (signIn as any).attemptFirstFactor({ strategy: "phone_code", code: code.trim() });
+        const attempt: any = await withTimeout(
+          (signIn as any).attemptFirstFactor({ strategy: "phone_code", code: code.trim() }),
+          "Clerk tardó demasiado en verificar el código.",
+        );
         sessionId = attempt.createdSessionId ?? null;
         if (attempt.status !== "complete") throw new Error("No se pudo verificar el codigo.");
       } else {
-        const attempt = await (signUp as any).attemptPhoneNumberVerification({ code: code.trim() });
+        const attempt: any = await withTimeout(
+          (signUp as any).attemptPhoneNumberVerification({ code: code.trim() }),
+          "Clerk tardó demasiado en verificar el código.",
+        );
         sessionId = attempt.createdSessionId ?? null;
         if (attempt.status !== "complete") throw new Error("No se pudo verificar el codigo.");
       }
 
       const activate = setActive ?? setActiveSignUp;
       if (sessionId && activate) {
-        await activate({ session: sessionId });
+        await withTimeout(activate({ session: sessionId }), "Clerk tardó demasiado en activar la sesión.");
       }
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
@@ -211,17 +245,21 @@ export function ClerkAuthGate() {
   }
 
   async function startSocial(strategy: "oauth_google" | "oauth_apple") {
+    setLoadingMessage(strategy === "oauth_google" ? "Abriendo Google" : "Abriendo Apple");
     setLoading(true);
     setError("");
     try {
-      const result: any = await startSSOFlow({ redirectUrl, strategy });
+      const result: any = await withTimeout(
+        startSSOFlow({ redirectUrl, strategy }),
+        "Clerk tardó demasiado en completar el ingreso social.",
+      );
       const sessionId =
         result.createdSessionId ??
         result.signIn?.createdSessionId ??
         result.signUp?.createdSessionId ??
         null;
       if (sessionId && result.setActive) {
-        await result.setActive({ session: sessionId });
+        await withTimeout(result.setActive({ session: sessionId }), "Clerk tardó demasiado en activar la sesión.");
         return;
       }
       throw new Error("No se pudo completar el ingreso social.");
@@ -234,12 +272,16 @@ export function ClerkAuthGate() {
 
   async function addSocialPhone() {
     if (!user) return;
+    setLoadingMessage("Agregando teléfono");
     setLoading(true);
     setError("");
     try {
       const phoneNumber = normalizePhoneNumber(phone);
-      const created = await (user as any).createPhoneNumber({ phoneNumber });
-      await created.prepareVerification();
+      const created: any = await withTimeout(
+        (user as any).createPhoneNumber({ phoneNumber }),
+        "Clerk tardó demasiado en agregar el teléfono.",
+      );
+      await withTimeout(created.prepareVerification(), "Clerk tardó demasiado en enviar el código por SMS.");
       setPendingSocialPhone(created);
       setStep("code");
     } catch (caughtError) {
@@ -251,11 +293,15 @@ export function ClerkAuthGate() {
 
   async function verifySocialPhone() {
     if (!pendingSocialPhone) return;
+    setLoadingMessage("Verificando teléfono");
     setLoading(true);
     setError("");
     try {
-      await pendingSocialPhone.attemptVerification({ code: code.trim() });
-      await user?.reload();
+      await withTimeout(
+        pendingSocialPhone.attemptVerification({ code: code.trim() }),
+        "Clerk tardó demasiado en verificar el teléfono.",
+      );
+      if (user) await withTimeout(user.reload(), "Clerk tardó demasiado en recargar el usuario.");
       setPendingSocialPhone(null);
     } catch (caughtError) {
       setError(getErrorMessage(caughtError));
@@ -264,15 +310,35 @@ export function ClerkAuthGate() {
     }
   }
 
+  function reloadPage() {
+    if (Platform.OS === "web" && typeof window !== "undefined") {
+      window.location.reload();
+    }
+  }
+
   if (authenticatedSession) {
     return <FieldMeetingApp authenticatedSession={authenticatedSession} />;
+  }
+
+  if (clerkLoadTimedOut) {
+    return (
+      <SafeAreaView style={styles.center}>
+        <Text style={styles.error}>Clerk tardó demasiado en preparar la sesión.</Text>
+        <Text style={styles.help}>Recargá la página. Si sigue igual, cerrá esta pestaña y abrí el enlace de nuevo.</Text>
+        {Platform.OS === "web" ? (
+          <Pressable onPress={reloadPage} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Recargar</Text>
+          </Pressable>
+        ) : null}
+      </SafeAreaView>
+    );
   }
 
   if (!isLoaded || loading) {
     return (
       <SafeAreaView style={styles.center}>
         <ActivityIndicator color="#2e3192" />
-        <Text style={styles.help}>Preparando sesion segura</Text>
+        <Text style={styles.help}>{isLoaded ? loadingMessage : "Preparando Clerk"}</Text>
       </SafeAreaView>
     );
   }
