@@ -49,97 +49,128 @@ type MeResponse = {
 };
 
 type Step = "phone" | "code" | "verify-social-phone";
+type AuthErrorKey =
+  | "authAccountNotFound"
+  | "authAdminRequired"
+  | "authAlreadySignedIn"
+  | "authGenericError"
+  | "authInvalidCode"
+  | "authInvalidSession"
+  | "authInviteRequired"
+  | "authMissingClerkConfig"
+  | "authMissingPhone"
+  | "authMissingSession"
+  | "authSessionLoadFailed"
+  | "authTokenTemplateError";
 
 const authCopy = {
   es: {
     addPhone: "Agregando telefono",
-    addPhoneTimeout: "Clerk tardo demasiado en agregar el telefono.",
+    addPhoneTimeout: "El inicio seguro tardó demasiado en agregar el teléfono.",
     apiUserTimeout: "La sesion se autentico, pero la API tardo demasiado en cargar el usuario.",
-    apiTokenTimeout: "La sesion de Clerk se creo, pero el token de API tardo demasiado.",
+    apiTokenTimeout: "La sesión se creó, pero la API tardó demasiado en preparar el acceso.",
     appleSignIn: "Apple",
-    clerkLoading: "Preparando Clerk",
-    clerkTimeout: "Clerk tardo demasiado en preparar la sesion.",
+    authAccountNotFound: "No encontramos una cuenta para ese número.",
+    authAdminRequired: "Tu cuenta no tiene rol de administrador.",
+    authAlreadySignedIn: "Ya hay una sesión iniciada. Salí de esa sesión e intentá de nuevo.",
+    authGenericError: "No se pudo completar el ingreso. Intentá de nuevo.",
+    authInvalidCode: "El código no es válido. Verificá el código e intentá de nuevo.",
+    authInvalidSession: "Tu sesión expiró o no es válida. Salí e ingresá de nuevo.",
+    authInviteRequired: "Tu cuenta existe, pero todavía no está habilitada para acceder a Diaconia.",
+    authMissingClerkConfig: "Falta configurar el inicio de sesión seguro.",
+    authMissingPhone: "Ingresá un número de teléfono válido.",
+    authMissingSession: "Iniciá sesión para continuar.",
+    authSessionLoadFailed: "No se pudo cargar la sesión.",
+    authTokenTemplateError: "No se pudo crear un token de sesión. Verificá la configuración de autenticación.",
+    clerkLoading: "Preparando inicio seguro",
+    clerkTimeout: "El inicio seguro tardó demasiado en preparar la sesión.",
     clerkTimeoutHelp: "Recarga la pagina. Si sigue igual, cerra esta pestana y abri el enlace de nuevo.",
-    clerkTimeoutRetry: "Clerk tardo demasiado en preparar la sesion. Recarga la pagina e intenta de nuevo.",
+    clerkTimeoutRetry: "El inicio seguro tardó demasiado en preparar la sesión. Recargá la página e intentá de nuevo.",
     codeLabel: "Codigo de verificacion",
     codePlaceholder: "Codigo",
     continueWith: "o",
-    fallbackError: "No se pudo completar el ingreso. Intenta de nuevo.",
     googleSignIn: "Google",
     loadingDiaconia: "Abriendo Diaconia",
     loadingGoogle: "Abriendo Google",
     loadingApple: "Abriendo Apple",
     loadingSecure: "Preparando sesion segura",
     loadingUser: "Cargando usuario de Diaconia",
-    noApiToken: "No se pudo crear un token de sesion.",
-    noInvitation: "Este numero no tiene invitacion activa.",
-    signedOut: "La sesion no es valida. Sali e ingresa de nuevo.",
+    noApiToken: "No se pudo crear un token de sesión. Verificá la configuración de autenticación.",
     phoneLabel: "Numero de WhatsApp",
     phoneSubtitle: "Por favor ingresá para continuar",
     reload: "Recargar",
     retry: "Intentar de nuevo",
     sendCode: "Enviar codigo por SMS",
     sendCodeLoading: "Enviando codigo por SMS",
-    signInTimeout: "Clerk tardo demasiado en iniciar el ingreso por SMS.",
+    signInTimeout: "El inicio seguro tardó demasiado en iniciar el ingreso por SMS.",
     signOut: "Salir",
     signOutAndRetry: "Salir y volver a ingresar",
-    signUpTimeout: "Clerk tardo demasiado en crear el usuario.",
+    signUpTimeout: "El inicio seguro tardó demasiado en crear el usuario.",
     socialError: "No se pudo completar el ingreso social.",
-    socialTimeout: "Clerk tardo demasiado en completar el ingreso social.",
-    tokenActivateTimeout: "Clerk tardo demasiado en activar la sesion.",
-    userReloadTimeout: "Clerk tardo demasiado en recargar el usuario.",
+    socialTimeout: "El inicio seguro tardó demasiado en completar el ingreso social.",
+    tokenActivateTimeout: "El inicio seguro tardó demasiado en activar la sesión.",
+    userReloadTimeout: "El inicio seguro tardó demasiado en recargar el usuario.",
     verify: "Verificar codigo",
     verifyCodeLoading: "Verificando codigo",
-    verifyCodeTimeout: "Clerk tardo demasiado en verificar el codigo.",
+    verifyCodeTimeout: "El inicio seguro tardó demasiado en verificar el código.",
     verifyFailed: "No se pudo verificar el codigo.",
     verifyPhoneLoading: "Verificando telefono",
-    verifyPhoneTimeout: "Clerk tardo demasiado en verificar el telefono.",
-    smsCodeTimeout: "Clerk tardo demasiado en enviar el codigo por SMS.",
+    verifyPhoneTimeout: "El inicio seguro tardó demasiado en verificar el teléfono.",
+    smsCodeTimeout: "El inicio seguro tardó demasiado en enviar el código por SMS.",
   },
   en: {
     addPhone: "Adding phone",
-    addPhoneTimeout: "Clerk took too long to add the phone.",
+    addPhoneTimeout: "Secure sign-in took too long to add the phone.",
     apiUserTimeout: "The session was authenticated, but the API took too long to load the user.",
-    apiTokenTimeout: "The Clerk session was created, but the API token took too long.",
+    apiTokenTimeout: "The session was created, but the API took too long to prepare access.",
     appleSignIn: "Apple",
-    clerkLoading: "Preparing Clerk",
-    clerkTimeout: "Clerk took too long to prepare the session.",
+    authAccountNotFound: "Could not find an account for that number.",
+    authAdminRequired: "Your account does not have the administrator role.",
+    authAlreadySignedIn: "You are already signed in. Sign out of that session and try again.",
+    authGenericError: "Could not complete sign in. Try again.",
+    authInvalidCode: "The code is not valid. Check the code and try again.",
+    authInvalidSession: "Your session expired or is not valid. Sign out and sign in again.",
+    authInviteRequired: "Your account exists, but it is not enabled for Diaconia access yet.",
+    authMissingClerkConfig: "Secure sign-in is not configured.",
+    authMissingPhone: "Enter a valid phone number.",
+    authMissingSession: "Sign in to continue.",
+    authSessionLoadFailed: "Could not load the session.",
+    authTokenTemplateError: "Could not create a session token. Check the authentication configuration.",
+    clerkLoading: "Preparing secure sign-in",
+    clerkTimeout: "Secure sign-in took too long to prepare the session.",
     clerkTimeoutHelp: "Reload the page. If it still happens, close this tab and open the link again.",
-    clerkTimeoutRetry: "Clerk took too long to prepare the session. Reload the page and try again.",
+    clerkTimeoutRetry: "Secure sign-in took too long to prepare the session. Reload the page and try again.",
     codeLabel: "Verification code",
     codePlaceholder: "Code",
     continueWith: "or",
-    fallbackError: "Could not complete sign in. Try again.",
     googleSignIn: "Google",
     loadingDiaconia: "Opening Diaconia",
     loadingGoogle: "Opening Google",
     loadingApple: "Opening Apple",
     loadingSecure: "Preparing secure session",
     loadingUser: "Loading Diaconia user",
-    noApiToken: "Could not create a session token.",
-    noInvitation: "This number does not have an active invitation.",
-    signedOut: "The session is not valid. Sign out and sign in again.",
+    noApiToken: "Could not create a session token. Check the authentication configuration.",
     phoneLabel: "WhatsApp number",
     phoneSubtitle: "Please sign in to continue",
     reload: "Reload",
     retry: "Try again",
     sendCode: "Send SMS code",
     sendCodeLoading: "Sending SMS code",
-    signInTimeout: "Clerk took too long to start SMS sign-in.",
+    signInTimeout: "Secure sign-in took too long to start SMS sign-in.",
     signOut: "Sign out",
     signOutAndRetry: "Sign out and sign in again",
-    signUpTimeout: "Clerk took too long to create the user.",
+    signUpTimeout: "Secure sign-in took too long to create the user.",
     socialError: "Could not complete social sign in.",
-    socialTimeout: "Clerk took too long to complete social sign in.",
-    tokenActivateTimeout: "Clerk took too long to activate the session.",
-    userReloadTimeout: "Clerk took too long to reload the user.",
+    socialTimeout: "Secure sign-in took too long to complete social sign in.",
+    tokenActivateTimeout: "Secure sign-in took too long to activate the session.",
+    userReloadTimeout: "Secure sign-in took too long to reload the user.",
     verify: "Verify code",
     verifyCodeLoading: "Verifying code",
-    verifyCodeTimeout: "Clerk took too long to verify the code.",
+    verifyCodeTimeout: "Secure sign-in took too long to verify the code.",
     verifyFailed: "Could not verify the code.",
     verifyPhoneLoading: "Verifying phone",
-    verifyPhoneTimeout: "Clerk took too long to verify the phone.",
-    smsCodeTimeout: "Clerk took too long to send the SMS code.",
+    verifyPhoneTimeout: "Secure sign-in took too long to verify the phone.",
+    smsCodeTimeout: "Secure sign-in took too long to send the SMS code.",
   },
 } satisfies Record<SupportedLocale, Record<string, string>>;
 
@@ -155,15 +186,50 @@ function toLocalUser(payload: MeResponse["user"]): LocalUser {
   };
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) return error.message;
-  return fallback;
+function getErrorKey(error: unknown): AuthErrorKey {
+  const message = error instanceof Error ? error.message : "";
+  const code = typeof error === "object" && error && "code" in error ? String((error as { code?: unknown }).code ?? "") : "";
+  return localizeAuthErrorKey(`${code} ${message}`.trim());
 }
 
-function localizeApiError(payload: { code?: string; error?: string } | null, text: (typeof authCopy)[SupportedLocale]) {
-  if (payload?.code === "INVITE_REQUIRED") return text.noInvitation;
-  if (payload?.code === "UNAUTHENTICATED") return text.signedOut;
-  return payload?.error ?? text.noInvitation;
+function localizeApiErrorKey(payload: { code?: string; error?: string } | null): AuthErrorKey {
+  if (payload?.code === "INVITE_REQUIRED" || /invited active user required/i.test(payload?.error ?? "")) {
+    return "authInviteRequired";
+  }
+  if (payload?.code === "ADMIN_REQUIRED" || /admin role required/i.test(payload?.error ?? "")) {
+    return "authAdminRequired";
+  }
+  if (payload?.code === "AUTH_CONFIG_MISSING" || /missing .*verifier configuration/i.test(payload?.error ?? "")) {
+    return "authMissingClerkConfig";
+  }
+  if (payload?.code === "UNAUTHENTICATED" || /invalid bearer token/i.test(payload?.error ?? "")) {
+    return "authInvalidSession";
+  }
+  if (/missing bearer token/i.test(payload?.error ?? "")) {
+    return "authMissingSession";
+  }
+  return "authGenericError";
+}
+
+function localizeAuthErrorKey(message: string): AuthErrorKey {
+  if (!message) return "authGenericError";
+  if (/invited active user required|invite_required|not enabled|not habilitada/i.test(message)) return "authInviteRequired";
+  if (/admin role required|admin_required|administrator role|rol de administrador/i.test(message)) return "authAdminRequired";
+  if (/auth_config_missing|publishable_key|sign-in is not configured|secure sign-in is not configured/i.test(message)) {
+    return "authMissingClerkConfig";
+  }
+  if (/jwt_template_error|session token|token de sesión|template|plantilla/i.test(message)) return "authTokenTemplateError";
+  if (/already signed in/i.test(message)) return "authAlreadySignedIn";
+  if (/not found|could not find|identifier|account.*number|cuenta.*n[uú]mero/i.test(message)) return "authAccountNotFound";
+  if (/invalid.*code|code.*invalid|incorrect.*code|could not verify|verification.*failed|no se pudo verificar|c[oó]digo.*no.*v[aá]lido/i.test(message)) {
+    return "authInvalidCode";
+  }
+  if (/phone.*required|missing.*phone|valid phone|n[uú]mero.*v[aá]lido/i.test(message)) return "authMissingPhone";
+  if (/session_load_failed|failed to fetch|load failed|network request failed|took too long|tard[oó] demasiado|cargar la sesi[oó]n/i.test(message)) {
+    return "authSessionLoadFailed";
+  }
+  if (/unauthenticated|invalid bearer token|session.*expired|session.*invalid/i.test(message)) return "authInvalidSession";
+  return "authGenericError";
 }
 
 function withTimeout<T>(promise: Promise<T>, message: string, timeoutMs = authLoadTimeoutMs) {
@@ -197,12 +263,13 @@ export function ClerkAuthGate() {
   const [loadingMessage, setLoadingMessage] = useState(authCopy.es.loadingSecure);
   const [clerkLoadTimedOut, setClerkLoadTimedOut] = useState(false);
   const [internalUserRetry, setInternalUserRetry] = useState(0);
-  const [error, setError] = useState("");
+  const [errorKey, setErrorKey] = useState<AuthErrorKey | null>(null);
   const [pendingSocialPhone, setPendingSocialPhone] = useState<any>(null);
   const verifiedPhone = user?.primaryPhoneNumber?.phoneNumber ?? null;
   const getTokenRef = useRef(getToken);
   const internalUserLoadKeyRef = useRef<string | null>(null);
   const text = authCopy[locale];
+  const errorMessage = errorKey ? text[errorKey] : "";
 
   useEffect(() => {
     getTokenRef.current = getToken;
@@ -247,7 +314,7 @@ export function ClerkAuthGate() {
 
     const timeout = setTimeout(() => {
       setClerkLoadTimedOut(true);
-      setError(text.clerkTimeoutRetry);
+      setErrorKey("authSessionLoadFailed");
     }, authLoadTimeoutMs);
 
     return () => clearTimeout(timeout);
@@ -278,7 +345,7 @@ export function ClerkAuthGate() {
 
       setLoadingMessage(text.loadingUser);
       setLoading(true);
-      setError("");
+      setErrorKey(null);
       try {
         const token = await withTimeout(
           getTokenRef.current({ template: jwtTemplate }),
@@ -297,7 +364,8 @@ export function ClerkAuthGate() {
         if (!active) return;
         if (!response.ok) {
           const payload = (await response.json().catch(() => null)) as { code?: string; error?: string } | null;
-          throw new Error(localizeApiError(payload, text));
+          setErrorKey(localizeApiErrorKey(payload));
+          return;
         }
         const payload = (await response.json()) as MeResponse;
         if (!active) return;
@@ -306,7 +374,7 @@ export function ClerkAuthGate() {
         if (!active || abortController.signal.aborted) return;
         internalUserLoadKeyRef.current = null;
         setSessionUser(null);
-        setError(getErrorMessage(caughtError, text.fallbackError));
+        setErrorKey(getErrorKey(caughtError));
       } finally {
         if (active) setLoading(false);
       }
@@ -324,7 +392,7 @@ export function ClerkAuthGate() {
     if (!signIn || !signUp) return;
     setLoadingMessage(text.sendCodeLoading);
     setLoading(true);
-    setError("");
+    setErrorKey(null);
 
     try {
       const phoneNumber = normalizePhoneNumber(phone);
@@ -353,7 +421,7 @@ export function ClerkAuthGate() {
       );
       setStep("code");
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError, text.fallbackError));
+      setErrorKey(getErrorKey(caughtError));
     } finally {
       setLoading(false);
     }
@@ -363,7 +431,7 @@ export function ClerkAuthGate() {
     if (!signIn || !signUp) return;
     setLoadingMessage(text.verifyCodeLoading);
     setLoading(true);
-    setError("");
+    setErrorKey(null);
     let sessionActivated = false;
 
     try {
@@ -391,7 +459,7 @@ export function ClerkAuthGate() {
         sessionActivated = true;
       }
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError, text.fallbackError));
+      setErrorKey(getErrorKey(caughtError));
     } finally {
       if (!sessionActivated) setLoading(false);
     }
@@ -400,7 +468,7 @@ export function ClerkAuthGate() {
   async function startSocial(strategy: "oauth_google" | "oauth_apple") {
     setLoadingMessage(strategy === "oauth_google" ? text.loadingGoogle : text.loadingApple);
     setLoading(true);
-    setError("");
+    setErrorKey(null);
     let sessionActivated = false;
     try {
       const result: any = await withTimeout(
@@ -420,7 +488,7 @@ export function ClerkAuthGate() {
       }
       throw new Error(text.socialError);
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError, text.fallbackError));
+      setErrorKey(getErrorKey(caughtError));
     } finally {
       if (!sessionActivated) setLoading(false);
     }
@@ -430,7 +498,7 @@ export function ClerkAuthGate() {
     if (!user) return;
     setLoadingMessage(text.addPhone);
     setLoading(true);
-    setError("");
+    setErrorKey(null);
     try {
       const phoneNumber = normalizePhoneNumber(phone);
       const created: any = await withTimeout(
@@ -441,7 +509,7 @@ export function ClerkAuthGate() {
       setPendingSocialPhone(created);
       setStep("code");
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError, text.fallbackError));
+      setErrorKey(getErrorKey(caughtError));
     } finally {
       setLoading(false);
     }
@@ -451,7 +519,7 @@ export function ClerkAuthGate() {
     if (!pendingSocialPhone) return;
     setLoadingMessage(text.verifyPhoneLoading);
     setLoading(true);
-    setError("");
+    setErrorKey(null);
     try {
       await withTimeout(
         pendingSocialPhone.attemptVerification({ code: code.trim() }),
@@ -460,7 +528,7 @@ export function ClerkAuthGate() {
       if (user) await withTimeout(user.reload(), text.userReloadTimeout);
       setPendingSocialPhone(null);
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError, text.fallbackError));
+      setErrorKey(getErrorKey(caughtError));
     } finally {
       setLoading(false);
     }
@@ -491,10 +559,10 @@ export function ClerkAuthGate() {
     );
   }
 
-  if (error && isSignedIn) {
+  if (errorKey && isSignedIn) {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.error}>{error}</Text>
+        <Text style={styles.error}>{errorMessage}</Text>
         <Pressable onPress={() => setInternalUserRetry((value) => value + 1)} style={styles.primaryButton}>
           <Text style={styles.primaryButtonText}>{text.retry}</Text>
         </Pressable>
@@ -525,9 +593,9 @@ export function ClerkAuthGate() {
         <View style={styles.heading}>
           <Text style={styles.subtitle}>{text.phoneSubtitle}</Text>
         </View>
-        {error ? (
+        {errorKey ? (
           <View style={styles.alert}>
-            <Text style={styles.error}>{error}</Text>
+            <Text style={styles.error}>{errorMessage}</Text>
           </View>
         ) : null}
         <View style={styles.socialRow}>

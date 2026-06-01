@@ -30,8 +30,8 @@ const adminLabels = {
     authAlreadySignedIn: "Ya hay una sesión iniciada. Salí de esa sesión e intentá de nuevo.",
     authInviteRequired: "Tu cuenta existe, pero todavía no está habilitada para acceder a Diaconia.",
     authAdminRequired: "Tu cuenta no tiene rol de administrador.",
-    authMissingClerkConfig: "Falta configurar el inicio de sesión de Clerk.",
-    authTokenTemplateError: "No se pudo crear un token de sesión. Verificá la plantilla JWT de Clerk.",
+    authMissingClerkConfig: "Falta configurar el inicio de sesión seguro.",
+    authTokenTemplateError: "No se pudo crear un token de sesión. Verificá la configuración de autenticación.",
     authSessionLoadFailed: "No se pudo cargar la sesión.",
     authTryAgain: "Intentar de nuevo",
     authInvalidSession: "Tu sesión expiró o no es válida. Salí e ingresá de nuevo.",
@@ -288,8 +288,8 @@ const adminLabels = {
     authAlreadySignedIn: "You are already signed in. Sign out of that session and try again.",
     authInviteRequired: "Your account exists, but it is not enabled for Diaconia access yet.",
     authAdminRequired: "Your account does not have the administrator role.",
-    authMissingClerkConfig: "Clerk sign-in is not configured.",
-    authTokenTemplateError: "Could not create a session token. Check the Clerk JWT template.",
+    authMissingClerkConfig: "Secure sign-in is not configured.",
+    authTokenTemplateError: "Could not create a session token. Check the authentication configuration.",
     authSessionLoadFailed: "Could not load the session.",
     authTryAgain: "Try again",
     authInvalidSession: "Your session expired or is not valid. Sign out and sign in again.",
@@ -551,6 +551,10 @@ export function localizeRouteError(
 ) {
   if (payload?.code === "UNAUTHENTICATED" || /invalid bearer token/i.test(payload?.error ?? "")) {
     return labels.authInvalidSession;
+  }
+
+  if (payload?.code === "AUTH_CONFIG_MISSING" || /missing .*verifier configuration/i.test(payload?.error ?? "")) {
+    return labels.authMissingClerkConfig;
   }
 
   if (/missing bearer token/i.test(payload?.error ?? "")) {
