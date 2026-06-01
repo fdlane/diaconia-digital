@@ -1,6 +1,6 @@
 import { useAuth, useSSO, useUser } from "@clerk/expo";
 import { useSignIn, useSignUp } from "@clerk/expo/legacy";
-import { normalizePhoneNumber } from "@diaconia/shared";
+import { normalizePhoneNumber, type SupportedLocale } from "@diaconia/shared";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,6 +10,7 @@ import diaconiaLogo from "../../assets/logo.png";
 import { getApiUrl } from "../config/endpoints";
 import { getEffectivePublicEnv, getPublicEnvValue } from "../config/publicEnv";
 import { FieldMeetingApp, type AuthenticatedSession } from "../FieldMeetingApp";
+import { loadLocale, saveLocale } from "../storage";
 import type { LocalUser } from "../types";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -17,6 +18,8 @@ WebBrowser.maybeCompleteAuthSession();
 const jwtTemplate = getPublicEnvValue("EXPO_PUBLIC_CLERK_JWT_TEMPLATE", process.env, "NEXT_PUBLIC_CLERK_JWT_TEMPLATE") ?? "diaconia-api";
 const redirectUrl = AuthSession.makeRedirectUri({ scheme: "diaconiamobile", path: "sign-in" });
 const authLoadTimeoutMs = 15000;
+const googleIconUri =
+  "data:image/png;base64,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";
 
 const devUser: LocalUser = {
   id: "019e606b-ce98-7134-b1d1-958703c36595",
@@ -47,6 +50,99 @@ type MeResponse = {
 
 type Step = "phone" | "code" | "verify-social-phone";
 
+const authCopy = {
+  es: {
+    addPhone: "Agregando telefono",
+    addPhoneTimeout: "Clerk tardo demasiado en agregar el telefono.",
+    apiUserTimeout: "La sesion se autentico, pero la API tardo demasiado en cargar el usuario.",
+    apiTokenTimeout: "La sesion de Clerk se creo, pero el token de API tardo demasiado.",
+    appleSignIn: "Apple",
+    clerkLoading: "Preparando Clerk",
+    clerkTimeout: "Clerk tardo demasiado en preparar la sesion.",
+    clerkTimeoutHelp: "Recarga la pagina. Si sigue igual, cerra esta pestana y abri el enlace de nuevo.",
+    clerkTimeoutRetry: "Clerk tardo demasiado en preparar la sesion. Recarga la pagina e intenta de nuevo.",
+    codeLabel: "Codigo de verificacion",
+    codePlaceholder: "Codigo",
+    continueWith: "o",
+    fallbackError: "No se pudo completar el ingreso. Intenta de nuevo.",
+    googleSignIn: "Google",
+    loadingDiaconia: "Abriendo Diaconia",
+    loadingGoogle: "Abriendo Google",
+    loadingApple: "Abriendo Apple",
+    loadingSecure: "Preparando sesion segura",
+    loadingUser: "Cargando usuario de Diaconia",
+    noApiToken: "No se pudo crear un token de sesion.",
+    noInvitation: "Este numero no tiene invitacion activa.",
+    signedOut: "La sesion no es valida. Sali e ingresa de nuevo.",
+    phoneLabel: "Numero de WhatsApp",
+    phoneSubtitle: "Por favor ingresá para continuar",
+    reload: "Recargar",
+    retry: "Intentar de nuevo",
+    sendCode: "Enviar codigo por SMS",
+    sendCodeLoading: "Enviando codigo por SMS",
+    signInTimeout: "Clerk tardo demasiado en iniciar el ingreso por SMS.",
+    signOut: "Salir",
+    signOutAndRetry: "Salir y volver a ingresar",
+    signUpTimeout: "Clerk tardo demasiado en crear el usuario.",
+    socialError: "No se pudo completar el ingreso social.",
+    socialTimeout: "Clerk tardo demasiado en completar el ingreso social.",
+    tokenActivateTimeout: "Clerk tardo demasiado en activar la sesion.",
+    userReloadTimeout: "Clerk tardo demasiado en recargar el usuario.",
+    verify: "Verificar codigo",
+    verifyCodeLoading: "Verificando codigo",
+    verifyCodeTimeout: "Clerk tardo demasiado en verificar el codigo.",
+    verifyFailed: "No se pudo verificar el codigo.",
+    verifyPhoneLoading: "Verificando telefono",
+    verifyPhoneTimeout: "Clerk tardo demasiado en verificar el telefono.",
+    smsCodeTimeout: "Clerk tardo demasiado en enviar el codigo por SMS.",
+  },
+  en: {
+    addPhone: "Adding phone",
+    addPhoneTimeout: "Clerk took too long to add the phone.",
+    apiUserTimeout: "The session was authenticated, but the API took too long to load the user.",
+    apiTokenTimeout: "The Clerk session was created, but the API token took too long.",
+    appleSignIn: "Apple",
+    clerkLoading: "Preparing Clerk",
+    clerkTimeout: "Clerk took too long to prepare the session.",
+    clerkTimeoutHelp: "Reload the page. If it still happens, close this tab and open the link again.",
+    clerkTimeoutRetry: "Clerk took too long to prepare the session. Reload the page and try again.",
+    codeLabel: "Verification code",
+    codePlaceholder: "Code",
+    continueWith: "or",
+    fallbackError: "Could not complete sign in. Try again.",
+    googleSignIn: "Google",
+    loadingDiaconia: "Opening Diaconia",
+    loadingGoogle: "Opening Google",
+    loadingApple: "Opening Apple",
+    loadingSecure: "Preparing secure session",
+    loadingUser: "Loading Diaconia user",
+    noApiToken: "Could not create a session token.",
+    noInvitation: "This number does not have an active invitation.",
+    signedOut: "The session is not valid. Sign out and sign in again.",
+    phoneLabel: "WhatsApp number",
+    phoneSubtitle: "Please sign in to continue",
+    reload: "Reload",
+    retry: "Try again",
+    sendCode: "Send SMS code",
+    sendCodeLoading: "Sending SMS code",
+    signInTimeout: "Clerk took too long to start SMS sign-in.",
+    signOut: "Sign out",
+    signOutAndRetry: "Sign out and sign in again",
+    signUpTimeout: "Clerk took too long to create the user.",
+    socialError: "Could not complete social sign in.",
+    socialTimeout: "Clerk took too long to complete social sign in.",
+    tokenActivateTimeout: "Clerk took too long to activate the session.",
+    userReloadTimeout: "Clerk took too long to reload the user.",
+    verify: "Verify code",
+    verifyCodeLoading: "Verifying code",
+    verifyCodeTimeout: "Clerk took too long to verify the code.",
+    verifyFailed: "Could not verify the code.",
+    verifyPhoneLoading: "Verifying phone",
+    verifyPhoneTimeout: "Clerk took too long to verify the phone.",
+    smsCodeTimeout: "Clerk took too long to send the SMS code.",
+  },
+} satisfies Record<SupportedLocale, Record<string, string>>;
+
 function toLocalUser(payload: MeResponse["user"]): LocalUser {
   return {
     id: payload.id,
@@ -59,9 +155,15 @@ function toLocalUser(payload: MeResponse["user"]): LocalUser {
   };
 }
 
-function getErrorMessage(error: unknown) {
+function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
-  return "No se pudo completar el ingreso. Intentá de nuevo.";
+  return fallback;
+}
+
+function localizeApiError(payload: { code?: string; error?: string } | null, text: (typeof authCopy)[SupportedLocale]) {
+  if (payload?.code === "INVITE_REQUIRED") return text.noInvitation;
+  if (payload?.code === "UNAUTHENTICATED") return text.signedOut;
+  return payload?.error ?? text.noInvitation;
 }
 
 function withTimeout<T>(promise: Promise<T>, message: string, timeoutMs = authLoadTimeoutMs) {
@@ -87,11 +189,12 @@ export function ClerkAuthGate() {
   const { setActive: setActiveSignUp, signUp } = useSignUp();
   const { startSSOFlow } = useSSO();
   const [sessionUser, setSessionUser] = useState<LocalUser | null>(null);
+  const [locale, setLocale] = useState<SupportedLocale>("es");
   const [phone, setPhone] = useState("+595");
   const [code, setCode] = useState("");
   const [step, setStep] = useState<Step>("phone");
   const [loading, setLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState("Preparando sesion segura");
+  const [loadingMessage, setLoadingMessage] = useState(authCopy.es.loadingSecure);
   const [clerkLoadTimedOut, setClerkLoadTimedOut] = useState(false);
   const [internalUserRetry, setInternalUserRetry] = useState(0);
   const [error, setError] = useState("");
@@ -99,10 +202,26 @@ export function ClerkAuthGate() {
   const verifiedPhone = user?.primaryPhoneNumber?.phoneNumber ?? null;
   const getTokenRef = useRef(getToken);
   const internalUserLoadKeyRef = useRef<string | null>(null);
+  const text = authCopy[locale];
 
   useEffect(() => {
     getTokenRef.current = getToken;
   }, [getToken]);
+
+  useEffect(() => {
+    let active = true;
+    void loadLocale().then((storedLocale) => {
+      if (active) setLocale(storedLocale);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function updateLocale(nextLocale: SupportedLocale) {
+    setLocale(nextLocale);
+    await saveLocale(nextLocale);
+  }
 
   const authenticatedSession = useMemo<AuthenticatedSession | null>(() => {
     if (!sessionUser) return null;
@@ -110,7 +229,7 @@ export function ClerkAuthGate() {
       user: sessionUser,
       getToken: async () => {
         const token = await getToken({ template: jwtTemplate });
-        if (!token) throw new Error("No se pudo crear un token de sesion.");
+        if (!token) throw new Error(text.noApiToken);
         return token;
       },
       signOut: async () => {
@@ -118,7 +237,7 @@ export function ClerkAuthGate() {
         await signOut();
       },
     };
-  }, [getToken, sessionUser, signOut]);
+  }, [getToken, sessionUser, signOut, text.noApiToken]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -128,11 +247,11 @@ export function ClerkAuthGate() {
 
     const timeout = setTimeout(() => {
       setClerkLoadTimedOut(true);
-      setError("Clerk tardó demasiado en preparar la sesión. Recargá la página e intentá de nuevo.");
+      setError(text.clerkTimeoutRetry);
     }, authLoadTimeoutMs);
 
     return () => clearTimeout(timeout);
-  }, [isLoaded]);
+  }, [isLoaded, text.clerkTimeoutRetry]);
 
   useEffect(() => {
     let active = true;
@@ -157,28 +276,28 @@ export function ClerkAuthGate() {
       if (internalUserLoadKeyRef.current === loadKey) return;
       internalUserLoadKeyRef.current = loadKey;
 
-      setLoadingMessage("Cargando usuario de Diaconia");
+      setLoadingMessage(text.loadingUser);
       setLoading(true);
       setError("");
       try {
         const token = await withTimeout(
           getTokenRef.current({ template: jwtTemplate }),
-          "La sesion de Clerk se creó, pero el token de API tardó demasiado.",
+          text.apiTokenTimeout,
         );
         if (!active) return;
-        if (!token) throw new Error("No se pudo crear un token de sesion.");
+        if (!token) throw new Error(text.noApiToken);
         const apiUrl = getApiUrl("/me", getEffectivePublicEnv(), Platform.OS);
         const response = await withTimeout(
           fetch(apiUrl, {
             headers: { authorization: `Bearer ${token}` },
             signal: abortController.signal,
           }),
-          `La sesion se autenticó, pero la API tardó demasiado en cargar el usuario desde ${apiUrl}.`,
+          `${text.apiUserTimeout} ${apiUrl}`,
         );
         if (!active) return;
         if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(payload?.error ?? "Este numero no tiene invitacion activa.");
+          const payload = (await response.json().catch(() => null)) as { code?: string; error?: string } | null;
+          throw new Error(localizeApiError(payload, text));
         }
         const payload = (await response.json()) as MeResponse;
         if (!active) return;
@@ -187,7 +306,7 @@ export function ClerkAuthGate() {
         if (!active || abortController.signal.aborted) return;
         internalUserLoadKeyRef.current = null;
         setSessionUser(null);
-        setError(getErrorMessage(caughtError));
+        setError(getErrorMessage(caughtError, text.fallbackError));
       } finally {
         if (active) setLoading(false);
       }
@@ -199,11 +318,11 @@ export function ClerkAuthGate() {
       active = false;
       abortController.abort();
     };
-  }, [internalUserRetry, isLoaded, isSignedIn, verifiedPhone]);
+  }, [internalUserRetry, isLoaded, isSignedIn, text, verifiedPhone]);
 
   async function startPhoneOtp() {
     if (!signIn || !signUp) return;
-    setLoadingMessage("Enviando código por SMS");
+    setLoadingMessage(text.sendCodeLoading);
     setLoading(true);
     setError("");
 
@@ -212,13 +331,13 @@ export function ClerkAuthGate() {
       try {
         const attempt: any = await withTimeout(
           (signIn as any).create({ identifier: phoneNumber }),
-          "Clerk tardó demasiado en iniciar el ingreso por SMS.",
+          text.signInTimeout,
         );
         const factor = attempt.supportedFirstFactors?.find((item: any) => item.strategy === "phone_code");
         if (factor?.phoneNumberId) {
           await withTimeout(
             (signIn as any).prepareFirstFactor({ strategy: "phone_code", phoneNumberId: factor.phoneNumberId }),
-            "Clerk tardó demasiado en enviar el código por SMS.",
+            text.smsCodeTimeout,
           );
           setStep("code");
           return;
@@ -227,14 +346,14 @@ export function ClerkAuthGate() {
         // If the phone has not created a Clerk user yet, continue into sign-up.
       }
 
-      await withTimeout((signUp as any).create({ phoneNumber }), "Clerk tardó demasiado en crear el usuario.");
+      await withTimeout((signUp as any).create({ phoneNumber }), text.signUpTimeout);
       await withTimeout(
         (signUp as any).preparePhoneNumberVerification({ strategy: "phone_code" }),
-        "Clerk tardó demasiado en enviar el código por SMS.",
+        text.smsCodeTimeout,
       );
       setStep("code");
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      setError(getErrorMessage(caughtError, text.fallbackError));
     } finally {
       setLoading(false);
     }
@@ -242,7 +361,7 @@ export function ClerkAuthGate() {
 
   async function verifyPhoneOtp() {
     if (!signIn || !signUp) return;
-    setLoadingMessage("Verificando código");
+    setLoadingMessage(text.verifyCodeLoading);
     setLoading(true);
     setError("");
     let sessionActivated = false;
@@ -252,41 +371,41 @@ export function ClerkAuthGate() {
       if ((signIn as any).status === "needs_first_factor") {
         const attempt: any = await withTimeout(
           (signIn as any).attemptFirstFactor({ strategy: "phone_code", code: code.trim() }),
-          "Clerk tardó demasiado en verificar el código.",
+          text.verifyCodeTimeout,
         );
         sessionId = attempt.createdSessionId ?? null;
-        if (attempt.status !== "complete") throw new Error("No se pudo verificar el codigo.");
+        if (attempt.status !== "complete") throw new Error(text.verifyFailed);
       } else {
         const attempt: any = await withTimeout(
           (signUp as any).attemptPhoneNumberVerification({ code: code.trim() }),
-          "Clerk tardó demasiado en verificar el código.",
+          text.verifyCodeTimeout,
         );
         sessionId = attempt.createdSessionId ?? null;
-        if (attempt.status !== "complete") throw new Error("No se pudo verificar el codigo.");
+        if (attempt.status !== "complete") throw new Error(text.verifyFailed);
       }
 
       const activate = setActive ?? setActiveSignUp;
       if (sessionId && activate) {
-        setLoadingMessage("Abriendo Diaconia");
-        await withTimeout(activate({ session: sessionId }), "Clerk tardó demasiado en activar la sesión.");
+        setLoadingMessage(text.loadingDiaconia);
+        await withTimeout(activate({ session: sessionId }), text.tokenActivateTimeout);
         sessionActivated = true;
       }
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      setError(getErrorMessage(caughtError, text.fallbackError));
     } finally {
       if (!sessionActivated) setLoading(false);
     }
   }
 
   async function startSocial(strategy: "oauth_google" | "oauth_apple") {
-    setLoadingMessage(strategy === "oauth_google" ? "Abriendo Google" : "Abriendo Apple");
+    setLoadingMessage(strategy === "oauth_google" ? text.loadingGoogle : text.loadingApple);
     setLoading(true);
     setError("");
     let sessionActivated = false;
     try {
       const result: any = await withTimeout(
         startSSOFlow({ redirectUrl, strategy }),
-        "Clerk tardó demasiado en completar el ingreso social.",
+        text.socialTimeout,
       );
       const sessionId =
         result.createdSessionId ??
@@ -294,14 +413,14 @@ export function ClerkAuthGate() {
         result.signUp?.createdSessionId ??
         null;
       if (sessionId && result.setActive) {
-        setLoadingMessage("Abriendo Diaconia");
-        await withTimeout(result.setActive({ session: sessionId }), "Clerk tardó demasiado en activar la sesión.");
+        setLoadingMessage(text.loadingDiaconia);
+        await withTimeout(result.setActive({ session: sessionId }), text.tokenActivateTimeout);
         sessionActivated = true;
         return;
       }
-      throw new Error("No se pudo completar el ingreso social.");
+      throw new Error(text.socialError);
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      setError(getErrorMessage(caughtError, text.fallbackError));
     } finally {
       if (!sessionActivated) setLoading(false);
     }
@@ -309,20 +428,20 @@ export function ClerkAuthGate() {
 
   async function addSocialPhone() {
     if (!user) return;
-    setLoadingMessage("Agregando teléfono");
+    setLoadingMessage(text.addPhone);
     setLoading(true);
     setError("");
     try {
       const phoneNumber = normalizePhoneNumber(phone);
       const created: any = await withTimeout(
         (user as any).createPhoneNumber({ phoneNumber }),
-        "Clerk tardó demasiado en agregar el teléfono.",
+        text.addPhoneTimeout,
       );
-      await withTimeout(created.prepareVerification(), "Clerk tardó demasiado en enviar el código por SMS.");
+      await withTimeout(created.prepareVerification(), text.smsCodeTimeout);
       setPendingSocialPhone(created);
       setStep("code");
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      setError(getErrorMessage(caughtError, text.fallbackError));
     } finally {
       setLoading(false);
     }
@@ -330,18 +449,18 @@ export function ClerkAuthGate() {
 
   async function verifySocialPhone() {
     if (!pendingSocialPhone) return;
-    setLoadingMessage("Verificando teléfono");
+    setLoadingMessage(text.verifyPhoneLoading);
     setLoading(true);
     setError("");
     try {
       await withTimeout(
         pendingSocialPhone.attemptVerification({ code: code.trim() }),
-        "Clerk tardó demasiado en verificar el teléfono.",
+        text.verifyPhoneTimeout,
       );
-      if (user) await withTimeout(user.reload(), "Clerk tardó demasiado en recargar el usuario.");
+      if (user) await withTimeout(user.reload(), text.userReloadTimeout);
       setPendingSocialPhone(null);
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError));
+      setError(getErrorMessage(caughtError, text.fallbackError));
     } finally {
       setLoading(false);
     }
@@ -360,13 +479,14 @@ export function ClerkAuthGate() {
   if (clerkLoadTimedOut) {
     return (
       <SafeAreaView style={styles.center}>
-        <Text style={styles.error}>Clerk tardó demasiado en preparar la sesión.</Text>
-        <Text style={styles.help}>Recargá la página. Si sigue igual, cerrá esta pestaña y abrí el enlace de nuevo.</Text>
+        <Text style={styles.error}>{text.clerkTimeout}</Text>
+        <Text style={styles.help}>{text.clerkTimeoutHelp}</Text>
         {Platform.OS === "web" ? (
           <Pressable onPress={reloadPage} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Recargar</Text>
+            <Text style={styles.primaryButtonText}>{text.reload}</Text>
           </Pressable>
         ) : null}
+        <LocaleToggle locale={locale} setLocale={updateLocale} />
       </SafeAreaView>
     );
   }
@@ -376,11 +496,12 @@ export function ClerkAuthGate() {
       <SafeAreaView style={styles.center}>
         <Text style={styles.error}>{error}</Text>
         <Pressable onPress={() => setInternalUserRetry((value) => value + 1)} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Intentar de nuevo</Text>
+          <Text style={styles.primaryButtonText}>{text.retry}</Text>
         </Pressable>
         <Pressable onPress={() => signOut()} style={styles.linkButton}>
-          <Text style={styles.linkButtonText}>Salir y volver a ingresar</Text>
+          <Text style={styles.linkButtonText}>{text.signOutAndRetry}</Text>
         </Pressable>
+        <LocaleToggle locale={locale} setLocale={updateLocale} />
       </SafeAreaView>
     );
   }
@@ -389,7 +510,7 @@ export function ClerkAuthGate() {
     return (
       <SafeAreaView style={styles.center}>
         <ActivityIndicator color="#2e3192" />
-        <Text style={styles.help}>{isLoaded ? loadingMessage : "Preparando Clerk"}</Text>
+        <Text style={styles.help}>{isLoaded ? loadingMessage : text.clerkLoading}</Text>
       </SafeAreaView>
     );
   }
@@ -400,19 +521,34 @@ export function ClerkAuthGate() {
         <View style={styles.logoWrap}>
           <Image accessibilityIgnoresInvertColors source={diaconiaLogo} style={styles.logo} resizeMode="contain" />
         </View>
+        <LocaleToggle locale={locale} setLocale={updateLocale} />
         <View style={styles.heading}>
-          <Text style={styles.title}>Diaconia Admin</Text>
-          <Text style={styles.subtitle}>Ingresá con tu número de WhatsApp, Google o Apple.</Text>
+          <Text style={styles.subtitle}>{text.phoneSubtitle}</Text>
         </View>
         {error ? (
           <View style={styles.alert}>
             <Text style={styles.error}>{error}</Text>
           </View>
         ) : null}
+        <View style={styles.socialRow}>
+          <Pressable accessibilityRole="button" onPress={() => startSocial("oauth_apple")} style={styles.secondaryButton}>
+            <AppleIcon />
+            <Text style={styles.secondaryButtonText}>{text.appleSignIn}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => startSocial("oauth_google")} style={styles.secondaryButton}>
+            <GoogleIcon />
+            <Text style={styles.secondaryButtonText}>{text.googleSignIn}</Text>
+          </Pressable>
+        </View>
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>{text.continueWith}</Text>
+          <View style={styles.dividerLine} />
+        </View>
         {step === "phone" || step === "verify-social-phone" ? (
           <>
             <TextInput
-              accessibilityLabel="Número de WhatsApp"
+              accessibilityLabel={text.phoneLabel}
               keyboardType="phone-pad"
               onChangeText={setPhone}
               placeholder="+595..."
@@ -420,44 +556,72 @@ export function ClerkAuthGate() {
               value={phone}
             />
             <Pressable accessibilityRole="button" onPress={step === "verify-social-phone" ? addSocialPhone : startPhoneOtp} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Enviar código por SMS</Text>
+              <Text style={styles.primaryButtonText}>{text.sendCode}</Text>
             </Pressable>
           </>
         ) : (
           <>
             <TextInput
-              accessibilityLabel="Código de verificación"
+              accessibilityLabel={text.codeLabel}
               keyboardType="number-pad"
               onChangeText={setCode}
-              placeholder="Código"
+              placeholder={text.codePlaceholder}
               style={styles.input}
               value={code}
             />
             <Pressable accessibilityRole="button" onPress={pendingSocialPhone ? verifySocialPhone : verifyPhoneOtp} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>Verificar código</Text>
+              <Text style={styles.primaryButtonText}>{text.verify}</Text>
             </Pressable>
           </>
         )}
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>o continuá con</Text>
-          <View style={styles.dividerLine} />
-        </View>
-        <View style={styles.socialRow}>
-          <Pressable accessibilityRole="button" onPress={() => startSocial("oauth_google")} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Google</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => startSocial("oauth_apple")} style={styles.secondaryButton}>
-            <Text style={styles.secondaryButtonText}>Apple</Text>
-          </Pressable>
-        </View>
         {isSignedIn ? (
           <Pressable accessibilityRole="button" onPress={() => signOut()} style={styles.linkButton}>
-            <Text style={styles.linkButtonText}>Salir</Text>
+            <Text style={styles.linkButtonText}>{text.signOut}</Text>
           </Pressable>
         ) : null}
       </View>
     </SafeAreaView>
+  );
+}
+
+function LocaleToggle({
+  locale,
+  setLocale,
+}: {
+  locale: SupportedLocale;
+  setLocale: (locale: SupportedLocale) => void;
+}) {
+  return (
+    <View accessibilityRole="tablist" style={styles.localeToggle}>
+      {(["es", "en"] as const).map((option) => (
+        <Pressable
+          accessibilityRole="tab"
+          accessibilityState={{ selected: locale === option }}
+          key={option}
+          onPress={() => setLocale(option)}
+          style={[styles.localeButton, locale === option && styles.localeButtonActive]}
+        >
+          <Text style={[styles.localeButtonText, locale === option && styles.localeButtonTextActive]}>
+            {option.toUpperCase()}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
+function AppleIcon() {
+  return <Text style={styles.appleIcon}>{"\uF8FF"}</Text>;
+}
+
+function GoogleIcon() {
+  return (
+    <Image
+      accessibilityIgnoresInvertColors
+      source={{ uri: googleIconUri }}
+      style={styles.googleIcon}
+      resizeMode="contain"
+    />
   );
 }
 
@@ -482,9 +646,8 @@ const styles = StyleSheet.create({
   },
   logoWrap: { alignItems: "center", justifyContent: "center" },
   logo: { width: 220, height: 58 },
-  heading: { alignItems: "center", gap: 10 },
-  title: { color: "#17202a", fontSize: 26, fontWeight: "800", letterSpacing: -0.4, lineHeight: 32, textAlign: "center" },
-  subtitle: { color: "#65717d", fontSize: 15, lineHeight: 22, textAlign: "center" },
+  heading: { alignItems: "center" },
+  subtitle: { color: "#65717d", fontSize: 14, lineHeight: 22, textAlign: "center" },
   help: { color: "#65717d" },
   alert: { borderWidth: 1, borderColor: "#f0b8b8", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, backgroundColor: "#fff5f5" },
   error: { color: "#b42318", fontWeight: "700", lineHeight: 19, textAlign: "center" },
@@ -505,21 +668,43 @@ const styles = StyleSheet.create({
     backgroundColor: "#2e3192",
   },
   primaryButtonText: { color: "#fff", fontSize: 15, fontWeight: "800" },
+  localeToggle: {
+    alignSelf: "center",
+    flexDirection: "row",
+    overflow: "hidden",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#dfe5ee",
+    borderRadius: 999,
+    backgroundColor: "#fff",
+  },
+  localeButton: { minWidth: 44, paddingHorizontal: 12, paddingVertical: 7, alignItems: "center" },
+  localeButtonActive: { backgroundColor: "#2e3192" },
+  localeButtonText: { color: "#65717d", fontSize: 12, fontWeight: "800" },
+  localeButtonTextActive: { color: "#fff" },
   dividerRow: { flexDirection: "row", alignItems: "center", gap: 10, marginVertical: -4 },
   dividerLine: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: "#dfe5ee" },
-  dividerText: { color: "#65717d", fontSize: 12, fontWeight: "700" },
+  dividerText: { color: "#65717d", fontSize: 14, fontWeight: "500" },
   socialRow: { flexDirection: "row", gap: 10 },
   secondaryButton: {
     flex: 1,
-    minHeight: 44,
-    borderRadius: 10,
+    minHeight: 38,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
+    gap: 12,
     borderWidth: 1,
-    borderColor: "#dfe5ee",
+    borderColor: "#dadce0",
     backgroundColor: "#fff",
+    ...Platform.select({
+      ios: { shadowColor: "#3c4043", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.08, shadowRadius: 2 },
+      android: { elevation: 1 },
+      web: { boxShadow: "0 1px 2px rgba(60, 64, 67, 0.08)" },
+    }),
   },
-  secondaryButtonText: { color: "#17202a", fontWeight: "700" },
+  secondaryButtonText: { color: "#3c4043", fontSize: 14, fontWeight: "600" },
+  appleIcon: { color: "#000", fontSize: 18, lineHeight: 20 },
+  googleIcon: { width: 18, height: 18 },
   linkButton: { alignItems: "center", padding: 8 },
   linkButtonText: { color: "#2e3192", fontWeight: "700" },
 });
