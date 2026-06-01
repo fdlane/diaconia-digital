@@ -1,5 +1,13 @@
 export type PublicEnv = Record<string, string | undefined>;
 
+const compileTimePublicEnv: PublicEnv = {
+  EXPO_PUBLIC_API_URL: process.env.EXPO_PUBLIC_API_URL,
+  EXPO_PUBLIC_AUTH_DEV_BYPASS: process.env.EXPO_PUBLIC_AUTH_DEV_BYPASS,
+  EXPO_PUBLIC_CLERK_JWT_TEMPLATE: process.env.EXPO_PUBLIC_CLERK_JWT_TEMPLATE,
+  EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
+  EXPO_PUBLIC_ZERO_CACHE_URL: process.env.EXPO_PUBLIC_ZERO_CACHE_URL,
+};
+
 export function getRuntimePublicEnv() {
   return (globalThis as typeof globalThis & {
     __DIACONIA_ENV__?: PublicEnv;
@@ -10,7 +18,7 @@ export function getPublicEnvValue(name: string, env: PublicEnv = process.env, ..
   const runtimeEnv = getRuntimePublicEnv();
 
   for (const candidate of [name, ...fallbackNames]) {
-    const value = env[candidate] || runtimeEnv?.[candidate];
+    const value = env[candidate] || runtimeEnv?.[candidate] || compileTimePublicEnv[candidate];
     if (value) return value;
   }
 
